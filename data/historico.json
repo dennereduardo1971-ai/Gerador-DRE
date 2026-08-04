@@ -1,4 +1,43 @@
 {
-  "historico": [],
-  "atualizadoEm": "2026-08-04T19:17:03.395Z"
+  "historico": [
+    {
+      "id": "1785871254771-mskdqb",
+      "criadoEm": 1785871254771,
+      "empresa": "",
+      "cnpj": "",
+      "periodo": "Jun/2026",
+      "totais": {
+        "receitaBruta": 23182659.480000008,
+        "deducoes": 14778113.389999999,
+        "receitaLiq": 8404546.09000001,
+        "resultadoOperBruto": 8404546.09000001,
+        "despOper": 9182393.569999997,
+        "resultadoFin": -203478.8499999998,
+        "resultadoOper": -981326.3299999873,
+        "naoOper": 1548940.44,
+        "antesIR": 567614.1100000127,
+        "liquido": 512069.0000000127
+      }
+    },
+    {
+      "id": "1785871253307-m1gpad",
+      "criadoEm": 1785871253307,
+      "empresa": "",
+      "cnpj": "",
+      "periodo": "Jun/2026",
+      "totais": {
+        "receitaBruta": 23182659.480000008,
+        "deducoes": 14778113.389999999,
+        "receitaLiq": 8404546.09000001,
+        "resultadoOperBruto": 8404546.09000001,
+        "despOper": 9182393.569999997,
+        "resultadoFin": -203478.8499999998,
+        "resultadoOper": -981326.3299999873,
+        "naoOper": 1548940.44,
+        "antesIR": 567614.1100000127,
+        "liquido": 512069.0000000127
+      }
+    }
+  ],
+  "atualizadoEm": "2026-08-04T19:21:02.028Z"
 }
