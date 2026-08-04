@@ -111,8 +111,8 @@ export default function App() {
   );
 
   const sugestao = useMemo(
-    () => (contasResultado.length ? sugerirClassificacao(contasResultado) : {}),
-    [contasResultado]
+    () => (contasResultado.length ? sugerirClassificacao(contasResultado, nomes) : {}),
+    [contasResultado, nomes]
   );
   const grupoDe = (conta) => classif[conta] ?? sugestao[conta] ?? "IGNORAR";
 

@@ -51,8 +51,14 @@ const PADROES = {
  * dígitos da conta —, o que funciona em qualquer plano de contas. Dentro
  * dela, o histórico decide o rótulo específico por maioria de contas do
  * subgrupo que confirmam o padrão, para não trocar de grupo por causa de
- * um lançamento isolado com nome atípico. */
-export function sugerirClassificacao(contas) {
+ * um lançamento isolado com nome atípico.
+ *
+ * Quando há um plano de contas importado (nomes), a descrição oficial da
+ * conta entra na mesma checagem — geralmente é um sinal mais limpo que o
+ * histórico dos lançamentos (que às vezes só tem número de NF), então
+ * importar o plano de contas pode mudar a sugestão de uma conta que antes
+ * não tinha texto suficiente pra bater com nenhum padrão. */
+export function sugerirClassificacao(contas, nomes = {}) {
   const porPrefixo = {};
   contas.forEach((c) => {
     const p = c.conta.slice(0, 3);
@@ -65,8 +71,9 @@ export function sugerirClassificacao(contas) {
   contas.forEach((c) => {
     const p = c.conta.slice(0, 3);
     contagem[p] = contagem[p] || {};
+    const texto = c.historico + " " + (nomes[c.conta] || "");
     for (const [nome, re] of Object.entries(PADROES)) {
-      if (re.test(c.historico)) contagem[p][nome] = (contagem[p][nome] || 0) + 1;
+      if (re.test(texto)) contagem[p][nome] = (contagem[p][nome] || 0) + 1;
     }
   });
 
