@@ -110,6 +110,53 @@ todas as contas de resultado (nada se perde ou duplica), (c) o
 Lucro Líquido final não muda por acaso — se mudar, entenda por quê
 antes de aceitar.
 
+### Camada de código exato (plano de contas do IESB)
+
+Acima do classificador por texto existe uma segunda camada, mais forte:
+`MAPA_CODIGO_IESB` em `classify.js` liga cada conta-síntese do plano de
+contas do IESB (ex. `31101`, `32104`, `41101`) direto ao grupo da DRE,
+sem depender de palavra nenhuma. Ela só entra em ação quando o plano de
+contas importado bate a "assinatura" do IESB (`assinaturaPlanoIESB` —
+checa o nome das contas-síntese 3/4/5/6); com outro plano de contas, ou
+sem plano nenhum, cai no texto/histórico como sempre caiu.
+
+Essa camada foi validada linha a linha contra a DRE real de jan a
+jun/2026 (script `fixtures/validar.mjs`, arquivos reais do Denner em
+`fixtures/`, ignorados no git) — bateu **centavo a centavo** em todo
+grupo, inclusive Lucro Líquido final. Rode esse script depois de
+qualquer mudança em `classify.js` ou `parse.js` para garantir que não
+regrediu:
+
+```bash
+node fixtures/validar.mjs
+```
+
+Três coisas importantes que esse trabalho revelou, para não serem
+desfeitas por acidente:
+
+1. **Custo dos Serviços ≠ Despesas com Pessoal.** A folha dos DOCENTES
+   (`411`/`4110`) é Custo dos Serviços (quem entrega o serviço-fim); a
+   folha do administrativo (`4111`) e do apoio acadêmico (`4112`) é
+   Despesas com Pessoal (Fopag) dentro de Despesas Operacionais. São
+   grupos diferentes por desenho contábil, não por coincidência.
+2. **Há exceções pontuais no próprio plano de contas** que o mapa por
+   código sozinho erraria — contas-folha cujo nome diz uma coisa e cujo
+   grupo-pai no plano diz outra (ex. conta de PROUNI dentro do grupo
+   "Bolsas Estudantis"; conta de IPTU de imóvel de investimento dentro
+   de "Provisões", mas tratada como Não Operacional na DRE oficial).
+   Ver `EXCECOES_CODIGO_IESB` e o comentário de `grupoPorCodigoIESB`.
+3. **`montarDRE` soma o saldo com sinal, não a magnitude.** Grupos como
+   Provisões misturam de verdade contas de despesa (nova provisão) com
+   contas de receita (reversão/estorno) na MESMA linha da DRE oficial —
+   em meses onde a reversão supera a provisão nova, a linha vira
+   positiva de verdade (reduz despesa). Somar `Math.abs(saldo)` por
+   conta, como o código fazia antes, perde esse líquido e infla o
+   grupo. Por isso `bal[g].total` acumula `saldo * sinalDoGrupo`, não
+   `Math.abs(saldo)` — e a tela (`EtapaDRE.jsx`) e o CSV
+   (`exportCsv.js`) mostram o valor líquido de verdade (podendo aparecer
+   uma despesa "positiva" num mês de reversão forte), em vez de forçar
+   parênteses de despesa sempre.
+
 ## Regras da DRE (estrutura fixa em `montarDRE`)
 
 ```

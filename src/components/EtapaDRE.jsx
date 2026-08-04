@@ -41,53 +41,53 @@ export function EtapaDRE({
         <L lbl="( = ) Receita Bruta de Serviços" val={dre.receitaBruta} tipo="sub" />
 
         <Secao nome="Deduções à Receita Operacional" />
-        <L lbl="( – ) Bolsas / Resoluções" val={dre.bal.DED_BOLSAS.total} sinal="-" />
+        <L lbl="( – ) Bolsas / Resoluções" val={-dre.bal.DED_BOLSAS.total} />
         {D("DED_BOLSAS")}
-        <L lbl="( – ) Prouni" val={dre.bal.DED_PROUNI.total} sinal="-" />
+        <L lbl="( – ) Prouni" val={-dre.bal.DED_PROUNI.total} />
         {D("DED_PROUNI")}
-        <L lbl="( – ) Mensalidades Devolvidas" val={dre.bal.DED_DEVOLUCOES.total} sinal="-" />
+        <L lbl="( – ) Mensalidades Devolvidas" val={-dre.bal.DED_DEVOLUCOES.total} />
         {D("DED_DEVOLUCOES")}
-        <L lbl="( – ) Descontos / Cancelamentos" val={dre.bal.DED_DESCONTOS.total} sinal="-" />
+        <L lbl="( – ) Descontos / Cancelamentos" val={-dre.bal.DED_DESCONTOS.total} />
         {D("DED_DESCONTOS")}
-        <L lbl="( – ) PIS / COFINS / ISS" val={dre.bal.DED_IMPOSTOS.total} sinal="-" />
+        <L lbl="( – ) PIS / COFINS / ISS" val={-dre.bal.DED_IMPOSTOS.total} />
         {D("DED_IMPOSTOS")}
         <L lbl="Receita Operacional Líquida" val={dre.receitaLiq} tipo="sub" />
 
-        {dre.bal.CUSTOS.total > 0 && (
+        {dre.bal.CUSTOS.contas.length > 0 && (
           <>
-            <L lbl="( – ) Custos dos Serviços" val={dre.bal.CUSTOS.total} sinal="-" />
+            <L lbl="( – ) Custos dos Serviços" val={-dre.bal.CUSTOS.total} />
             {D("CUSTOS")}
             <L lbl="( = ) Resultado Operacional Bruto" val={dre.resultadoOperBruto} tipo="sub" />
           </>
         )}
 
         <Secao nome="Despesas Operacionais" />
-        <L lbl="Despesas com Pessoal (Fopag)" val={dre.bal.DESP_FOPAG.total} sinal="-" />
+        <L lbl="Despesas com Pessoal (Fopag)" val={-dre.bal.DESP_FOPAG.total} />
         {D("DESP_FOPAG")}
-        <L lbl="Despesas Administrativas" val={dre.bal.DESP_ADM.total} sinal="-" />
+        <L lbl="Despesas Administrativas" val={-dre.bal.DESP_ADM.total} />
         {D("DESP_ADM")}
-        {dre.bal.DEPRECIACAO.total > 0 && (<><L lbl="Depreciação / Amortização" val={dre.bal.DEPRECIACAO.total} sinal="-" />{D("DEPRECIACAO")}</>)}
-        {dre.bal.PROVISOES.total > 0 && (<><L lbl="Provisões / Reversões" val={dre.bal.PROVISOES.total} sinal="-" />{D("PROVISOES")}</>)}
+        {dre.bal.DEPRECIACAO.contas.length > 0 && (<><L lbl="Depreciação / Amortização" val={-dre.bal.DEPRECIACAO.total} />{D("DEPRECIACAO")}</>)}
+        {dre.bal.PROVISOES.contas.length > 0 && (<><L lbl="Provisões / Reversões" val={-dre.bal.PROVISOES.total} />{D("PROVISOES")}</>)}
 
         <Secao nome="Receita / Despesas Financeiras" />
         <L lbl="( + ) Receitas Financeiras" val={dre.bal.REC_FIN.total} />
         {D("REC_FIN")}
-        <L lbl="( – ) Despesas Financeiras" val={dre.bal.DESP_FIN.total} sinal="-" />
+        <L lbl="( – ) Despesas Financeiras" val={-dre.bal.DESP_FIN.total} />
         {D("DESP_FIN")}
         <L lbl="Resultado Operacional" val={dre.resultadoOper} tipo="sub" />
 
-        {(dre.bal.OUTRAS_REC.total > 0 || dre.bal.OUTRAS_DESP.total > 0) && (
+        {(dre.bal.OUTRAS_REC.contas.length > 0 || dre.bal.OUTRAS_DESP.contas.length > 0) && (
           <>
             <Secao nome="Receitas / Despesas Não Operacionais" />
             <L lbl="( + ) Receitas Não Operacionais" val={dre.bal.OUTRAS_REC.total} />
             {D("OUTRAS_REC")}
-            <L lbl="( – ) Despesas Não Operacionais" val={dre.bal.OUTRAS_DESP.total} sinal="-" />
+            <L lbl="( – ) Despesas Não Operacionais" val={-dre.bal.OUTRAS_DESP.total} />
             {D("OUTRAS_DESP")}
           </>
         )}
 
         <L lbl="Lucro Antes do Imposto de Renda e Cont. Social" val={dre.antesIR} tipo="sub" />
-        <L lbl="( – ) IRPJ e CSLL" val={dre.bal.IRPJ_CSLL.total} sinal="-" />
+        <L lbl="( – ) IRPJ e CSLL" val={-dre.bal.IRPJ_CSLL.total} />
         {D("IRPJ_CSLL")}
         <L lbl="Lucro Líquido do Exercício" val={dre.liquido} tipo="final" />
 

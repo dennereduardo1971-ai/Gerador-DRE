@@ -1,11 +1,17 @@
 import { brl, pct } from "../lib/parse.js";
 
-export function Linha({ lbl, val, tipo, sinal, base }) {
+/** Mostra uma linha da DRE. `val` já deve vir no sinal contábil real da
+ *  linha (negativo para despesa/dedução, positivo para receita) — quem
+ *  chama decide o sinal, não este componente. Isso importa porque um grupo
+ *  "de despesa" pode fechar líquido positivo num mês em que reversões
+ *  superam provisões novas (ex. Provisões/Reversões de PCLD), e nesse caso
+ *  a linha tem que aparecer positiva de verdade, não forçada em parênteses. */
+export function Linha({ lbl, val, tipo, base }) {
   return (
     <div className="line" data-k={tipo || ""}>
       <div className="lbl">{lbl}</div>
       <div className={"val " + (val < 0 && tipo !== "final" ? "neg" : "")}>
-        {sinal === "-" ? "(" + brl(Math.abs(val)) + ")" : brl(val)}
+        {val < 0 ? "(" + brl(Math.abs(val)) + ")" : brl(val)}
       </div>
       <div className="av">{pct(val / base)}</div>
     </div>
