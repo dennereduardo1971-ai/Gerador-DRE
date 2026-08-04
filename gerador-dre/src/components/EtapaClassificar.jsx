@@ -4,7 +4,7 @@ import { GRUPOS } from "../lib/classify.js";
 
 export function EtapaClassificar({
   grupos1, digitosResultado, resultadoManual, onResultadoManual,
-  contasResultado, grupoDe, tocadas, busca, onBusca,
+  contasResultado, grupoDe, tocadas, nomes, busca, onBusca,
   onClassificar, onImportarPlano, onGerarDRE, onLimparManuais,
 }) {
   const [buscaLocal, setBuscaLocal] = useState(busca);
@@ -82,12 +82,12 @@ export function EtapaClassificar({
             </thead>
             <tbody>
               {contasResultado
-                .filter((c) => !busca || (c.conta + " " + c.historico).toLowerCase().includes(busca.toLowerCase()))
+                .filter((c) => !busca || (c.conta + " " + c.historico + " " + (nomes[c.conta] || "")).toLowerCase().includes(busca.toLowerCase()))
                 .map((c) => (
                   <tr key={c.conta}>
                     <td className="code">{c.conta}</td>
                     <td style={{ fontSize: 12.5, color: "var(--soft)" }}>
-                      {(c.historico.trim().split(",")[0] || "").slice(0, 38)}
+                      {nomes[c.conta] || (c.historico.trim().split(",")[0] || "").slice(0, 38)}
                     </td>
                     <td className={"num " + (c.saldo < 0 ? "neg" : "")}>{brl(c.saldo)}</td>
                     <td>

@@ -186,7 +186,7 @@ export default function App() {
           <EtapaClassificar
             grupos1={grupos1} digitosResultado={digitosResultado}
             resultadoManual={resultadoManual} onResultadoManual={setResultadoManual}
-            contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas}
+            contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas} nomes={nomes}
             busca={busca} onBusca={setBusca}
             onClassificar={(conta, grupo) => {
               setClassif({ ...classif, [conta]: grupo });
