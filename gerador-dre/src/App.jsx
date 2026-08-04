@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import Papa from "papaparse";
 import "./App.css";
 
-import { agregarPorConta, competenciaLegivel, lerTexto, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
-import { importarArquivo } from "./lib/importarArquivo.js";
+import { agregarPorConta, competenciaLegivel, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
+import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { baixarCSV } from "./lib/exportCsv.js";
@@ -87,9 +86,8 @@ export default function App() {
 
   function importarPlano(file) {
     if (!file) return;
-    lerTexto(file).then((txt) => {
-      const r = Papa.parse(txt, { header: false, skipEmptyLines: true });
-      setNomes((p) => ({ ...p, ...parsearPlanoDeContas(r.data) }));
+    importarLinhasSimples(file).then((linhasBrutas) => {
+      setNomes((p) => ({ ...p, ...parsearPlanoDeContas(linhasBrutas) }));
     });
   }
 

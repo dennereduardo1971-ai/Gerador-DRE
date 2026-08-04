@@ -64,12 +64,12 @@ export function EtapaClassificar({
             <button className="btn ghost" style={{ width: "100%" }} onClick={() => planoRef.current?.click()}>
               Importar plano de contas
             </button>
-            <input ref={planoRef} type="file" accept=".csv,.txt" style={{ display: "none" }}
+            <input ref={planoRef} type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb,.ods" style={{ display: "none" }}
               onChange={(e) => onImportarPlano(e.target.files[0])} />
           </div>
         </div>
         <p className="hint" style={{ marginTop: -6 }}>
-          O plano de contas é um CSV de duas colunas: código e descrição. Sem ele, o app usa o
+          O plano de contas é um arquivo (CSV ou Excel) de duas colunas: código e descrição. Sem ele, o app usa o
           início do histórico como nome provisório.
         </p>
         <div className="scroll">

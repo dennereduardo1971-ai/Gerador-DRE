@@ -63,6 +63,17 @@ export async function importarExcel(file, onProgress) {
   return { campos, linhas, aba, abas: wb.SheetNames };
 }
 
+/** Lê um arquivo Excel como array de arrays (sem assumir cabeçalho) — usado
+ *  pelo plano de contas, que é só duas colunas (código, descrição), ao
+ *  contrário do razão principal que precisa dos nomes das colunas. */
+export async function importarExcelComoLinhas(file) {
+  const [XLSX, buf] = await Promise.all([import("xlsx"), file.arrayBuffer()]);
+  const wb = XLSX.read(buf, { type: "array" });
+  const abasComDados = wb.SheetNames.filter((nome) => temDados(XLSX, wb.Sheets[nome]));
+  const aba = abasComDados[0] || wb.SheetNames[0];
+  return XLSX.utils.sheet_to_json(wb.Sheets[aba], { header: 1, defval: "" });
+}
+
 const EXTENSOES_EXCEL = [".xlsx", ".xls", ".xlsm", ".xlsb", ".ods"];
 
 export function ehArquivoExcel(nome) {
