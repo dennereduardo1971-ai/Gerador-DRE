@@ -3,7 +3,7 @@ import Papa from "papaparse";
 import "./App.css";
 
 import { agregarPorConta, competenciaLegivel, lerTexto, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
-import { importarCSV } from "./lib/importarCSV.js";
+import { importarArquivo } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { baixarCSV } from "./lib/exportCsv.js";
@@ -64,7 +64,7 @@ export default function App() {
     setErro("");
     setProgresso({ linhas: 0, pct: 0, tamanho: file.size });
     try {
-      const { campos, linhas } = await importarCSV(file, (p) => setProgresso((prev) => ({ ...prev, ...p })));
+      const { campos, linhas } = await importarArquivo(file, (p) => setProgresso((prev) => ({ ...prev, ...p })));
       if (!campos.length) throw new Error("Não encontrei cabeçalho no arquivo.");
       const m = mapearColunas(campos);
       if (!m.contaD && !m.contaC) throw new Error("Não identifiquei as colunas de conta. Ajuste o mapeamento abaixo.");

@@ -15,8 +15,10 @@ conta e valor de débito/crédito em colunas separadas.
 
 ## Etapas
 
-1. **Importar** — CSV do razão, lido em streaming (sem travar a página
-   mesmo com dezenas de milhares de linhas), com barra de progresso real.
+1. **Importar** — CSV ou Excel (.xlsx, .xls, .xlsm, .xlsb, .ods) do
+   razão, lido em partes (sem travar a página mesmo com dezenas de
+   milhares de linhas), com barra de progresso real. Se o Excel tiver
+   mais de uma aba, usa automaticamente a primeira que tiver dados.
 2. **Conferir** — totais, teste de partidas dobradas, filtro por
    **competência** (mês/ano — isola a DRE e o Balanço num mês só) e por
    dia específico ou centro de custo, mapeamento manual de colunas.
@@ -81,7 +83,9 @@ Netlify, GitHub Pages, etc.).
 src/
   lib/
     parse.js        # leitura do CSV, normalização de número/encoding, agregação por conta e competência
-    importarCSV.js  # importação em streaming (worker) com progresso real
+    importarArquivo.js  # decide entre CSV e Excel pela extensão do arquivo
+    importarCSV.js   # importação de CSV em chunks, com progresso real
+    importarExcel.js # importação de Excel (xlsx/xls/xlsm/xlsb/ods) via SheetJS, carregado sob demanda
     classify.js     # grupos da DRE e sugestão automática de classificação
     balanco.js       # Balanço Patrimonial simplificado (contas 1 e 2)
     exportCsv.js     # exportação da DRE final em CSV
@@ -114,6 +118,21 @@ Em `src/lib/classify.js`:
   `BOLSA`, `FOPAG`). Ajuste ou adicione termos do seu próprio razão aqui.
 - `sugerirClassificacao` — a lógica de decisão em si, caso os grupos
   mudem de forma mais estrutural.
+
+## Limitações conhecidas
+
+- A leitura de Excel usa o pacote `xlsx` (SheetJS) da versão publicada no
+  npm, que tem duas vulnerabilidades conhecidas sem correção nessa
+  distribuição (prototype pollution e ReDoS — [GHSA-4r6h-8v6p-xvw6](https://github.com/advisories/GHSA-4r6h-8v6p-xvw6),
+  [GHSA-5pgg-2g8v-p4x9](https://github.com/advisories/GHSA-5pgg-2g8v-p4x9)).
+  Como o app roda inteiramente no navegador e só processa arquivos que
+  você mesmo escolhe abrir, o risco prático pra uso pessoal é baixo — mas
+  não abra planilhas de origem desconhecida nele. A SheetJS publica
+  versões corrigidas fora do npm, em cdn.sheetjs.com, caso queira trocar.
+- Contas com zero à esquerda armazenadas como número (não texto) numa
+  célula do Excel perdem esse zero — comum em qualquer app que lê
+  planilhas. Se isso for um problema no seu plano de contas, formate a
+  coluna de conta como texto na planilha de origem antes de importar.
 
 ## Licença
 
