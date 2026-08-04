@@ -4,7 +4,7 @@ import { GRUPOS } from "../lib/classify.js";
 
 export function EtapaClassificar({
   grupos1, digitosResultado, resultadoManual, onResultadoManual,
-  contasResultado, grupoDe, tocadas, busca, onBusca,
+  contasResultado, grupoDe, tocadas, nomes, busca, onBusca,
   onClassificar, onImportarPlano, onGerarDRE, onLimparManuais,
 }) {
   const [buscaLocal, setBuscaLocal] = useState(busca);
@@ -64,13 +64,17 @@ export function EtapaClassificar({
             <button className="btn ghost" style={{ width: "100%" }} onClick={() => planoRef.current?.click()}>
               Importar plano de contas
             </button>
-            <input ref={planoRef} type="file" accept=".csv,.txt" style={{ display: "none" }}
+            <input ref={planoRef} type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb,.ods" style={{ display: "none" }}
               onChange={(e) => onImportarPlano(e.target.files[0])} />
           </div>
         </div>
         <p className="hint" style={{ marginTop: -6 }}>
-          O plano de contas é um CSV de duas colunas: código e descrição. Sem ele, o app usa o
-          início do histórico como nome provisório.
+          O plano de contas é um arquivo (CSV ou Excel) de duas colunas: código e descrição.
+          Importar o plano de contas pode <b>mudar a sugestão de grupo</b> aqui embaixo — a
+          descrição oficial da conta costuma ser um sinal mais limpo que o histórico dos
+          lançamentos. Contas que você já reclassificou manualmente não são alteradas. (A coluna
+          "Descrição" desta tabela continua mostrando o histórico; o nome do plano de contas
+          aparece nas etapas Conferir e DRE.)
         </p>
         <div className="scroll">
           <table>
@@ -82,7 +86,7 @@ export function EtapaClassificar({
             </thead>
             <tbody>
               {contasResultado
-                .filter((c) => !busca || (c.conta + " " + c.historico).toLowerCase().includes(busca.toLowerCase()))
+                .filter((c) => !busca || (c.conta + " " + c.historico + " " + (nomes[c.conta] || "")).toLowerCase().includes(busca.toLowerCase()))
                 .map((c) => (
                   <tr key={c.conta}>
                     <td className="code">{c.conta}</td>

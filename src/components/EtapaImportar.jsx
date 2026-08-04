@@ -35,13 +35,13 @@ export function EtapaImportar({ carregando, progresso, onImportar }) {
         ) : (
           <>
             <b>Solte o razão aqui</b>
-            <span>CSV separado por ponto e vírgula ou vírgula · aceita acentuação ANSI</span>
+            <span>CSV ou Excel (.xlsx, .xls, .xlsm, .xlsb, .ods) · aceita acentuação ANSI</span>
           </>
         )}
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.txt"
+          accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb,.ods"
           style={{ display: "none" }}
           onChange={(e) => onImportar(e.target.files[0])}
         />
@@ -51,8 +51,10 @@ export function EtapaImportar({ carregando, progresso, onImportar }) {
         <p className="hint">
           Uma linha por lançamento, com conta e valor de débito e de crédito em colunas
           separadas — o formato padrão de exportação de razão. As colunas são reconhecidas
-          pelo nome; se o seu sistema usa outros títulos, dá para ajustar na etapa 2. Arquivos
-          grandes (dezenas de milhares de linhas) são lidos em partes, sem travar a página.
+          pelo nome; se o seu sistema usa outros títulos, dá para ajustar na etapa 2. Funciona
+          tanto com CSV quanto com planilhas Excel — se o Excel tiver mais de uma aba, o app usa
+          a primeira que tiver dados. Arquivos grandes (dezenas de milhares de linhas) são lidos
+          em partes, sem travar a página.
         </p>
         <table>
           <thead>

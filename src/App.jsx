@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import Papa from "papaparse";
 import "./App.css";
 
-import { agregarPorConta, lerTexto, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
-import { importarCSV } from "./lib/importarCSV.js";
+import { agregarPorConta, competenciaLegivel, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
+import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { baixarCSV } from "./lib/exportCsv.js";
@@ -43,6 +42,7 @@ export default function App() {
   const [nomes, setNomes] = useState({});
   const [filtroMes, setFiltroMes] = useState("todos");
   const [filtroCC, setFiltroCC] = useState("todos");
+  const [filtroCompetencia, setFiltroCompetencia] = useState("todas");
   const [busca, setBusca] = useState("");
   const [detalhado, setDetalhado] = useState(true);
   const [empresa, setEmpresa] = useState("");
@@ -63,7 +63,7 @@ export default function App() {
     setErro("");
     setProgresso({ linhas: 0, pct: 0, tamanho: file.size });
     try {
-      const { campos, linhas } = await importarCSV(file, (p) => setProgresso((prev) => ({ ...prev, ...p })));
+      const { campos, linhas } = await importarArquivo(file, (p) => setProgresso((prev) => ({ ...prev, ...p })));
       if (!campos.length) throw new Error("Não encontrei cabeçalho no arquivo.");
       const m = mapearColunas(campos);
       if (!m.contaD && !m.contaC) throw new Error("Não identifiquei as colunas de conta. Ajuste o mapeamento abaixo.");
@@ -75,6 +75,7 @@ export default function App() {
       setTocadas({});
       setFiltroMes("todos");
       setFiltroCC("todos");
+      setFiltroCompetencia("todas");
       setAba("conferir");
     } catch (e) {
       setErro(e.message || "Não consegui ler esse arquivo.");
@@ -85,16 +86,17 @@ export default function App() {
 
   function importarPlano(file) {
     if (!file) return;
-    lerTexto(file).then((txt) => {
-      const r = Papa.parse(txt, { header: false, skipEmptyLines: true });
-      setNomes((p) => ({ ...p, ...parsearPlanoDeContas(r.data) }));
+    importarLinhasSimples(file).then((linhasBrutas) => {
+      setNomes((p) => ({ ...p, ...parsearPlanoDeContas(linhasBrutas) }));
     });
   }
 
   const { contas, tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia } = useMemo(
-    () => agregarPorConta(linhas, map, filtroMes, filtroCC),
-    [linhas, map, filtroMes, filtroCC]
+    () => agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompetencia),
+    [linhas, map, filtroMes, filtroCC, filtroCompetencia]
   );
+
+  const competenciasDisponiveis = useMemo(() => listarCompetencias(linhas, map), [linhas, map]);
 
   const grupos1 = useMemo(() => agruparPorDigito(contas), [contas]);
 
@@ -109,8 +111,8 @@ export default function App() {
   );
 
   const sugestao = useMemo(
-    () => (contasResultado.length ? sugerirClassificacao(contasResultado) : {}),
-    [contasResultado]
+    () => (contasResultado.length ? sugerirClassificacao(contasResultado, nomes) : {}),
+    [contasResultado, nomes]
   );
   const grupoDe = (conta) => classif[conta] ?? sugestao[conta] ?? "IGNORAR";
 
@@ -171,6 +173,8 @@ export default function App() {
           <EtapaConferir
             arquivo={arquivo} nLinhas={nLinhas} contas={contas} dif={dif}
             meses={meses} ccs={ccs} filtroMes={filtroMes} filtroCC={filtroCC}
+            competenciasDisponiveis={competenciasDisponiveis} filtroCompetencia={filtroCompetencia}
+            onFiltroCompetencia={setFiltroCompetencia}
             empresa={empresa} cnpj={cnpj} map={map} cols={cols} nomes={nomes}
             onFiltroMes={setFiltroMes} onFiltroCC={setFiltroCC}
             onEmpresa={setEmpresa} onCnpj={setCnpj} onMap={setMap}
@@ -182,7 +186,7 @@ export default function App() {
           <EtapaClassificar
             grupos1={grupos1} digitosResultado={digitosResultado}
             resultadoManual={resultadoManual} onResultadoManual={setResultadoManual}
-            contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas}
+            contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas} nomes={nomes}
             busca={busca} onBusca={setBusca}
             onClassificar={(conta, grupo) => {
               setClassif({ ...classif, [conta]: grupo });
@@ -197,18 +201,21 @@ export default function App() {
         {aba === "dre" && temDados && (
           <EtapaDRE
             dre={dre} empresa={empresa} cnpj={cnpj} filtroMes={filtroMes} meses={meses}
-            filtroCC={filtroCC} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
+            filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
             detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
             onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes })}
             contasIgnoradas={contasIgnoradas}
             onSalvarHistorico={() => {
-              salvarNoHistorico({ empresa, cnpj, periodo: filtroMes === "todos" ? meses.join(", ") : filtroMes, dre });
+              const periodo = filtroCompetencia !== "todas"
+                ? competenciaLegivel(filtroCompetencia)
+                : (filtroMes === "todos" ? meses.join(", ") : filtroMes);
+              salvarNoHistorico({ empresa, cnpj, periodo, dre });
               setHistorico(listarHistorico());
             }}
           />
         )}
 
-        {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} />}
+        {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia} />}
 
         {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
 

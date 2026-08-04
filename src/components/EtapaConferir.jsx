@@ -1,7 +1,8 @@
-import { brl } from "../lib/parse.js";
+import { brl, competenciaLegivel } from "../lib/parse.js";
 
 export function EtapaConferir({
   arquivo, nLinhas, contas, dif, meses, ccs, filtroMes, filtroCC,
+  competenciasDisponiveis, filtroCompetencia, onFiltroCompetencia,
   empresa, cnpj, map, cols, nomes, onFiltroMes, onFiltroCC,
   onEmpresa, onCnpj, onMap, onIrClassificar,
 }) {
@@ -11,6 +12,9 @@ export function EtapaConferir({
         <div className="check"><div className="k">Arquivo</div><div className="v" style={{ fontSize: 13 }}>{arquivo}</div></div>
         <div className="check"><div className="k">Lançamentos</div><div className="v">{nLinhas.toLocaleString("pt-BR")}</div></div>
         <div className="check"><div className="k">Contas movimentadas</div><div className="v">{contas.length}</div></div>
+        {filtroCompetencia !== "todas" && (
+          <div className="check" data-tone="ok"><div className="k">Competência isolada</div><div className="v">{competenciaLegivel(filtroCompetencia)}</div></div>
+        )}
         <div className="check" data-tone={Math.abs(dif) < 0.01 ? "ok" : "bad"}>
           <div className="k">Débito x crédito</div>
           <div className="v">{Math.abs(dif) < 0.01 ? "Confere" : brl(dif)}</div>
@@ -27,11 +31,25 @@ export function EtapaConferir({
 
       <div className="card">
         <h2>Filtros</h2>
-        <p className="hint">Recortam o razão antes de somar os saldos.</p>
+        <p className="hint">
+          Recortam o razão antes de somar os saldos. A <b>competência</b> isola um mês inteiro —
+          é o jeito mais direto de ver a DRE e o Balanço de um período só.
+        </p>
         <div className="filters">
+          {competenciasDisponiveis.length > 0 && (
+            <div>
+              <label>Competência (mês/ano)</label>
+              <select value={filtroCompetencia} onChange={(e) => onFiltroCompetencia(e.target.value)}>
+                <option value="todas">Todas ({competenciasDisponiveis.length})</option>
+                {competenciasDisponiveis.map((c) => (
+                  <option key={c} value={c}>{competenciaLegivel(c)}</option>
+                ))}
+              </select>
+            </div>
+          )}
           {meses.length > 1 && (
             <div>
-              <label>Período</label>
+              <label>Dia específico (opcional)</label>
               <select value={filtroMes} onChange={(e) => onFiltroMes(e.target.value)}>
                 <option value="todos">Todos ({meses.length})</option>
                 {meses.map((m) => <option key={m} value={m}>{m}</option>)}

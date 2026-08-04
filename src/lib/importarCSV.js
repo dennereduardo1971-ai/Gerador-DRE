@@ -9,9 +9,13 @@ async function detectarEncoding(file) {
   return txt.includes("\uFFFD") ? "windows-1252" : "utf-8";
 }
 
-/** Importa um CSV grande em streaming, sem bloquear a interface.
- *  Reporta progresso real (bytes lidos / tamanho do arquivo) via onProgress,
- *  ao contrário de ler o arquivo inteiro de uma vez e só então parsear. */
+/** Importa um CSV grande em pedaços (chunks), sem worker — o modo worker
+ *  do Papaparse depende de carregar um script separado por URL, o que
+ *  quebra quando o app está empacotado (Vite) e publicado num subcaminho
+ *  (como GitHub Pages: /Gerador-DRE/). Processar em chunks no thread
+ *  principal, cedendo o loop de eventos a cada pedaço com um pequeno
+ *  await, ainda evita travar a interface — só não é 100% paralelo.
+ *  Reporta progresso real (bytes lidos / tamanho do arquivo) via onProgress. */
 export function importarCSV(file, onProgress) {
   return new Promise((resolve, reject) => {
     detectarEncoding(file).then((encoding) => {
@@ -20,15 +24,20 @@ export function importarCSV(file, onProgress) {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        worker: true,
+        worker: false,
         encoding,
-        chunk: (results) => {
+        chunkSize: 1024 * 1024, // 1 MB por pedaço
+        chunk: (results, parser) => {
           if (!campos.length) campos = (results.meta.fields || []).filter((f) => f && f.trim());
           linhas.push(...results.data);
           if (onProgress) {
             const pct = file.size ? Math.min(99, Math.round((results.meta.cursor / file.size) * 100)) : null;
             onProgress({ linhas: linhas.length, pct });
           }
+          // cede o loop de eventos entre pedaços para a barra de progresso
+          // e o resto da página continuarem respondendo
+          parser.pause();
+          setTimeout(() => parser.resume(), 0);
         },
         complete: () => {
           if (!campos.length) { reject(new Error("Não encontrei cabeçalho no arquivo.")); return; }

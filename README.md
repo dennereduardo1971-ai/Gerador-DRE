@@ -15,10 +15,13 @@ conta e valor de débito/crédito em colunas separadas.
 
 ## Etapas
 
-1. **Importar** — CSV do razão, lido em streaming (sem travar a página
-   mesmo com dezenas de milhares de linhas), com barra de progresso real.
-2. **Conferir** — totais, teste de partidas dobradas, filtros de período
-   e centro de custo, mapeamento manual de colunas.
+1. **Importar** — CSV ou Excel (.xlsx, .xls, .xlsm, .xlsb, .ods) do
+   razão, lido em partes (sem travar a página mesmo com dezenas de
+   milhares de linhas), com barra de progresso real. Se o Excel tiver
+   mais de uma aba, usa automaticamente a primeira que tiver dados.
+2. **Conferir** — totais, teste de partidas dobradas, filtro por
+   **competência** (mês/ano — isola a DRE e o Balanço num mês só) e por
+   dia específico ou centro de custo, mapeamento manual de colunas.
 3. **Classificar** — sugestão automática de grupo por conta, ajustável.
 4. **DRE** — demonstração final, com opção de salvar no histórico local.
 5. **Balanço** — contas 1 (ativo) e 2 (passivo/PL), com aviso claro de que
@@ -80,7 +83,9 @@ Netlify, GitHub Pages, etc.).
 src/
   lib/
     parse.js        # leitura do CSV, normalização de número/encoding, agregação por conta e competência
-    importarCSV.js  # importação em streaming (worker) com progresso real
+    importarArquivo.js  # decide entre CSV e Excel pela extensão do arquivo
+    importarCSV.js   # importação de CSV em chunks, com progresso real
+    importarExcel.js # importação de Excel (xlsx/xls/xlsm/xlsb/ods) via SheetJS, carregado sob demanda
     classify.js     # grupos da DRE e sugestão automática de classificação
     balanco.js       # Balanço Patrimonial simplificado (contas 1 e 2)
     exportCsv.js     # exportação da DRE final em CSV
@@ -104,15 +109,51 @@ src/
 A lógica de parsing e classificação está isolada de React (`src/lib`),
 então dá pra testar ou reaproveitar sem montar componente nenhum.
 
+## Como a classificação automática funciona
+
+Cada conta de resultado é testada individualmente contra um texto
+"enriquecido": o histórico dos lançamentos + o nome da própria conta no
+plano de contas importado + o nome de cada conta **ancestral** no plano
+de contas (a conta-síntese que a agrupa, um nível acima, dois níveis
+acima etc.). Isso importa porque num plano de contas real é comum a
+conta-folha ter um nome genérico e só a conta-síntese algumas casas
+acima dizer do que se trata de verdade — por exemplo, uma conta chamada
+só "GRADUACAO PRESENCIAL" só fica clara como "devolução de mensalidade"
+quando se sabe que ela está dentro de "(-)DEVOLUCOES MENSALIDADES/TAXAS"
+duas casas decimais acima.
+
+Sem plano de contas importado, cai num fallback por maioria dentro do
+prefixo de 3 dígitos — mais grosseiro, mas que não depende de nome
+nenhum, só do histórico dos lançamentos.
+
 ## O que ajustar para outro plano de contas
 
 Em `src/lib/classify.js`:
 - `GRUPOS` — os itens da DRE e o sinal de cada um.
-- Os padrões `PAT_*` — expressões regulares que casam com o histórico dos
-  lançamentos para sugerir o grupo de cada conta (ex.: `MENSALIDADE`,
-  `BOLSA`, `FOPAG`). Ajuste ou adicione termos do seu próprio razão aqui.
+- Os padrões `PAT_*` — expressões regulares que casam com o texto
+  enriquecido de cada conta (histórico + nome + ancestrais) para sugerir
+  o grupo (ex.: `MENSALIDADE`, `BOLSA`, `FOPAG`, `FINANCEIR`). Ajuste ou
+  adicione termos do seu próprio plano de contas aqui — e preste atenção
+  à ORDEM das checagens: padrões mais específicos (ex. IRPJ/CSLL) têm que
+  vir antes dos mais genéricos (ex. provisão), porque "PROVISÃO DE IRPJ"
+  bate nos dois.
 - `sugerirClassificacao` — a lógica de decisão em si, caso os grupos
   mudem de forma mais estrutural.
+
+## Limitações conhecidas
+
+- A leitura de Excel usa o pacote `xlsx` (SheetJS) da versão publicada no
+  npm, que tem duas vulnerabilidades conhecidas sem correção nessa
+  distribuição (prototype pollution e ReDoS — [GHSA-4r6h-8v6p-xvw6](https://github.com/advisories/GHSA-4r6h-8v6p-xvw6),
+  [GHSA-5pgg-2g8v-p4x9](https://github.com/advisories/GHSA-5pgg-2g8v-p4x9)).
+  Como o app roda inteiramente no navegador e só processa arquivos que
+  você mesmo escolhe abrir, o risco prático pra uso pessoal é baixo — mas
+  não abra planilhas de origem desconhecida nele. A SheetJS publica
+  versões corrigidas fora do npm, em cdn.sheetjs.com, caso queira trocar.
+- Contas com zero à esquerda armazenadas como número (não texto) numa
+  célula do Excel perdem esse zero — comum em qualquer app que lê
+  planilhas. Se isso for um problema no seu plano de contas, formate a
+  coluna de conta como texto na planilha de origem antes de importar.
 
 ## Licença
 
