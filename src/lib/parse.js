@@ -57,8 +57,40 @@ export function mapearColunas(campos) {
     valorC: acharColuna(campos, "valor credito", "vlr credito", "credito"),
     hist: acharColuna(campos, "historico", "descricao", "complemento"),
     data: acharColuna(campos, "dia/mes", "data", "mes"),
+    ano: acharColuna(campos, "ano"),
     cc: acharColuna(campos, "c.custo debito", "centro de custo", "ccusto"),
   };
+}
+
+const MESES_ABREV = {
+  jan: "01", fev: "02", mar: "03", abr: "04", mai: "05", jun: "06",
+  jul: "07", ago: "08", set: "09", out: "10", nov: "11", dez: "12",
+};
+
+/** Extrai a competência (mês/ano) de uma linha, a partir da data e do ano.
+ *  Aceita "DD/mmm" + ano separado (formato comum de razão brasileiro) ou uma
+ *  data completa "DD/MM/AAAA". Retorna algo como "07/2026", ou "" se não der
+ *  para reconhecer o formato — nesse caso a linha não entra na análise
+ *  horizontal, mas continua valendo para os totais normais. */
+export function competenciaDaLinha(dataStr, anoStr) {
+  if (!dataStr) return "";
+  const s = String(dataStr).trim().toLowerCase();
+  const partes = s.split("/");
+  if (partes.length >= 2) {
+    const mesTxt = partes[1];
+    const mesNum = MESES_ABREV[mesTxt.slice(0, 3)] || (/^\d{1,2}$/.test(mesTxt) ? mesTxt.padStart(2, "0") : null);
+    if (mesNum) {
+      const ano = partes[2] || anoStr;
+      if (ano) return `${mesNum}/${String(ano).trim()}`;
+    }
+  }
+  return "";
+}
+
+const NOME_MES = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+export function competenciaLegivel(comp) {
+  const [mes, ano] = comp.split("/");
+  return `${NOME_MES[Number(mes)] || mes}/${ano}`;
 }
 
 /** Agrega as linhas do razão por conta, respeitando filtros de mês e centro
@@ -70,6 +102,7 @@ export function agregarPorConta(linhas, map, filtroMes, filtroCC) {
   let tDeb = 0, tCre = 0;
   const setMeses = new Set(), setCC = new Set();
   const LIMITE_HISTORICO = 20000;
+  const porCompetencia = {}; // competencia -> { contas: { conta: {deb,cre} } }
 
   for (const l of linhas) {
     const mes = map.data ? String(l[map.data] ?? "").trim() : "";
@@ -85,25 +118,46 @@ export function agregarPorConta(linhas, map, filtroMes, filtroCC) {
     const cd = String(l[map.contaD] ?? "").trim();
     const cc2 = String(l[map.contaC] ?? "").trim();
     const h = map.hist ? String(l[map.hist] ?? "") : "";
+    const comp = competenciaDaLinha(mes, map.ano ? l[map.ano] : "");
 
     if (cd && vd) {
       acc[cd] = acc[cd] || { conta: cd, deb: 0, cre: 0, n: 0, historico: "" };
       acc[cd].deb += vd; acc[cd].n++;
       if (acc[cd].historico.length < LIMITE_HISTORICO) acc[cd].historico += " " + h;
+      if (comp) {
+        porCompetencia[comp] = porCompetencia[comp] || {};
+        porCompetencia[comp][cd] = porCompetencia[comp][cd] || { deb: 0, cre: 0 };
+        porCompetencia[comp][cd].deb += vd;
+      }
     }
     if (cc2 && vc) {
       acc[cc2] = acc[cc2] || { conta: cc2, deb: 0, cre: 0, n: 0, historico: "" };
       acc[cc2].cre += vc; acc[cc2].n++;
       if (acc[cc2].historico.length < LIMITE_HISTORICO) acc[cc2].historico += " " + h;
+      if (comp) {
+        porCompetencia[comp] = porCompetencia[comp] || {};
+        porCompetencia[comp][cc2] = porCompetencia[comp][cc2] || { deb: 0, cre: 0 };
+        porCompetencia[comp][cc2].cre += vc;
+      }
     }
   }
 
   const contas = Object.values(acc).map((c) => ({ ...c, saldo: c.cre - c.deb }));
   contas.sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo));
 
+  const competencias = Object.keys(porCompetencia).sort();
+  const contasPorCompetencia = {};
+  competencias.forEach((comp) => {
+    contasPorCompetencia[comp] = Object.entries(porCompetencia[comp]).map(([conta, v]) => ({
+      conta, deb: v.deb, cre: v.cre, saldo: v.cre - v.deb,
+      historico: acc[conta] ? acc[conta].historico : "",
+    }));
+  });
+
   return {
     contas, tDeb, tCre, nLinhas: linhas.length,
     meses: [...setMeses], ccs: [...setCC].sort(),
+    competencias, contasPorCompetencia,
   };
 }
 

@@ -1,21 +1,32 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 import "./App.css";
 
 import { agregarPorConta, lerTexto, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
+import { importarCSV } from "./lib/importarCSV.js";
 import { agruparPorDigito, montarDRE, sugerirClassificacao } from "./lib/classify.js";
+import { montarBalanco } from "./lib/balanco.js";
 import { baixarCSV } from "./lib/exportCsv.js";
+import { useTema } from "./lib/useTema.js";
+import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
+import { lerConfigGitHub } from "./lib/githubApi.js";
 
 import { EtapaImportar } from "./components/EtapaImportar.jsx";
 import { EtapaConferir } from "./components/EtapaConferir.jsx";
 import { EtapaClassificar } from "./components/EtapaClassificar.jsx";
 import { EtapaDRE } from "./components/EtapaDRE.jsx";
+import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
+import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
+import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
 
 const ABAS = [
   ["importar", "1 · Importar"],
   ["conferir", "2 · Conferir"],
   ["classificar", "3 · Classificar"],
   ["dre", "4 · DRE"],
+  ["balanco", "5 · Balanço"],
+  ["horizontal", "6 · Horizontal"],
+  ["historico", "7 · Histórico"],
 ];
 
 export default function App() {
@@ -36,21 +47,29 @@ export default function App() {
   const [detalhado, setDetalhado] = useState(true);
   const [empresa, setEmpresa] = useState("");
   const [cnpj, setCnpj] = useState("");
+  const [progresso, setProgresso] = useState(null);
+  const [tema, setTema] = useTema();
+  const [historico, setHistorico] = useState(() => listarHistorico());
+
+  useEffect(() => {
+    if (lerConfigGitHub()) {
+      sincronizarHistorico().then((r) => { if (r.ok) setHistorico(listarHistorico()); }).catch(() => {});
+    }
+  }, []);
 
   async function importar(file) {
     if (!file) return;
     setCarregando(true);
     setErro("");
+    setProgresso({ linhas: 0, pct: 0, tamanho: file.size });
     try {
-      const txt = await lerTexto(file);
-      const r = Papa.parse(txt, { header: true, skipEmptyLines: true, delimiter: "" });
-      const campos = (r.meta.fields || []).filter((f) => f && f.trim());
+      const { campos, linhas } = await importarCSV(file, (p) => setProgresso((prev) => ({ ...prev, ...p })));
       if (!campos.length) throw new Error("Não encontrei cabeçalho no arquivo.");
       const m = mapearColunas(campos);
       if (!m.contaD && !m.contaC) throw new Error("Não identifiquei as colunas de conta. Ajuste o mapeamento abaixo.");
       setCols(campos);
       setMap(m);
-      setLinhas(r.data);
+      setLinhas(linhas);
       setArquivo(file.name);
       setClassif({});
       setTocadas({});
@@ -61,6 +80,7 @@ export default function App() {
       setErro(e.message || "Não consegui ler esse arquivo.");
     }
     setCarregando(false);
+    setProgresso(null);
   }
 
   function importarPlano(file) {
@@ -71,7 +91,7 @@ export default function App() {
     });
   }
 
-  const { contas, tDeb, tCre, meses, ccs, nLinhas } = useMemo(
+  const { contas, tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia } = useMemo(
     () => agregarPorConta(linhas, map, filtroMes, filtroCC),
     [linhas, map, filtroMes, filtroCC]
   );
@@ -99,6 +119,17 @@ export default function App() {
     [contasResultado, classif, sugestao]
   );
 
+  const balanco = useMemo(() => montarBalanco(contas), [contas]);
+
+  const dresPorCompetencia = useMemo(() => {
+    return competencias.map((comp) => {
+      const cs = contasPorCompetencia[comp] || [];
+      const csResultado = cs.filter((c) => digitosResultado.includes(c.conta[0]));
+      const g = (conta) => classif[conta] ?? sugestao[conta] ?? "IGNORAR";
+      return { competencia: comp, dre: montarDRE(csResultado, g) };
+    });
+  }, [competencias, contasPorCompetencia, digitosResultado, classif, sugestao]);
+
   const dif = tDeb - tCre;
   const temDados = contas.length > 0;
   const contasIgnoradas = contasResultado.filter((c) => grupoDe(c.conta) === "IGNORAR").length;
@@ -114,13 +145,19 @@ export default function App() {
               A demonstração sai pronta, com análise vertical e detalhe por conta.
             </p>
           </div>
-          <div className="stamp">Partidas dobradas · CPC 26</div>
+          <div className="row" style={{ gap: 10 }}>
+            <button className="btn ghost theme-btn" onClick={() => setTema(tema === "dark" ? "light" : "dark")}
+              aria-label="Alternar tema claro/escuro">
+              {tema === "dark" ? "Modo claro" : "Modo escuro"}
+            </button>
+            <div className="stamp">Partidas dobradas · CPC 26</div>
+          </div>
         </header>
 
         <nav className="tabs">
           {ABAS.map(([id, nome]) => (
             <button key={id} className="tab" data-on={aba === id ? "1" : "0"}
-              disabled={id !== "importar" && !temDados} onClick={() => setAba(id)}>
+              disabled={!["importar", "historico"].includes(id) && !temDados} onClick={() => setAba(id)}>
               {nome}
             </button>
           ))}
@@ -128,7 +165,7 @@ export default function App() {
 
         {erro && <div className="err">{erro}</div>}
 
-        {aba === "importar" && <EtapaImportar carregando={carregando} onImportar={importar} />}
+        {aba === "importar" && <EtapaImportar carregando={carregando} progresso={progresso} onImportar={importar} />}
 
         {aba === "conferir" && temDados && (
           <EtapaConferir
@@ -164,10 +201,26 @@ export default function App() {
             detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
             onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes })}
             contasIgnoradas={contasIgnoradas}
+            onSalvarHistorico={() => {
+              salvarNoHistorico({ empresa, cnpj, periodo: filtroMes === "todos" ? meses.join(", ") : filtroMes, dre });
+              setHistorico(listarHistorico());
+            }}
           />
         )}
 
-        {!temDados && aba !== "importar" && (
+        {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} />}
+
+        {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
+
+        {aba === "historico" && (
+          <EtapaHistorico
+            historico={historico}
+            onRemover={async (id) => { await removerDoHistorico(id); setHistorico(listarHistorico()); }}
+            onSincronizado={() => setHistorico(listarHistorico())}
+          />
+        )}
+
+        {!temDados && !["importar", "historico"].includes(aba) && (
           <div className="empty"><b>Nenhum razão carregado</b>Importe um arquivo na etapa 1.</div>
         )}
       </div>

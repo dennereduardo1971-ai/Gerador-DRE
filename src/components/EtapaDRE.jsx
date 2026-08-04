@@ -3,7 +3,7 @@ import { Linha, Secao, Detalhe } from "./LinhaDRE.jsx";
 
 export function EtapaDRE({
   dre, empresa, cnpj, filtroMes, meses, filtroCC, tDeb, tCre, dif,
-  nomes, detalhado, onToggleDetalhado, onBaixarCSV, contasIgnoradas,
+  nomes, detalhado, onToggleDetalhado, onBaixarCSV, contasIgnoradas, onSalvarHistorico,
 }) {
   const base = dre.receitaLiq || 1;
   const D = (id) => <Detalhe dre={dre} id={id} nomes={nomes} base={base} mostrar={detalhado} />;
@@ -17,6 +17,7 @@ export function EtapaDRE({
         <button className="btn ghost" onClick={onToggleDetalhado}>
           {detalhado ? "Ocultar contas" : "Mostrar contas"}
         </button>
+        <button className="btn ghost" onClick={onSalvarHistorico}>Salvar no histórico</button>
       </div>
       <div className="dre">
         <div className="dre-head">

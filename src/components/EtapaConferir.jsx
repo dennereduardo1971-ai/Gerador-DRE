@@ -67,7 +67,7 @@ export function EtapaConferir({
           {[
             ["contaD", "Conta débito"], ["contaC", "Conta crédito"],
             ["valorD", "Valor débito"], ["valorC", "Valor crédito"],
-            ["hist", "Histórico"], ["data", "Data / mês"], ["cc", "Centro de custo"],
+            ["hist", "Histórico"], ["data", "Data / mês"], ["ano", "Ano"], ["cc", "Centro de custo"],
           ].map(([k, lbl]) => (
             <div key={k}>
               <label>{lbl}</label>
