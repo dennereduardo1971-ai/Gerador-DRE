@@ -29,7 +29,8 @@ export function baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes }) {
   add("Despesas com Pessoal (Fopag)", (-dre.bal.DESP_FOPAG.total).toFixed(2));
   add("Despesas Administrativas", (-dre.bal.DESP_ADM.total).toFixed(2));
   add("Depreciação / Amortização", (-dre.bal.DEPRECIACAO.total).toFixed(2));
-  add("Provisões / Reversões", (-dre.bal.PROVISOES.total).toFixed(2));
+  add("Provisões / Reversões Contingências", (-dre.bal.PROVISOES_CONTINGENCIAS.total).toFixed(2));
+  add("Provisões / Reversões PCLD", (-dre.bal.PROVISOES_PCLD.total).toFixed(2));
   add("", "");
   add("RECEITA / DESPESAS FINANCEIRAS", dre.resultadoFin.toFixed(2));
   add("Receitas Financeiras", dre.bal.REC_FIN.total.toFixed(2));

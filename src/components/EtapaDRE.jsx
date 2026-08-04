@@ -67,7 +67,8 @@ export function EtapaDRE({
         <L lbl="Despesas Administrativas" val={-dre.bal.DESP_ADM.total} />
         {D("DESP_ADM")}
         {dre.bal.DEPRECIACAO.contas.length > 0 && (<><L lbl="Depreciação / Amortização" val={-dre.bal.DEPRECIACAO.total} />{D("DEPRECIACAO")}</>)}
-        {dre.bal.PROVISOES.contas.length > 0 && (<><L lbl="Provisões / Reversões" val={-dre.bal.PROVISOES.total} />{D("PROVISOES")}</>)}
+        {dre.bal.PROVISOES_CONTINGENCIAS.contas.length > 0 && (<><L lbl="Provisões / Reversões Contingências" val={-dre.bal.PROVISOES_CONTINGENCIAS.total} />{D("PROVISOES_CONTINGENCIAS")}</>)}
+        {dre.bal.PROVISOES_PCLD.contas.length > 0 && (<><L lbl="Provisões / Reversões PCLD" val={-dre.bal.PROVISOES_PCLD.total} />{D("PROVISOES_PCLD")}</>)}
 
         <Secao nome="Receita / Despesas Financeiras" />
         <L lbl="( + ) Receitas Financeiras" val={dre.bal.REC_FIN.total} />

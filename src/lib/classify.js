@@ -16,7 +16,8 @@ export const GRUPOS = [
   { id: "DESP_FOPAG", nome: "Despesas com Pessoal (Fopag)", sinal: -1 },
   { id: "DESP_ADM", nome: "Despesas Administrativas", sinal: -1 },
   { id: "DEPRECIACAO", nome: "Depreciação / Amortização", sinal: -1 },
-  { id: "PROVISOES", nome: "Provisões / Reversões", sinal: -1 },
+  { id: "PROVISOES_CONTINGENCIAS", nome: "Provisões / Reversões Contingências", sinal: -1 },
+  { id: "PROVISOES_PCLD", nome: "Provisões / Reversões PCLD", sinal: -1 },
   { id: "REC_FIN", nome: "Receitas Financeiras", sinal: 1 },
   { id: "DESP_FIN", nome: "Despesas Financeiras", sinal: -1 },
   { id: "OUTRAS_REC", nome: "Receitas Não Operacionais", sinal: 1 },
@@ -36,6 +37,7 @@ const PAT_IMPOSTO = /\bPIS\b|COFINS|\bISS\b/i;
 const PAT_FOPAG = /FOPAG|SAL[ÁA]RIO|FOLHA DE PAG|\bFGTS\b|\bINSS\b|F[ÉE]RIAS|13[º°O]?\s|D[ÉE]CIMO TERCEIRO|RESCIS[ÃA]O|VALE TRANSP|VALE ALIMENT|PR[ÓO].?LABORE|ENCARGOS SOCIAIS|\bPESSOAL\b|DOCENTES?\b/i;
 const PAT_DEPREC = /DEPRECIA|AMORTIZ/i;
 const PAT_PROVISAO = /PROVIS[ÃA]O|PCLD|CONTING[ÊE]NCIA/i;
+const PAT_PCLD = /PCLD|CR[ÉE]D.{0,15}LIQUIDA[ÇC][ÃA]O DUVIDOSA|PERDAS? ESTIMADAS?/i;
 const PAT_FIN = /JUROS|TARIFA BANC|DESPESA BANC|\bIOF\b|FINANCIAMENTO|EMPR[ÉE]STIMO|RENDIMENTO DE APLIC|APLICA[ÇC][ÃA]O FINANC|FINANCEIR/i;
 const PAT_IRPJCSLL = /\bIRPJ\b|\bCSLL\b/i;
 const PAT_NAO_OPER = /OUTRAS RECEITA|OUTRAS DESPESA|N[ÃA]O OPERACIONAL|EQUIVAL[ÊE]NCIA PATRIMONIAL|GANHO.{0,15}CAPITAL|PERDA.{0,15}CAPITAL|OPERA[ÇC][ÕO]ES DESCONTINUADAS/i;
@@ -43,7 +45,7 @@ const PAT_NAO_OPER = /OUTRAS RECEITA|OUTRAS DESPESA|N[ÃA]O OPERACIONAL|EQUIVAL[
 const PADROES = {
   mens: PAT_MENSALIDADE, taxa: PAT_TAXA, bolsa: PAT_BOLSA, prouni: PAT_PROUNI,
   devolu: PAT_DEVOLU, desconto: PAT_DESCONTO, imposto: PAT_IMPOSTO, fopag: PAT_FOPAG,
-  deprec: PAT_DEPREC, provisao: PAT_PROVISAO, fin: PAT_FIN, irpj: PAT_IRPJCSLL,
+  deprec: PAT_DEPREC, provisao: PAT_PROVISAO, pcld: PAT_PCLD, fin: PAT_FIN, irpj: PAT_IRPJCSLL,
   naoOper: PAT_NAO_OPER,
 };
 
@@ -90,8 +92,24 @@ const MAPA_CODIGO_IESB = {
   // Resultado financeiro
   "42101": "DESP_FIN", // DESPESAS FINANCEIRAS
   "42102": "REC_FIN", // (-)RECEITAS FINANCEIRAS (nome do plano é enganoso: é receita)
-  // Provisões
-  "61101": "PROVISOES",
+  // Provisões — separadas em duas linhas, como na DRE oficial: Contingências
+  // (cíveis/trabalhistas, novas e revertidas) e PCLD (perdas estimadas com
+  // créditos de liquidação duvidosa, fiscal e societária, novas e revertidas).
+  // Confirmado batendo com as duas linhas da DRE oficial mês a mês.
+  "6110100": "PROVISOES_CONTINGENCIAS", // PROV. CONTINGENCIAS CIVEIS
+  "6110101": "PROVISOES_CONTINGENCIAS", // (-) REV. PROV. CONTINGENCIAS CIVEIS
+  "6110102": "PROVISOES_CONTINGENCIAS", // INSS (contingência)
+  "6110104": "PROVISOES_CONTINGENCIAS", // PROV. CONTINGENCIAS TRABALHISTAS
+  "6110105": "PROVISOES_CONTINGENCIAS", // (-) REV. PROV. CONTING. TRABALHISTAS
+  "6110115": "PROVISOES_CONTINGENCIAS", // CONTINGENCIAS CIVEIS REALIZADAS
+  "6110116": "PROVISOES_CONTINGENCIAS", // CONTINGENCIAS TRABALHISTAS REALIZADAS
+  "6110103": "PROVISOES_PCLD", // PERDAS EST. P/CRED. LIQ. DUVIDOSA FISCAL
+  "6110106": "PROVISOES_PCLD", // PERDAS EST. PROG./CONVENIOS
+  "6110111": "PROVISOES_PCLD", // (-)REV. CRED. LIQ. DUV. EXERC ANTERIORES
+  "6110112": "PROVISOES_PCLD", // (-)REV. CRED. LIQ. DUV. EXERC. CORRENTE
+  "6110114": "PROVISOES_PCLD", // (-)PROG. ALIM. TRABALHADOR
+  "6110119": "PROVISOES_PCLD", // PERDAS EST. P/CRED. LIQ. DUVIDOSA SOCIET
+  "61101": "PROVISOES_PCLD", // fallback — qualquer conta nova nesse grupo que ainda não foi vista
   // Fechamento do exercício — não é conta de resultado
   "71101": "IGNORAR",
 };
@@ -233,7 +251,7 @@ export function sugerirClassificacao(contas, nomes = {}) {
       else if (bate(PAT_IMPOSTO)) g = "DED_IMPOSTOS";
       else if (bate(PAT_IRPJCSLL)) g = "IRPJ_CSLL";
       else if (bate(PAT_DEPREC)) g = "DEPRECIACAO";
-      else if (bate(PAT_PROVISAO)) g = "PROVISOES";
+      else if (bate(PAT_PROVISAO)) g = bate(PAT_PCLD) ? "PROVISOES_PCLD" : "PROVISOES_CONTINGENCIAS";
       else if (bate(PAT_FIN)) g = "DESP_FIN";
       else if (bate(PAT_DESCONTO)) g = "DED_DESCONTOS";
       else if (bate(PAT_NAO_OPER)) g = "OUTRAS_DESP";
@@ -257,7 +275,7 @@ export function sugerirClassificacao(contas, nomes = {}) {
         else if (maioria("imposto")) g = "DED_IMPOSTOS";
         else if (maioria("irpj")) g = "IRPJ_CSLL";
         else if (maioria("deprec")) g = "DEPRECIACAO";
-        else if (maioria("provisao")) g = "PROVISOES";
+        else if (maioria("provisao")) g = maioria("pcld") ? "PROVISOES_PCLD" : "PROVISOES_CONTINGENCIAS";
         else if (maioria("fin")) g = "DESP_FIN";
         else if (maioria("desconto")) g = "DED_DESCONTOS";
         else if (digitoReceita && p[0] === digitoReceita) g = "DED_DESCONTOS";
@@ -315,7 +333,7 @@ export function montarDRE(contasResultado, grupoDe) {
   const deducoes = v("DED_BOLSAS") + v("DED_PROUNI") + v("DED_DEVOLUCOES") + v("DED_DESCONTOS") + v("DED_IMPOSTOS");
   const receitaLiq = receitaBruta - deducoes;
   const resultadoOperBruto = receitaLiq - v("CUSTOS");
-  const despOper = v("DESP_FOPAG") + v("DESP_ADM") + v("DEPRECIACAO") + v("PROVISOES");
+  const despOper = v("DESP_FOPAG") + v("DESP_ADM") + v("DEPRECIACAO") + v("PROVISOES_CONTINGENCIAS") + v("PROVISOES_PCLD");
   const resultadoFin = v("REC_FIN") - v("DESP_FIN");
   const resultadoOper = resultadoOperBruto - despOper + resultadoFin;
   const naoOper = v("OUTRAS_REC") - v("OUTRAS_DESP");

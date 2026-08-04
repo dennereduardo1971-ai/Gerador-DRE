@@ -156,6 +156,16 @@ desfeitas por acidente:
    (`exportCsv.js`) mostram o valor líquido de verdade (podendo aparecer
    uma despesa "positiva" num mês de reversão forte), em vez de forçar
    parênteses de despesa sempre.
+4. **Provisões é, na DRE oficial, DUAS linhas, não uma**: "Provisões/
+   Reversões Contingências" (cíveis/trabalhistas, novas e revertidas —
+   contas `6110100`, `6110101`, `6110102`, `6110104`, `6110105`,
+   `6110115`, `6110116`) e "Provisões/Reversões PCLD" (perdas estimadas
+   com créditos de liquidação duvidosa, fiscal e societária, novas e
+   revertidas — contas `6110103`, `6110106`, `6110111`, `6110112`,
+   `6110114`, `6110119`). Os grupos na DRE são `PROVISOES_CONTINGENCIAS`
+   e `PROVISOES_PCLD`. Não junte de volta numa linha só sem confirmar
+   contra a DRE oficial — foi assim que apareceu o erro da primeira
+   versão dessa camada.
 
 ## Regras da DRE (estrutura fixa em `montarDRE`)
 

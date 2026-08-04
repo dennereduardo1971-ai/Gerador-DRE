@@ -44,18 +44,17 @@ const ROTULO_GRUPO = {
 };
 const alvoPorMes = {};
 for (const [comp, col] of Object.entries(COL_MES)) {
-  const alvo = {};
-  let deprec = 0, provisoes = 0;
+  const alvo = { DEPRECIACAO: 0, PROVISOES_CONTINGENCIAS: 0, PROVISOES_PCLD: 0 };
   for (const row of linhasDre) {
     const rotulo = row[1] || row[0];
     if (!rotulo) continue;
     const val = row[col];
     if (ROTULO_GRUPO[rotulo] && val != null) alvo[ROTULO_GRUPO[rotulo]] = val;
-    if ((rotulo === "Depreciação/Amortização" || rotulo === "Depreciação CPC 06") && val != null) deprec += val;
-    if ((rotulo === "Provisões/Reversões Contingências" || rotulo === "Provisões/Reversões PCLD") && val != null) provisoes += val;
+    if (rotulo === "Depreciação/Amortização" && val != null) alvo.DEPRECIACAO = (alvo.DEPRECIACAO || 0) + val;
+    if (rotulo === "Depreciação CPC 06" && val != null) alvo.DEPRECIACAO = (alvo.DEPRECIACAO || 0) + val;
+    if (rotulo === "Provisões/Reversões Contingências" && val != null) alvo.PROVISOES_CONTINGENCIAS = val;
+    if (rotulo === "Provisões/Reversões PCLD" && val != null) alvo.PROVISOES_PCLD = val;
   }
-  alvo.DEPRECIACAO = deprec;
-  alvo.PROVISOES = provisoes;
   alvoPorMes[comp] = alvo;
 }
 
