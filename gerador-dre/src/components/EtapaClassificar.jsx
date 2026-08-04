@@ -69,11 +69,12 @@ export function EtapaClassificar({
           </div>
         </div>
         <p className="hint" style={{ marginTop: -6 }}>
-          O plano de contas é um arquivo (CSV ou Excel) de duas colunas: código e descrição. Sem
-          ele, o app usa o início do histórico como nome provisório. Importar o plano de contas
-          também pode <b>mudar a sugestão de grupo</b> — a descrição oficial da conta costuma ser
-          um sinal mais limpo que o histórico dos lançamentos. Contas que você já reclassificou
-          manualmente não são alteradas.
+          O plano de contas é um arquivo (CSV ou Excel) de duas colunas: código e descrição.
+          Importar o plano de contas pode <b>mudar a sugestão de grupo</b> aqui embaixo — a
+          descrição oficial da conta costuma ser um sinal mais limpo que o histórico dos
+          lançamentos. Contas que você já reclassificou manualmente não são alteradas. (A coluna
+          "Descrição" desta tabela continua mostrando o histórico; o nome do plano de contas
+          aparece nas etapas Conferir e DRE.)
         </p>
         <div className="scroll">
           <table>
@@ -90,7 +91,7 @@ export function EtapaClassificar({
                   <tr key={c.conta}>
                     <td className="code">{c.conta}</td>
                     <td style={{ fontSize: 12.5, color: "var(--soft)" }}>
-                      {nomes[c.conta] || (c.historico.trim().split(",")[0] || "").slice(0, 38)}
+                      {(c.historico.trim().split(",")[0] || "").slice(0, 38)}
                     </td>
                     <td className={"num " + (c.saldo < 0 ? "neg" : "")}>{brl(c.saldo)}</td>
                     <td>
