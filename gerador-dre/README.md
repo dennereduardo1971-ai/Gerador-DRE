@@ -109,13 +109,34 @@ src/
 A lógica de parsing e classificação está isolada de React (`src/lib`),
 então dá pra testar ou reaproveitar sem montar componente nenhum.
 
+## Como a classificação automática funciona
+
+Cada conta de resultado é testada individualmente contra um texto
+"enriquecido": o histórico dos lançamentos + o nome da própria conta no
+plano de contas importado + o nome de cada conta **ancestral** no plano
+de contas (a conta-síntese que a agrupa, um nível acima, dois níveis
+acima etc.). Isso importa porque num plano de contas real é comum a
+conta-folha ter um nome genérico e só a conta-síntese algumas casas
+acima dizer do que se trata de verdade — por exemplo, uma conta chamada
+só "GRADUACAO PRESENCIAL" só fica clara como "devolução de mensalidade"
+quando se sabe que ela está dentro de "(-)DEVOLUCOES MENSALIDADES/TAXAS"
+duas casas decimais acima.
+
+Sem plano de contas importado, cai num fallback por maioria dentro do
+prefixo de 3 dígitos — mais grosseiro, mas que não depende de nome
+nenhum, só do histórico dos lançamentos.
+
 ## O que ajustar para outro plano de contas
 
 Em `src/lib/classify.js`:
 - `GRUPOS` — os itens da DRE e o sinal de cada um.
-- Os padrões `PAT_*` — expressões regulares que casam com o histórico dos
-  lançamentos para sugerir o grupo de cada conta (ex.: `MENSALIDADE`,
-  `BOLSA`, `FOPAG`). Ajuste ou adicione termos do seu próprio razão aqui.
+- Os padrões `PAT_*` — expressões regulares que casam com o texto
+  enriquecido de cada conta (histórico + nome + ancestrais) para sugerir
+  o grupo (ex.: `MENSALIDADE`, `BOLSA`, `FOPAG`, `FINANCEIR`). Ajuste ou
+  adicione termos do seu próprio plano de contas aqui — e preste atenção
+  à ORDEM das checagens: padrões mais específicos (ex. IRPJ/CSLL) têm que
+  vir antes dos mais genéricos (ex. provisão), porque "PROVISÃO DE IRPJ"
+  bate nos dois.
 - `sugerirClassificacao` — a lógica de decisão em si, caso os grupos
   mudem de forma mais estrutural.
 
