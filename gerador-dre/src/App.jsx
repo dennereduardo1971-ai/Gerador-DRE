@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 import "./App.css";
 
-import { agregarPorConta, lerTexto, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
+import { agregarPorConta, competenciaLegivel, lerTexto, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
 import { importarCSV } from "./lib/importarCSV.js";
 import { agruparPorDigito, montarDRE, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
@@ -43,6 +43,7 @@ export default function App() {
   const [nomes, setNomes] = useState({});
   const [filtroMes, setFiltroMes] = useState("todos");
   const [filtroCC, setFiltroCC] = useState("todos");
+  const [filtroCompetencia, setFiltroCompetencia] = useState("todas");
   const [busca, setBusca] = useState("");
   const [detalhado, setDetalhado] = useState(true);
   const [empresa, setEmpresa] = useState("");
@@ -75,6 +76,7 @@ export default function App() {
       setTocadas({});
       setFiltroMes("todos");
       setFiltroCC("todos");
+      setFiltroCompetencia("todas");
       setAba("conferir");
     } catch (e) {
       setErro(e.message || "Não consegui ler esse arquivo.");
@@ -92,9 +94,11 @@ export default function App() {
   }
 
   const { contas, tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia } = useMemo(
-    () => agregarPorConta(linhas, map, filtroMes, filtroCC),
-    [linhas, map, filtroMes, filtroCC]
+    () => agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompetencia),
+    [linhas, map, filtroMes, filtroCC, filtroCompetencia]
   );
+
+  const competenciasDisponiveis = useMemo(() => listarCompetencias(linhas, map), [linhas, map]);
 
   const grupos1 = useMemo(() => agruparPorDigito(contas), [contas]);
 
@@ -171,6 +175,8 @@ export default function App() {
           <EtapaConferir
             arquivo={arquivo} nLinhas={nLinhas} contas={contas} dif={dif}
             meses={meses} ccs={ccs} filtroMes={filtroMes} filtroCC={filtroCC}
+            competenciasDisponiveis={competenciasDisponiveis} filtroCompetencia={filtroCompetencia}
+            onFiltroCompetencia={setFiltroCompetencia}
             empresa={empresa} cnpj={cnpj} map={map} cols={cols} nomes={nomes}
             onFiltroMes={setFiltroMes} onFiltroCC={setFiltroCC}
             onEmpresa={setEmpresa} onCnpj={setCnpj} onMap={setMap}
@@ -197,18 +203,21 @@ export default function App() {
         {aba === "dre" && temDados && (
           <EtapaDRE
             dre={dre} empresa={empresa} cnpj={cnpj} filtroMes={filtroMes} meses={meses}
-            filtroCC={filtroCC} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
+            filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
             detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
             onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes })}
             contasIgnoradas={contasIgnoradas}
             onSalvarHistorico={() => {
-              salvarNoHistorico({ empresa, cnpj, periodo: filtroMes === "todos" ? meses.join(", ") : filtroMes, dre });
+              const periodo = filtroCompetencia !== "todas"
+                ? competenciaLegivel(filtroCompetencia)
+                : (filtroMes === "todos" ? meses.join(", ") : filtroMes);
+              salvarNoHistorico({ empresa, cnpj, periodo, dre });
               setHistorico(listarHistorico());
             }}
           />
         )}
 
-        {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} />}
+        {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia} />}
 
         {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
 

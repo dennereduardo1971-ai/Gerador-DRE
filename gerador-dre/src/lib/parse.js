@@ -93,11 +93,25 @@ export function competenciaLegivel(comp) {
   return `${NOME_MES[Number(mes)] || mes}/${ano}`;
 }
 
-/** Agrega as linhas do razão por conta, respeitando filtros de mês e centro
- *  de custo. Mantém uma amostra ampla do histórico de cada conta (até 20 mil
- *  caracteres) para que a classificação por padrão de texto tenha material
- *  suficiente mesmo em contas com milhares de lançamentos. */
-export function agregarPorConta(linhas, map, filtroMes, filtroCC) {
+/** Lista as competências (mês/ano) presentes no arquivo, sem aplicar
+ *  nenhum filtro — usada para popular o seletor, para que as opções não
+ *  mudem conforme o filtro de competência já selecionado. */
+export function listarCompetencias(linhas, map) {
+  const set = new Set();
+  for (const l of linhas) {
+    const mes = map.data ? String(l[map.data] ?? "").trim() : "";
+    const comp = competenciaDaLinha(mes, map.ano ? l[map.ano] : "");
+    if (comp) set.add(comp);
+  }
+  return [...set].sort();
+}
+
+/** Agrega as linhas do razão por conta, respeitando filtros de dia, centro
+ *  de custo e competência (mês/ano). Mantém uma amostra ampla do histórico
+ *  de cada conta (até 20 mil caracteres) para que a classificação por
+ *  padrão de texto tenha material suficiente mesmo em contas com milhares
+ *  de lançamentos. */
+export function agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompetencia = "todas") {
   const acc = {};
   let tDeb = 0, tCre = 0;
   const setMeses = new Set(), setCC = new Set();
@@ -107,10 +121,12 @@ export function agregarPorConta(linhas, map, filtroMes, filtroCC) {
   for (const l of linhas) {
     const mes = map.data ? String(l[map.data] ?? "").trim() : "";
     const cc = map.cc ? String(l[map.cc] ?? "").trim() : "";
+    const comp = competenciaDaLinha(mes, map.ano ? l[map.ano] : "");
     if (mes) setMeses.add(mes);
     if (cc) setCC.add(cc);
     if (filtroMes !== "todos" && mes !== filtroMes) continue;
     if (filtroCC !== "todos" && cc !== filtroCC) continue;
+    if (filtroCompetencia !== "todas" && comp !== filtroCompetencia) continue;
 
     const vd = numeroBR(l[map.valorD]);
     const vc = numeroBR(l[map.valorC]);
@@ -118,7 +134,6 @@ export function agregarPorConta(linhas, map, filtroMes, filtroCC) {
     const cd = String(l[map.contaD] ?? "").trim();
     const cc2 = String(l[map.contaC] ?? "").trim();
     const h = map.hist ? String(l[map.hist] ?? "") : "";
-    const comp = competenciaDaLinha(mes, map.ano ? l[map.ano] : "");
 
     if (cd && vd) {
       acc[cd] = acc[cd] || { conta: cd, deb: 0, cre: 0, n: 0, historico: "" };

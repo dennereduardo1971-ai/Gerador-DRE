@@ -17,8 +17,9 @@ conta e valor de débito/crédito em colunas separadas.
 
 1. **Importar** — CSV do razão, lido em streaming (sem travar a página
    mesmo com dezenas de milhares de linhas), com barra de progresso real.
-2. **Conferir** — totais, teste de partidas dobradas, filtros de período
-   e centro de custo, mapeamento manual de colunas.
+2. **Conferir** — totais, teste de partidas dobradas, filtro por
+   **competência** (mês/ano — isola a DRE e o Balanço num mês só) e por
+   dia específico ou centro de custo, mapeamento manual de colunas.
 3. **Classificar** — sugestão automática de grupo por conta, ajustável.
 4. **DRE** — demonstração final, com opção de salvar no histórico local.
 5. **Balanço** — contas 1 (ativo) e 2 (passivo/PL), com aviso claro de que

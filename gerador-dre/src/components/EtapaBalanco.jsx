@@ -1,6 +1,6 @@
-import { brl } from "../lib/parse.js";
+import { brl, competenciaLegivel } from "../lib/parse.js";
 
-export function EtapaBalanco({ balanco }) {
+export function EtapaBalanco({ balanco, filtroCompetencia }) {
   if (!balanco.temDados) {
     return (
       <div className="empty">
@@ -14,7 +14,10 @@ export function EtapaBalanco({ balanco }) {
   return (
     <>
       <div className="warn">
-        Isto reflete a <b>movimentação das contas dentro deste arquivo</b>, não necessariamente
+        {filtroCompetencia && filtroCompetencia !== "todas" ? (
+          <>Isolado em <b>{competenciaLegivel(filtroCompetencia)}</b>. </>
+        ) : null}
+        Isto reflete a <b>movimentação das contas dentro deste arquivo</b>{filtroCompetencia && filtroCompetencia !== "todas" ? " (e do período filtrado)" : ""}, não necessariamente
         o saldo patrimonial acumulado da empresa. Se o razão não trouxer o saldo de abertura de
         cada conta — comum quando se importa só um mês —, os totais abaixo são a variação do
         período, não o saldo final real. Para um Balanço fiel, o arquivo precisa cobrir desde a
