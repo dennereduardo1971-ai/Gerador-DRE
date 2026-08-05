@@ -58,6 +58,7 @@ src/
     linhasDRE.js                  # a estrutura da DRE (rótulos, sinais,
                                    #  cascata, soma por seção)
     abertura.js                   # balancete simples (código;saldo)
+    indicadores.js                # margens, índices e séries do painel
     balancete.js                  # balancete de verificação hierárquico
                                    #  (traz o Balanço inteiro pronto)
     exportacao.js                 # CSV e Excel, ambos a partir de linhasDRE
@@ -436,6 +437,40 @@ Quatro armadilhas deste formato, todas cobertas por teste:
   = 930.559,09, idêntico a débitos − créditos do período. **Nunca trate
   isso como erro de importação.** A tela escreve a identidade e, havendo
   razão do mesmo período, confronta o valor com o Lucro Líquido da DRE.
+
+## Painel
+
+`Painel.jsx` responde "e daí?", enquanto as outras telas respondem "os
+números estão certos?". São públicos diferentes: quem confere abre a DRE
+e o balancete, quem decide abre o painel.
+
+Cada bloco depende de uma fonte e só aparece se ela existir — margens
+precisam do razão, índices patrimoniais precisam do balancete. **Nunca
+mostre zero no lugar de dado ausente**: `indicadores.js` devolve `null`
+quando o denominador é zero, porque uma liquidez corrente em 0,00 parece
+diagnóstico ("não cobre o curto prazo") quando na verdade é ausência de
+passivo circulante. Endividamento 0% é diferente: aí o zero é resposta.
+
+A classificação circulante × não circulante × PL é feita pelo **nome** do
+grupo, não pelo código: no plano do IESB, `1.2` e `1.3` são ambos Ativo
+Não Circulante, e outro plano usaria outra numeração.
+
+### Sobre o 3D
+
+As torres patrimoniais (`TorresPatrimoniais.jsx`) são o único lugar com
+três dimensões, e é deliberado. O Balanço É duas pilhas de mesma altura,
+então volume e perspectiva tornam a igualdade física — dá para ver que as
+torres terminam no mesmo nível antes de ler qualquer número.
+
+**Não estenda 3D aos outros gráficos.** Perspectiva distorce comparação:
+a barra mais próxima parece maior que outra de mesmo valor, e num painel
+financeiro isso deixa de ser estilo e vira erro de leitura. Cascata,
+evolução e ranking são 2D e precisos de propósito.
+
+Feito com transformações CSS, não com three.js: uma biblioteca 3D
+custaria mais de 600 kB num app cujo bundle tem 300, para desenhar
+caixas. Todo o painel — indicadores, três gráficos SVG e as torres —
+somou 15 kB.
 
 ## Integração contínua
 

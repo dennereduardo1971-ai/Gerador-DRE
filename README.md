@@ -121,6 +121,25 @@ Na tela da DRE:
 - **Imprimir / PDF** — abre a impressão do navegador; em "Destino",
   escolha "Salvar como PDF".
 
+## Painel
+
+A aba **Painel** é a leitura rápida do período:
+
+- **Indicadores** — receita líquida, lucro, margens, EBITDA aproximado e,
+  com balancete carregado, liquidez corrente e geral, endividamento,
+  capital circulante líquido e imobilização do patrimônio líquido.
+- **Estrutura patrimonial em 3D** — Ativo e Passivo + PL como duas torres
+  empilhadas que terminam na mesma altura, com o resultado do exercício
+  visível do lado direito. Arraste para girar; há um botão "ver de
+  frente" e quem usa redução de movimento já recebe a versão plana.
+- **Cascata do resultado** — da receita bruta ao lucro líquido, mostrando
+  o que cada linha retirou.
+- **Evolução mensal** — receita, despesas e lucro por competência.
+- **Composição das despesas** — para onde foi o dinheiro, ranqueado.
+
+O painel funciona com só uma das duas fontes e diz qual falta para
+completar.
+
 ## Balancete de verificação
 
 Se o arquivo carregado for um **balancete de verificação completo** (o

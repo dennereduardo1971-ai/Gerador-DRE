@@ -22,6 +22,7 @@ import { EtapaClassificar } from "./components/EtapaClassificar.jsx";
 import { EtapaDRE } from "./components/EtapaDRE.jsx";
 import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
 import { BalancoCompleto } from "./components/BalancoCompleto.jsx";
+import { Painel } from "./components/Painel.jsx";
 import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
 import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
@@ -38,6 +39,7 @@ const FLUXO = [
 ];
 
 const VISTAS = [
+  ["painel", "Painel"],
   ["balanco", "Balanço"],
   ["horizontal", "Horizontal"],
   ["comparativo", "Comparativa"],
@@ -338,7 +340,7 @@ export default function App() {
               {VISTAS.map(([id, nome]) => (
                 <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
                   aria-current={aba === id ? "page" : undefined}
-                  disabled={id !== "historico" && !temDados && !(id === "balanco" && temBalancete)}
+                  disabled={id !== "historico" && !temDados && !(["balanco", "painel"].includes(id) && temBalancete)}
                   onClick={() => setAba(id)}>
                   <span className="etapa-marca" />
                   <span className="etapa-txt">
@@ -406,6 +408,13 @@ export default function App() {
               />
             )}
 
+            {aba === "painel" && (temDados || temBalancete) && (
+              <Painel dre={dre} temDados={temDados} balancete={abertura.balancete}
+                dresPorCompetencia={dresPorCompetencia} empresa={empresa}
+                periodo={filtroCompetencia !== "todas" ? competenciaLegivel(filtroCompetencia)
+                  : (meses.length ? `${meses[0]} a ${meses[meses.length - 1]}` : "")} />
+            )}
+
             {aba === "balanco" && (temDados || temBalancete) && (
               abertura.balancete
                 ? <BalancoCompleto bal={abertura.balancete} arquivo={abertura.arquivo}
@@ -427,7 +436,7 @@ export default function App() {
               />
             )}
 
-            {!temDados && !(aba === "balanco" && temBalancete) && !["importar", "historico"].includes(aba) && (
+            {!temDados && !(["balanco", "painel"].includes(aba) && temBalancete) && !["importar", "historico"].includes(aba) && (
               <div className="empty">
                 <b>Nenhum razão carregado</b>
                 Comece pela etapa 1, Importar — as outras telas se abrem sozinhas assim que o
