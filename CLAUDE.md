@@ -50,6 +50,13 @@ src/
                                  # sincronização com githubApi.js
     githubApi.js                 # lê/grava um arquivo JSON no repo via API do
                                   # GitHub — o "banco de dados" do histórico
+    grupos.js                     # os grupos da DRE e o sinal de cada um
+                                   # (módulo próprio: classify e planoPerfil
+                                   #  precisam dele e se importavam em círculo)
+    planoPerfil.js                # motor de perfis de plano de contas
+    planos/iesb.js                # o plano do IESB, como DADO
+    linhasDRE.js                  # a estrutura da DRE (rótulos, sinais,
+                                   #  cascata, soma por seção)
     sessao.js                     # persistência da sessão em IndexedDB
     perfil.js                     # perfil de classificação (conta → grupo)
                                    # salvável em arquivo
@@ -340,35 +347,48 @@ nenhum. Ao carregar, `cobertura()` responde "esse perfil serve para este
 razão?" antes de aplicar. Contas vindas do perfil entram como `tocadas`
 (manuais), porque é o que elas são: alguém já decidiu antes.
 
-Esse é também o caminho previsto para generalizar o app: um plano de
-contas que não seja o do IESB deve ser atendido por um perfil, **não**
-por mais um mapa hardcoded em `classify.js`.
+## Perfil de plano de contas
+
+O plano do IESB **não mora mais em `classify.js`** — virou dado em
+`planos/iesb.js`, lido pelo motor em `planoPerfil.js`. Atender outro
+cliente é carregar um arquivo pela etapa 3, sem commit e sem build.
+
+Duas coisas que não devem ser afrouxadas:
+
+- **A assinatura é obrigatória.** Um perfil sem assinatura é recusado na
+  leitura. Sem ela não há como saber se o perfil serve para o plano
+  importado, e aplicar o perfil errado distribuiria os valores de forma
+  silenciosamente errada — que é exatamente a classe de defeito que este
+  projeto mais tenta evitar.
+- **A resolução é do código mais específico para o mais genérico.** A
+  conta-folha exata vence a conta-síntese que a contém. É isso que faz
+  as exceções (3210208, 6110113) e o IRPJ/CSLL dentro de 611 caírem no
+  lugar certo sem nenhuma lista de prioridade à parte.
+
+Regras cobrem o que não cabe num mapa de prefixo: `tipo: "nome"` (Prouni
+morando dentro de Bolsas) e `tipo: "sinal"` (seções que misturam receita
+e despesa). `quando: "antes"` roda antes do mapa; `"depois"`, só se o
+mapa não resolveu.
+
+Ao mexer aqui, os testes de `planoPerfil.test.js` cobrem a mecânica, mas
+**só `fixtures/validar.mjs` prova que o perfil do IESB continua certo.**
 
 ## Ideias de expansão (backlog, não compromissos)
 
 Na ordem que eu (Claude) priorizaria, já sem o que foi feito:
 
-1. **Perfil de plano de contas orientado a dados** — tirar
-   `MAPA_CODIGO_IESB`/`EXCECOES_CODIGO_IESB`/`assinaturaPlanoIESB` do
-   código-fonte e transformá-los num perfil (o `perfil.js` já é a
-   metade do caminho: falta o mapa por CÓDIGO-SÍNTESE, não só por conta
-   folha). Hoje atender um segundo cliente exige editar `classify.js` e
-   refazer o build; e os dados de um cliente real moram no repositório
-   público.
-2. **DRE multi-coluna + linha de prova de integridade** — contador quer
-   12 meses lado a lado; `dresPorCompetencia` já calcula o dado, falta
-   a tabela aceitar N colunas. E falta na tela a linha que prova que
-   nada se perdeu: soma dos grupos + ignorado = soma das contas de
-   resultado, em R$ (hoje só se mostra a CONTAGEM de contas ignoradas,
-   não o valor — que é o número que faz um contador confiar).
-3. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
+1. **Editor de perfil de plano na própria interface** — hoje dá para
+   CARREGAR um perfil de plano, mas para criar um do zero ainda é
+   preciso escrever o JSON à mão. Uma tela que gere o perfil a partir
+   das classificações feitas por código fecharia o ciclo.
+2. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
    aba com dados; já devolve `abas`, falta UI.
-4. **Balanço com saldo de abertura** — aceitar um balancete de abertura
+3. **Balanço com saldo de abertura** — aceitar um balancete de abertura
    opcional (código;saldo) resolveria a limitação hoje documentada com
    aviso na tela.
-5. **Exportar DRE em Excel/PDF formatado** — o SheetJS já está no
+4. **Exportar DRE em Excel/PDF formatado** — o SheetJS já está no
    bundle quando se importa planilha.
-6. **Deploy automático via GitHub Actions** — hoje `docs/` é commitado
+5. **Deploy automático via GitHub Actions** — hoje `docs/` é commitado
    na mão a cada mudança.
-7. **Agregar durante a importação** em vez de guardar `linhas` cru em
+6. **Agregar durante a importação** em vez de guardar `linhas` cru em
    memória — tiraria o teto de tamanho de arquivo.

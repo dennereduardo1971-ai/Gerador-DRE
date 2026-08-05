@@ -82,6 +82,33 @@ nomes das contas — nenhum valor, nenhum lançamento. Isso é de propósito:
 o arquivo pode ser versionado no Git ou levado para outro computador sem
 carregar nenhum dado financeiro de cliente.
 
+O mesmo botão aceita também um **perfil de plano de contas**, que liga
+faixas de código a grupos da DRE. É assim que o app atende um plano de
+contas diferente do que já vem embutido, sem precisar alterar o código.
+Um perfil de plano só é aplicado se sua assinatura bater com o plano
+importado — aplicar o perfil errado distribuiria os valores de forma
+silenciosamente errada.
+
+## DRE comparativa
+
+A aba **Comparativa** mostra a demonstração inteira com uma coluna por
+mês, com a análise vertical de cada mês embaixo de cada valor — dá para
+comparar a estrutura do resultado, e não só o tamanho. Precisa de um
+razão que cubra pelo menos dois meses.
+
+Cada título de seção (Receita Operacional Bruta, Deduções, Despesas
+Operacionais, Financeiras, Não Operacionais) traz o total das contas
+agrupadas embaixo dele, para quem não conhece a estrutura da DRE de cor
+bater o olho e já ver o valor.
+
+## Prova de integridade
+
+No rodapé da DRE, uma linha mostra em reais quanto entrou na
+demonstração, quanto ficou de fora e se os dois somados batem com o
+movimento das contas de resultado do razão. Antes havia apenas a
+contagem de contas ignoradas — número que não diz nada sozinho, já que
+12 contas podem ser R$ 3,00 ou R$ 3 milhões.
+
 ## Testes
 
 ```bash
