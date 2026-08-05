@@ -24,13 +24,26 @@ export function Linha({ lbl, val, tipo, base, escala, inicio, fim, nivel }) {
   );
 }
 
-export function Secao({ nome }) {
+/** Título de seção com o total do que está agrupado embaixo dele — para
+ *  quem não conhece a estrutura da DRE bater o olho e já ver o valor, sem
+ *  precisar somar as linhas uma por uma.
+ *
+ *  `val` é a soma das linhas da seção (calculada em EtapaDRE), NÃO um
+ *  subtotal contábil oficial: "Despesas Operacionais" tem total próprio na
+ *  DRE, mas "Receita / Despesas Financeiras" é um agrupamento de leitura.
+ *  Por isso o estilo fica entre o título comum e o subtotal em negrito —
+ *  a diferença visual é o que impede o número de ser lido como uma linha
+ *  oficial da demonstração. */
+export function Secao({ nome, val, base }) {
+  const temValor = val != null;
   return (
     <div className="line" data-k="secao">
       <div className="lbl">{nome}</div>
       <div className="canal" />
-      <div className="val" />
-      <div className="av" />
+      <div className={"val " + (temValor && val < 0 ? "neg" : "")}>
+        {temValor ? (val < 0 ? "(" + brl(Math.abs(val)) + ")" : brl(val)) : ""}
+      </div>
+      <div className="av">{temValor ? pct(val / base) : ""}</div>
     </div>
   );
 }
