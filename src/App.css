@@ -1364,3 +1364,71 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
 @media (prefers-reduced-motion: reduce) {
   .palco { transition: none; }
 }
+
+/* ============================================================
+   ARQUIVOS / GALERIA
+   ============================================================ */
+
+.painel-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drop.compacto {
+  min-height: auto;
+  padding: 18px;
+  margin-bottom: 4px;
+}
+
+.galeria {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.galeria-item {
+  border: 1px solid var(--regua-forte);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--superficie);
+  display: flex;
+  flex-direction: column;
+}
+.galeria-imagem {
+  display: block;
+  aspect-ratio: 4 / 3;
+  background: var(--regua);
+  overflow: hidden;
+}
+.galeria-imagem img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.galeria-arquivo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  background: var(--regua);
+  color: var(--tinta-2);
+}
+.galeria-ext { font-size: 13px; font-weight: 700; letter-spacing: .05em; }
+.galeria-legenda {
+  padding: 9px 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11.5px;
+}
+.galeria-legenda span:first-child {
+  color: var(--tinta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.galeria-tam { color: var(--tinta-2); font-size: 10.5px; }
+.galeria-item .btn.ghost {
+  margin: 8px 10px 10px;
+  padding: 5px 10px;
+  font-size: 11px;
+  align-self: flex-start;
+}

@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { brl, pct } from "../lib/parse.js";
 import { GRUPOS } from "../lib/grupos.js";
 import { indicesPatrimoniais, margens, ranquearDespesas, serieMensal } from "../lib/indicadores.js";
+import { gerarImagemPainel, baixarImagemPainel } from "../lib/imagemPainel.js";
+import { enviarBlobParaGaleria } from "./Arquivos.jsx";
+import { lerConfigGitHub } from "../lib/githubApi.js";
 import { TorresPatrimoniais } from "./TorresPatrimoniais.jsx";
 import { Cascata, Evolucao, RankingDespesas } from "./Graficos.jsx";
 
@@ -54,6 +57,58 @@ export function Painel({ dre, temDados, balancete, dresPorCompetencia = [], empr
   const ip = useMemo(() => indicesPatrimoniais(balancete), [balancete]);
   const serie = useMemo(() => serieMensal(dresPorCompetencia), [dresPorCompetencia]);
   const despesas = useMemo(() => (temDados ? ranquearDespesas(dre, GRUPOS) : []), [dre, temDados]);
+  const [exportando, setExportando] = useState(false);
+  const [msgExport, setMsgExport] = useState("");
+
+  // A mesma lista que vira os cartões na tela, achatada em {k, texto, sub,
+  // tone} — é o que o gerador de imagem desenha. Uma função só, para a
+  // imagem nunca mostrar um indicador diferente do que está no painel.
+  const listaIndicadores = useMemo(() => {
+    const lista = [];
+    if (temDados) {
+      lista.push(
+        { k: "Receita líquida", texto: brl(dre.receitaLiq) },
+        { k: "Lucro líquido", texto: brl(dre.liquido), tone: dre.liquido >= 0 ? "ok" : "bad" },
+        { k: "Margem líquida", texto: m.margemLiquida == null ? "—" : pct(m.margemLiquida), sub: "sobre a receita líquida" },
+        { k: "Margem bruta", texto: m.margemBruta == null ? "—" : pct(m.margemBruta) },
+        { k: "EBITDA aproximado", texto: brl(m.ebitda) },
+        { k: "Peso das deduções", texto: m.pesoDeducoes == null ? "—" : pct(m.pesoDeducoes), sub: "sobre a receita bruta" },
+      );
+    }
+    if (ip) {
+      const lc = veredito("liquidezCorrente", ip.liquidezCorrente);
+      const en = veredito("endividamento", ip.endividamento);
+      lista.push(
+        { k: "Liquidez corrente", texto: ip.liquidezCorrente == null ? "—" : ip.liquidezCorrente.toFixed(2), tone: lc?.t, sub: lc?.txt },
+        { k: "Liquidez geral", texto: ip.liquidezGeral == null ? "—" : ip.liquidezGeral.toFixed(2) },
+        { k: "Endividamento", texto: ip.endividamento == null ? "—" : pct(ip.endividamento), tone: en?.t, sub: en?.txt },
+        { k: "Capital circulante líquido", texto: brl(ip.capitalCirculanteLiquido), tone: ip.capitalCirculanteLiquido >= 0 ? "ok" : "bad" },
+      );
+    }
+    return lista;
+  }, [dre, temDados, m, ip]);
+
+  async function exportarImagem(paraGithub) {
+    setExportando(true);
+    setMsgExport("");
+    try {
+      const tema = document.documentElement.getAttribute("data-tema") === "dark" ? "escuro" : "claro";
+      const blob = await gerarImagemPainel({
+        empresa, periodo, indicadores: listaIndicadores, dre: temDados ? dre : { receitaBruta: 0, deducoes: 0, receitaLiq: 0, despOper: 0, resultadoFin: 0, antesIR: 0, liquido: 0 },
+        serie, despesas, tema,
+      });
+      const nome = `painel_${(empresa || "resultado").replace(/\W+/g, "_")}_${(periodo || "periodo").replace(/\W+/g, "_")}.png`;
+      if (paraGithub) {
+        const r = await enviarBlobParaGaleria(nome, blob);
+        setMsgExport(r.ok ? `Salvo no repositório como "${nome}".` : r.erro);
+      } else {
+        baixarImagemPainel(blob, nome);
+      }
+    } catch {
+      setMsgExport("Não consegui gerar a imagem.");
+    }
+    setExportando(false);
+  }
 
   if (!temDados && !balancete) {
     return (
@@ -76,8 +131,27 @@ export function Painel({ dre, temDados, balancete, dresPorCompetencia = [], empr
           <span className="rotulo">Painel</span>
           <h2>{empresa || "Resultado do período"}</h2>
         </div>
-        {periodo && <span className="painel-periodo">{periodo}</span>}
+        <div className="painel-acoes">
+          {periodo && <span className="painel-periodo">{periodo}</span>}
+          <button className="btn ghost" disabled={exportando} onClick={() => exportarImagem(false)}>
+            {exportando ? "Gerando…" : "Baixar imagem"}
+          </button>
+          <button
+            className="btn ghost"
+            disabled={exportando}
+            onClick={() => {
+              const cfg = lerConfigGitHub();
+              if (!cfg?.token) { setMsgExport("Configure a sincronização com o GitHub na aba Histórico primeiro."); return; }
+              if (window.confirm(
+                "Este repositório é público: a imagem ficará acessível a qualquer pessoa, sem login, e permanece no histórico do Git mesmo se apagada depois. Ela trará valores financeiros reais do período. Continuar?"
+              )) exportarImagem(true);
+            }}
+          >
+            Salvar no GitHub
+          </button>
+        </div>
       </div>
+      {msgExport && <p className="hint" style={{ marginTop: -8, marginBottom: 16 }}>{msgExport}</p>}
 
       {temDados && (
         <div className="inds">
