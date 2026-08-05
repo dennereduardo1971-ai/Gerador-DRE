@@ -12,7 +12,7 @@
  * assim o arquivo pode ser compartilhado ou versionado sem carregar
  * número de cliente nenhum. */
 
-import { GRUPOS } from "./classify.js";
+import { GRUPOS } from "./grupos.js";
 
 const VERSAO = 1;
 const IDS_VALIDOS = new Set(GRUPOS.map((g) => g.id));

@@ -4,28 +4,11 @@
  * devoluções, descontos, PIS/COFINS/ISS, fopag, administrativas,
  * depreciação, provisões, financeiro e não operacional). */
 
-export const GRUPOS = [
-  { id: "REC_MENSALIDADES", nome: "Receita Bruta com Mensalidades", sinal: 1 },
-  { id: "REC_TAXAS", nome: "Receita com Taxas", sinal: 1 },
-  { id: "DED_BOLSAS", nome: "Bolsas / Resoluções", sinal: -1 },
-  { id: "DED_PROUNI", nome: "Prouni", sinal: -1 },
-  { id: "DED_DEVOLUCOES", nome: "Mensalidades Devolvidas", sinal: -1 },
-  { id: "DED_DESCONTOS", nome: "Descontos / Cancelamentos", sinal: -1 },
-  { id: "DED_IMPOSTOS", nome: "PIS / COFINS / ISS", sinal: -1 },
-  { id: "CUSTOS", nome: "Custos dos Serviços", sinal: -1 },
-  { id: "DESP_FOPAG", nome: "Despesas com Pessoal (Fopag)", sinal: -1 },
-  { id: "DESP_ADM", nome: "Despesas Administrativas", sinal: -1 },
-  { id: "DEPRECIACAO", nome: "Depreciação / Amortização", sinal: -1 },
-  { id: "PROVISOES_CONTINGENCIAS", nome: "Provisões / Reversões Contingências", sinal: -1 },
-  { id: "PROVISOES_PCLD", nome: "Provisões / Reversões PCLD", sinal: -1 },
-  { id: "REC_FIN", nome: "Receitas Financeiras", sinal: 1 },
-  { id: "DESP_FIN", nome: "Despesas Financeiras", sinal: -1 },
-  { id: "OUTRAS_REC", nome: "Receitas Não Operacionais", sinal: 1 },
-  { id: "OUTRAS_DESP", nome: "Despesas Não Operacionais", sinal: -1 },
-  { id: "IRPJ_CSLL", nome: "IRPJ e CSLL", sinal: -1 },
-  { id: "IGNORAR", nome: "Não entra na DRE", sinal: 0 },
-];
-export const NOME_GRUPO = Object.fromEntries(GRUPOS.map((g) => [g.id, g.nome]));
+import { GRUPOS, SINAL_GRUPO } from "./grupos.js";
+import { escolherPlano, grupoPorPlano } from "./planoPerfil.js";
+import { PLANOS_EMBUTIDOS } from "./planos/iesb.js";
+
+export { GRUPOS, NOME_GRUPO, SINAL_GRUPO } from "./grupos.js";
 
 const PAT_MENSALIDADE = /MENSALIDADE|\bMENS\.?\b/i;
 const PAT_TAXA = /\bTAXA/i;
@@ -56,126 +39,13 @@ const PADROES = {
   naoOper: PAT_NAO_OPER,
 };
 
-/* ---------------------------------------------------------------------
- * Classificação exata por código de conta — plano de contas do IESB
- * ---------------------------------------------------------------------
- * O texto/histórico é um sinal probabilístico; o CÓDIGO da conta no plano
- * de contas oficial é um fato. Este mapa liga cada conta SINTÉTICA mais
- * específica do plano (a que agrupa diretamente as contas-folha de um
- * mesmo assunto) ao grupo da DRE correspondente. Validado linha a linha
- * contra a DRE real de jan a jun/2026: todo grupo bateu com a DRE oficial
- * até o centavo (ver histórico do commit para o script de conferência).
- *
- * Só entra em ação quando o plano de contas importado tem a "assinatura"
- * do IESB (ver `assinaturaPlanoIESB`) — com outro plano de contas, ou sem
- * plano de contas nenhum, a classificação cai no texto/histórico como
- * sempre caiu. Isso existe para que a distribuição de valores bata
- * exatamente com o contábil real do Denner, sem depender de palavras-chave
- * que podem coincidir por acaso. */
-const MAPA_CODIGO_IESB = {
-  // Receita bruta
-  "31101": "REC_MENSALIDADES", // RECEITAS PROPRIAS
-  "31103": "REC_MENSALIDADES", // RECEITAS BOLSISTAS (fies/prouni/gdf/institucional/convênios — ainda receita bruta)
-  "31102": "REC_TAXAS", // OUTRAS/RECEITAS ACESSORIAS TAXAS
-  // Deduções da receita
-  "32100": "DED_BOLSAS", // (-)BOLSAS ESTUDANTIS
-  "32101": "DED_DESCONTOS", // (-)OUTROS DESCONTOS
-  "32102": "DED_DESCONTOS", // (-)MENSALIDADES CANCELADAS PROPRIAS
-  "32103": "DED_DESCONTOS", // (-)MENSALIDADES CANCELADAS BOLSISTAS
-  "32104": "DED_DEVOLUCOES", // (-)DEVOLUCOES MENSALIDADES/TAXAS
-  "32105": "DED_IMPOSTOS", // (-)IMPOSTOS E CONTRIB. S/SERVICOS (ISS/PIS/COFINS)
-  // Custo dos serviços = folha dos docentes (quem entrega o serviço-fim)
-  "41101": "CUSTOS", // CUSTO TOTAL - DOCENTES
-  "41102": "CUSTOS", // IMPOSTOS/CONTRIB. FOPAG - DOCENTES
-  "41103": "CUSTOS", // DEMAIS ENCARGOS FOPAG - DOCENTES
-  // Fopag operacional = folha do administrativo + apoio acadêmico
-  "41110": "DESP_FOPAG", "41111": "DESP_FOPAG", "41112": "DESP_FOPAG", // administrativo
-  "41120": "DESP_FOPAG", "41121": "DESP_FOPAG", "41122": "DESP_FOPAG", // apoio acadêmico
-  // Despesas administrativas
-  "41201": "DESP_ADM", "41202": "DESP_ADM", "41203": "DESP_ADM", "41204": "DESP_ADM",
-  "41205": "DESP_ADM", "41206": "DESP_ADM", "41207": "DESP_ADM", "41208": "DESP_ADM",
-  "41209": "DESP_ADM", "41211": "DESP_ADM",
-  "41210": "DEPRECIACAO", // DEPRECIACAO SOCIETARIA (não é despesa administrativa comum)
-  // Resultado financeiro
-  "42101": "DESP_FIN", // DESPESAS FINANCEIRAS
-  "42102": "REC_FIN", // (-)RECEITAS FINANCEIRAS (nome do plano é enganoso: é receita)
-  // Provisões — separadas em duas linhas, como na DRE oficial: Contingências
-  // (cíveis/trabalhistas, novas e revertidas) e PCLD (perdas estimadas com
-  // créditos de liquidação duvidosa, fiscal e societária, novas e revertidas).
-  // Confirmado batendo com as duas linhas da DRE oficial mês a mês.
-  "6110100": "PROVISOES_CONTINGENCIAS", // PROV. CONTINGENCIAS CIVEIS
-  "6110101": "PROVISOES_CONTINGENCIAS", // (-) REV. PROV. CONTINGENCIAS CIVEIS
-  "6110102": "PROVISOES_CONTINGENCIAS", // INSS (contingência)
-  "6110104": "PROVISOES_CONTINGENCIAS", // PROV. CONTINGENCIAS TRABALHISTAS
-  "6110105": "PROVISOES_CONTINGENCIAS", // (-) REV. PROV. CONTING. TRABALHISTAS
-  "6110115": "PROVISOES_CONTINGENCIAS", // CONTINGENCIAS CIVEIS REALIZADAS
-  "6110116": "PROVISOES_CONTINGENCIAS", // CONTINGENCIAS TRABALHISTAS REALIZADAS
-  "6110103": "PROVISOES_PCLD", // PERDAS EST. P/CRED. LIQ. DUVIDOSA FISCAL
-  "6110106": "PROVISOES_PCLD", // PERDAS EST. PROG./CONVENIOS
-  "6110111": "PROVISOES_PCLD", // (-)REV. CRED. LIQ. DUV. EXERC ANTERIORES
-  "6110112": "PROVISOES_PCLD", // (-)REV. CRED. LIQ. DUV. EXERC. CORRENTE
-  "6110114": "PROVISOES_PCLD", // (-)PROG. ALIM. TRABALHADOR
-  "6110119": "PROVISOES_PCLD", // PERDAS EST. P/CRED. LIQ. DUVIDOSA SOCIET
-  "61101": "PROVISOES_PCLD", // fallback — qualquer conta nova nesse grupo que ainda não foi vista
-  // Fechamento do exercício — não é conta de resultado
-  "71101": "IGNORAR",
-};
-
-/** Contas-folha cujo nome diz uma coisa diferente do grupo em que o plano
- *  as colocou — exceções pontuais, achadas comparando com a DRE oficial:
- *  - 6110113 mora dentro de "Provisões" no plano, mas a DRE oficial trata
- *    IPTU de imóvel de investimento como Não Operacional.
- *  - 3210208 mora dentro de "Mensalidades Canceladas Próprias" no plano,
- *    mas o nome ("DEV. DE MENSALIDADES") é devolução de verdade. */
-const EXCECOES_CODIGO_IESB = {
-  "6110113": "OUTRAS_DESP", // IPTU IMOVEIS INVESTIMENTO
-  "3210208": "DED_DEVOLUCOES", // (-)DEV. DE MENSALIDADES
-};
-
-/** Contas de IRPJ/CSLL (inclui incentivo Prouni e diferimento) dentro do
- *  grupo 611 de provisões — checadas antes do mapa geral porque "provisão
- *  de IRPJ/CSLL" bate em Provisões por código, mas tem grupo próprio. */
-const CODIGOS_IRPJ_CSLL_IESB = new Set([
-  "6110107", "6110108", // PROVISAO IRPJ / CSLL
-  "6110109", "6110110", // (-) RESERVA INCENTIVO FISCAL PROUNI IRPJ / CSLL
-  "6110117", "6110118", // PROVISAO IRPJ / CSLL DIFERIDO(A)
-]);
-
-/** A assinatura confirma que o plano de contas importado é o do IESB antes
- *  de confiar no mapa de códigos acima — checa o nome das contas-síntese
- *  de topo (1 dígito), que são as mais estáveis do plano. */
-function assinaturaPlanoIESB(nomes) {
-  const tem = (cod, trecho) => (nomes[cod] || "").toUpperCase().includes(trecho);
-  return (
-    tem("3", "RECEITAS LIQUIDAS") &&
-    tem("4", "DESPESAS ADMINISTRATIVAS") &&
-    tem("5", "OUTRAS RECEITAS") &&
-    tem("6", "PROVISOES")
-  );
-}
-
-/** Resolve o grupo de uma conta pelo código, seguindo a ordem: exceção
- *  pontual > IRPJ/CSLL > Prouni dentro de Bolsas > mapa geral > seção 511
- *  (outras receitas/despesas não operacionais, decidida pelo sinal do
- *  saldo, pois no plano ela mistura contas devedoras e credoras). Retorna
- *  null quando o código não é reconhecido, para cair no classificador por
- *  texto/histórico. */
-function grupoPorCodigoIESB(conta, nomes, saldo) {
-  if (EXCECOES_CODIGO_IESB[conta]) return EXCECOES_CODIGO_IESB[conta];
-  if (CODIGOS_IRPJ_CSLL_IESB.has(conta)) return "IRPJ_CSLL";
-  // "(-)PROUNI" mora dentro da conta-síntese "(-)BOLSAS ESTUDANTIS" (32100)
-  // no plano, mas a DRE oficial trata Prouni como linha própria. Contas de
-  // Prouni dentro de OUTROS grupos (ex. Mensalidades Canceladas Bolsistas)
-  // ficam no grupo do código mesmo — só a de Bolsas é exceção, confirmado
-  // batendo com a DRE oficial mês a mês.
-  if (conta.slice(0, 5) === "32100" && PAT_PROUNI.test(nomes[conta] || "")) return "DED_PROUNI";
-  for (let len = conta.length; len >= 1; len--) {
-    const g = MAPA_CODIGO_IESB[conta.slice(0, len)];
-    if (g) return g;
-  }
-  if (conta.slice(0, 2) === "51") return saldo > 0 ? "OUTRAS_REC" : "OUTRAS_DESP";
-  return null;
-}
+/* A classificação exata por CÓDIGO de conta saiu daqui: o plano de contas
+ * do IESB era três constantes cravadas no código-fonte, o que obrigava a
+ * editar a lógica e refazer o build para atender qualquer outro cliente.
+ * Agora é um perfil de dados — ver `planoPerfil.js` (o motor) e
+ * `planos/iesb.js` (o perfil do IESB, validado centavo a centavo contra a
+ * DRE oficial de jan a jun/2026). O comportamento é idêntico; o que mudou
+ * é onde o conhecimento mora. */
 
 /** Sugere o grupo de cada conta de resultado.
  *
@@ -193,7 +63,7 @@ function grupoPorCodigoIESB(conta, nomes, saldo) {
  * Sem plano de contas importado, cai num fallback por maioria dentro do
  * prefixo de 3 dígitos (o comportamento original, mais grosseiro mas que
  * não depende de nome nenhum — só do histórico dos lançamentos). */
-export function sugerirClassificacao(contas, nomes = {}) {
+export function sugerirClassificacao(contas, nomes = {}, planos = PLANOS_EMBUTIDOS) {
   const porPrefixo = {};
   contas.forEach((c) => {
     const p = c.conta.slice(0, 3);
@@ -230,16 +100,17 @@ export function sugerirClassificacao(contas, nomes = {}) {
     }
   });
 
-  // se o plano de contas importado é o do IESB, o código da conta manda —
-  // é um fato do plano, não uma suposição sobre o texto do lançamento
-  const usarCodigoIESB = assinaturaPlanoIESB(nomes);
+  // Se algum perfil reconhece o plano de contas importado, o código da
+  // conta manda — é um fato do plano, não uma suposição sobre o texto do
+  // lançamento. Sem perfil aplicável, cai no texto/histórico.
+  const plano = escolherPlano(planos, nomes);
 
   const mapa = {};
   contas.forEach((c) => {
     const p = c.conta.slice(0, 3);
     const texto = textoDaConta(c);
     const bate = (re) => re.test(texto);
-    let g = usarCodigoIESB ? grupoPorCodigoIESB(c.conta, nomes, c.saldo) : null;
+    let g = plano ? grupoPorPlano(plano, c.conta, nomes, c.saldo) : null;
     if (g) { mapa[c.conta] = g; return; }
 
     // decisão direta, conta por conta — a ordem importa: padrões mais
@@ -309,7 +180,6 @@ export function agruparPorDigito(contas) {
   return Object.values(g).sort((a, b) => a.digito.localeCompare(b.digito));
 }
 
-export const SINAL_GRUPO = Object.fromEntries(GRUPOS.map((g) => [g.id, g.sinal || 1]));
 
 /** Monta a DRE completa a partir das contas de resultado já classificadas.
  *
@@ -350,5 +220,34 @@ export function montarDRE(contasResultado, grupoDe) {
   return {
     bal, receitaBruta, deducoes, receitaLiq, resultadoOperBruto, despOper,
     resultadoFin, resultadoOper, naoOper, antesIR, liquido,
+  };
+}
+
+/** Prova de integridade: nada se perdeu nem foi contado duas vezes entre
+ *  o razão e a demonstração.
+ *
+ *  A tela mostrava só a CONTAGEM de contas deixadas de fora ("12 contas
+ *  não entraram") — número que não diz nada sozinho: 12 contas podem ser
+ *  R$ 3,00 ou R$ 3 milhões. O que um contador precisa antes de assinar é
+ *  o VALOR, e a confirmação de que o resto fechou.
+ *
+ *  Compara em magnitude (`Math.abs`) de propósito: aqui a pergunta não é
+ *  "qual o resultado", é "cada centavo do razão foi parar em alguma linha
+ *  da DRE ou na pilha do que ficou de fora?". */
+export function provaIntegridade(contasResultado, grupoDe) {
+  let total = 0, classificado = 0, ignorado = 0;
+  let nIgnoradas = 0;
+  contasResultado.forEach((c) => {
+    const v = Math.abs(c.saldo);
+    total += v;
+    if (grupoDe(c.conta) === "IGNORAR") { ignorado += v; nIgnoradas++; }
+    else classificado += v;
+  });
+  const diferenca = total - (classificado + ignorado);
+  return {
+    total, classificado, ignorado, nIgnoradas,
+    nContas: contasResultado.length,
+    diferenca,
+    fecha: Math.abs(diferenca) < 0.01,
   };
 }

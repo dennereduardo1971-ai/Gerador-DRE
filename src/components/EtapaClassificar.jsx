@@ -2,21 +2,36 @@ import { useRef, useState } from "react";
 import { brl } from "../lib/parse.js";
 import { GRUPOS } from "../lib/classify.js";
 import { cobertura, lerPerfil } from "../lib/perfil.js";
+import { lerPlano } from "../lib/planoPerfil.js";
 
 export function EtapaClassificar({
   grupos1, digitosResultado, resultadoManual, onResultadoManual,
   contasResultado, grupoDe, tocadas, nomes, busca, onBusca,
   onClassificar, onImportarPlano, onGerarDRE, onLimparManuais,
-  avisoPerfil, onAvisoPerfil, onSalvarPerfil, onAplicarPerfil,
+  avisoPerfil, onAvisoPerfil, onSalvarPerfil, onAplicarPerfil, onAplicarPlano, planoAtivo,
 }) {
   const [buscaLocal, setBuscaLocal] = useState(busca);
   const planoRef = useRef(null);
   const perfilRef = useRef(null);
   const manuais = Object.values(tocadas).filter(Boolean).length;
 
+  /* Um mesmo botão aceita os dois tipos de perfil, distinguidos pelo campo
+     "formato" de dentro do arquivo — pedir ao usuário que saiba de cabeça
+     qual é qual seria transferir para ele um detalhe de implementação. */
   function carregarPerfil(file) {
     if (!file) return;
     file.text().then((txt) => {
+      if (txt.includes("gerador-dre/plano")) {
+        const rp = lerPlano(txt);
+        if (!rp.ok) { onAvisoPerfil(rp.erro); return; }
+        onAplicarPlano(rp.plano);
+        const sobra = rp.ignorados ? ` ${rp.ignorados} código(s) usavam um grupo que não existe e foram ignorados.` : "";
+        onAvisoPerfil(
+          `Plano de contas "${rp.plano.nome}" carregado com ${Object.keys(rp.plano.codigos).length} códigos. ` +
+          "Ele só será aplicado se a assinatura bater com o plano de contas importado." + sobra
+        );
+        return;
+      }
       const r = lerPerfil(txt);
       if (!r.ok) { onAvisoPerfil(r.erro); return; }
       const c = cobertura(r.perfil, contasResultado);
@@ -74,6 +89,13 @@ export function EtapaClassificar({
           seguinte em vez de refazer tudo. O perfil guarda só as <b>decisões</b> (conta → grupo)
           e os nomes das contas — nenhum valor, nenhum lançamento —, então dá para guardar junto
           do projeto ou levar para outro computador sem carregar dado financeiro de cliente.
+        </p>
+        <p className="hint">
+          {planoAtivo
+            ? <>Plano de contas reconhecido: <b>{planoAtivo.nome}</b> — a classificação por código está ativa.</>
+            : <>Nenhum perfil de plano de contas reconheceu o plano importado, então a
+               classificação está sendo feita pelo nome e pelo histórico das contas. É mais
+               frágil: confira grupo por grupo antes de gerar a DRE.</>}
         </p>
         <div className="row">
           <button className="btn ghost" onClick={onSalvarPerfil} disabled={!manuais}>
