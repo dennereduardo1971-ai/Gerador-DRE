@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
-import { agregarPorConta, competenciaLegivel, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
+import { agregarPorConta, avisosDoMapeamento, competenciaLegivel, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
 import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
@@ -98,10 +98,15 @@ export default function App() {
     });
   }
 
-  const { contas, tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia } = useMemo(
+  const {
+    contas, tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia,
+    debSemConta, creSemConta,
+  } = useMemo(
     () => agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompetencia),
     [linhas, map, filtroMes, filtroCC, filtroCompetencia]
   );
+
+  const avisosMap = useMemo(() => avisosDoMapeamento(map, linhas), [map, linhas]);
 
   const competenciasDisponiveis = useMemo(() => listarCompetencias(linhas, map), [linhas, map]);
 
@@ -208,6 +213,7 @@ export default function App() {
                 competenciasDisponiveis={competenciasDisponiveis} filtroCompetencia={filtroCompetencia}
                 onFiltroCompetencia={setFiltroCompetencia}
                 empresa={empresa} cnpj={cnpj} map={map} cols={cols} nomes={nomes}
+                avisosMap={avisosMap} debSemConta={debSemConta} creSemConta={creSemConta}
                 onFiltroMes={setFiltroMes} onFiltroCC={setFiltroCC}
                 onEmpresa={setEmpresa} onCnpj={setCnpj} onMap={setMap}
                 onIrClassificar={() => setAba("classificar")}

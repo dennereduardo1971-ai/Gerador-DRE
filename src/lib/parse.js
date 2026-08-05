@@ -30,11 +30,19 @@ export async function lerTexto(file) {
   return txt;
 }
 
+const normalizarNome = (s) =>
+  String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
+
 /** Acha a coluna do CSV cujo nome bate com um dos termos, ignorando acentos
- *  e pontuação — primeiro por igualdade exata, depois por inclusão. */
+ *  e pontuação, em três passadas cada vez mais tolerantes:
+ *  1. igualdade exata ("Historico" = "historico");
+ *  2. a coluna contém o termo ("Valor Debito" contém "debito");
+ *  3. o termo contém a coluna ("historico" contém "hist") — é o que faz
+ *     abreviação de sistema contábil ser reconhecida. Exige pelo menos 3
+ *     letras na coluna, senão uma coluna chamada "D" viraria a data só
+ *     porque "d" cabe dentro de "dia/mes". */
 export function acharColuna(cols, ...termos) {
-  const norm = (s) =>
-    String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
+  const norm = normalizarNome;
   for (const t of termos) {
     const alvo = norm(t);
     const hit = cols.find((c) => norm(c) === alvo);
@@ -45,21 +53,90 @@ export function acharColuna(cols, ...termos) {
     const hit = cols.find((c) => norm(c).includes(alvo));
     if (hit) return hit;
   }
+  for (const t of termos) {
+    const alvo = norm(t);
+    const hit = cols.find((c) => norm(c).length >= 3 && alvo.includes(norm(c)));
+    if (hit) return hit;
+  }
   return "";
 }
 
-/** Descobre o mapeamento de colunas de um razão a partir do cabeçalho. */
+/** Descobre o mapeamento de colunas de um razão a partir do cabeçalho.
+ *
+ *  Cada coluna só pode ser usada UMA vez. Sem isso, um cabeçalho enxuto
+ *  como "Data;Debito;Credito;Valor" fazia `contaD` e `valorD` apontarem
+ *  para a mesma coluna "Debito" — e o app somava o CÓDIGO da conta como
+ *  se fosse dinheiro, calado, produzindo uma DRE inteira de números
+ *  inventados. Errar a coluna é recuperável (o usuário corrige na etapa
+ *  2); somar código de conta como valor sem avisar, não. */
 export function mapearColunas(campos) {
-  return {
-    contaD: acharColuna(campos, "cta. debito", "conta debito", "debito"),
-    contaC: acharColuna(campos, "cta. credito", "conta credito", "credito"),
-    valorD: acharColuna(campos, "valor debito", "vlr debito", "debito"),
-    valorC: acharColuna(campos, "valor credito", "vlr credito", "credito"),
-    hist: acharColuna(campos, "historico", "descricao", "complemento"),
-    data: acharColuna(campos, "dia/mes", "data", "mes"),
-    ano: acharColuna(campos, "ano"),
-    cc: acharColuna(campos, "c.custo debito", "centro de custo", "ccusto"),
+  const usadas = new Set();
+  const pegar = (...termos) => {
+    const hit = acharColuna(campos.filter((c) => !usadas.has(c)), ...termos);
+    if (hit) usadas.add(hit);
+    return hit;
   };
+  return {
+    contaD: pegar("cta. debito", "conta debito", "debito"),
+    contaC: pegar("cta. credito", "conta credito", "credito"),
+    valorD: pegar("valor debito", "vlr debito", "debito"),
+    valorC: pegar("valor credito", "vlr credito", "credito"),
+    hist: pegar("historico", "descricao", "complemento"),
+    data: pegar("dia/mes", "data", "mes"),
+    ano: pegar("ano"),
+    cc: pegar("c.custo debito", "centro de custo", "ccusto"),
+  };
+}
+
+/** Um texto "parece valor"? Código de conta é inteiro longo sem separador
+ *  decimal; valor tem centavos ou é um número curto. Heurística boba de
+ *  propósito — só precisa ser boa o bastante para levantar a mão. */
+function pareceValor(v) {
+  const s = String(v ?? "").replace(/[R$\s]/g, "").trim();
+  if (!s) return false;
+  if (/^\d{5,}$/.test(s)) return false; // 3110101 é conta, não R$
+  return !isNaN(numeroBR(s)) && /\d/.test(s);
+}
+
+/** Confere o mapeamento contra uma amostra das linhas e devolve avisos em
+ *  português para mostrar na etapa Conferir. A ideia é que nenhum erro de
+ *  mapeamento chegue calado até a DRE: se o app não tem certeza, ele diz. */
+export function avisosDoMapeamento(map, linhas = []) {
+  const avisos = [];
+
+  if (!map.valorD && !map.valorC) {
+    avisos.push(
+      "Não identifiquei nenhuma coluna de valor. Sem ela todos os saldos ficam zerados — " +
+      "escolha as colunas de valor de débito e de crédito abaixo."
+    );
+  }
+
+  const colidem = [];
+  if (map.contaD && map.contaD === map.valorD) colidem.push(map.contaD);
+  if (map.contaC && map.contaC === map.valorC) colidem.push(map.contaC);
+  if (colidem.length) {
+    avisos.push(
+      `A coluna "${colidem[0]}" está sendo usada como conta e como valor ao mesmo tempo. ` +
+      "Uma das duas está errada — corrija antes de seguir, senão o código da conta entra na soma como se fosse dinheiro."
+    );
+  }
+
+  const amostra = linhas.slice(0, 200);
+  for (const [chave, nome] of [["valorD", "valor de débito"], ["valorC", "valor de crédito"]]) {
+    const col = map[chave];
+    if (!col || !amostra.length) continue;
+    const preenchidas = amostra.filter((l) => String(l[col] ?? "").trim() !== "");
+    if (!preenchidas.length) continue;
+    const validas = preenchidas.filter((l) => pareceValor(l[col])).length;
+    if (validas / preenchidas.length < 0.5) {
+      avisos.push(
+        `A coluna "${col}", mapeada como ${nome}, não parece conter valores em R$ — ` +
+        "os números lá dentro têm cara de código de conta. Confira o mapeamento."
+      );
+    }
+  }
+
+  return avisos;
 }
 
 const MESES_ABREV = {
@@ -72,6 +149,17 @@ const MESES_ABREV = {
  *  data completa "DD/MM/AAAA". Retorna algo como "07/2026", ou "" se não der
  *  para reconhecer o formato — nesse caso a linha não entra na análise
  *  horizontal, mas continua valendo para os totais normais. */
+/** Ano sempre com 4 dígitos. Razão exportado com ano "26" gerava a
+ *  competência "01/26", que convivia com "01/2026" vinda de outro arquivo
+ *  como se fossem meses diferentes — o mesmo mês aparecia duas vezes no
+ *  seletor e na análise horizontal. */
+function normalizarAno(v) {
+  const s = String(v ?? "").trim();
+  if (/^\d{4}$/.test(s)) return s;
+  if (/^\d{2}$/.test(s)) return `20${s}`;
+  return "";
+}
+
 export function competenciaDaLinha(dataStr, anoStr) {
   if (!dataStr) return "";
   const s = String(dataStr).trim().toLowerCase();
@@ -80,11 +168,24 @@ export function competenciaDaLinha(dataStr, anoStr) {
     const mesTxt = partes[1];
     const mesNum = MESES_ABREV[mesTxt.slice(0, 3)] || (/^\d{1,2}$/.test(mesTxt) ? mesTxt.padStart(2, "0") : null);
     if (mesNum) {
-      const ano = partes[2] || anoStr;
-      if (ano) return `${mesNum}/${String(ano).trim()}`;
+      const ano = normalizarAno(partes[2] || anoStr);
+      if (ano) return `${mesNum}/${ano}`;
     }
   }
   return "";
+}
+
+/** Ordena competências "MM/AAAA" cronologicamente.
+ *
+ *  Um `.sort()` comum ordena como texto e coloca o mês na frente do ano:
+ *  ['12/2025','01/2026'] virava ['01/2026','12/2025']. Todo razão que
+ *  cruza a virada do ano saía com a análise horizontal fora de ordem, e
+ *  cada mês era comparado com o "anterior" errado — sem nenhum sinal na
+ *  tela de que algo estava trocado. */
+export function compararCompetencia(a, b) {
+  const [mesA, anoA] = String(a).split("/");
+  const [mesB, anoB] = String(b).split("/");
+  return `${anoA}${mesA}`.localeCompare(`${anoB}${mesB}`);
 }
 
 const NOME_MES = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -103,7 +204,7 @@ export function listarCompetencias(linhas, map) {
     const comp = competenciaDaLinha(mes, map.ano ? l[map.ano] : "");
     if (comp) set.add(comp);
   }
-  return [...set].sort();
+  return [...set].sort(compararCompetencia);
 }
 
 /** Agrega as linhas do razão por conta, respeitando filtros de dia, centro
@@ -114,6 +215,7 @@ export function listarCompetencias(linhas, map) {
 export function agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompetencia = "todas") {
   const acc = {};
   let tDeb = 0, tCre = 0;
+  let debSemConta = 0, creSemConta = 0;
   const setMeses = new Set(), setCC = new Set();
   const LIMITE_HISTORICO = 20000;
   const porCompetencia = {}; // competencia -> { contas: { conta: {deb,cre} } }
@@ -134,6 +236,13 @@ export function agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompeten
     const cd = String(l[map.contaD] ?? "").trim();
     const cc2 = String(l[map.contaC] ?? "").trim();
     const h = map.hist ? String(l[map.hist] ?? "") : "";
+
+    // Valor lançado sem conta do lado correspondente: entra no total de
+    // débito/crédito mas não em conta nenhuma. É uma das origens de
+    // "diferença que não aparece em conta nenhuma" no teste de partidas
+    // dobradas — então em vez de sumir, é contado e reportado.
+    if (!cd && vd) debSemConta += vd;
+    if (!cc2 && vc) creSemConta += vc;
 
     if (cd && vd) {
       acc[cd] = acc[cd] || { conta: cd, deb: 0, cre: 0, n: 0, historico: "" };
@@ -160,7 +269,7 @@ export function agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompeten
   const contas = Object.values(acc).map((c) => ({ ...c, saldo: c.cre - c.deb }));
   contas.sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo));
 
-  const competencias = Object.keys(porCompetencia).sort();
+  const competencias = Object.keys(porCompetencia).sort(compararCompetencia);
   const contasPorCompetencia = {};
   competencias.forEach((comp) => {
     contasPorCompetencia[comp] = Object.entries(porCompetencia[comp]).map(([conta, v]) => ({
@@ -173,6 +282,7 @@ export function agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompeten
     contas, tDeb, tCre, nLinhas: linhas.length,
     meses: [...setMeses], ccs: [...setCC].sort(),
     competencias, contasPorCompetencia,
+    debSemConta, creSemConta,
   };
 }
 

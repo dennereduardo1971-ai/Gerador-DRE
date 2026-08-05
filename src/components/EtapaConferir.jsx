@@ -4,11 +4,16 @@ import { Balanca } from "./Eixo.jsx";
 export function EtapaConferir({
   arquivo, nLinhas, contas, dif, tDeb, tCre, meses, ccs, filtroMes, filtroCC,
   competenciasDisponiveis, filtroCompetencia, onFiltroCompetencia,
-  empresa, cnpj, map, cols, nomes, onFiltroMes, onFiltroCC,
+  empresa, cnpj, map, cols, nomes, avisosMap = [], debSemConta = 0, creSemConta = 0,
+  onFiltroMes, onFiltroCC,
   onEmpresa, onCnpj, onMap, onIrClassificar,
 }) {
   return (
     <>
+      {avisosMap.map((aviso, i) => (
+        <div className="warn" key={i}>{aviso}</div>
+      ))}
+
       <div className="checks">
         <div className="check"><div className="k">Arquivo</div><div className="v" style={{ fontSize: 13 }}>{arquivo}</div></div>
         <div className="check"><div className="k">Lançamentos</div><div className="v">{nLinhas.toLocaleString("pt-BR")}</div></div>
@@ -40,6 +45,17 @@ export function EtapaConferir({
           O razão fecha com diferença de <b>{brl(Math.abs(dif))}</b> entre débitos e créditos.
           Costuma ser arredondamento ou lançamento cortado na exportação — vale conferir antes
           de assinar a DRE.
+        </div>
+      )}
+
+      {(debSemConta > 0.005 || creSemConta > 0.005) && (
+        <div className="warn">
+          Há valor lançado <b>sem conta preenchida</b> do lado correspondente:{" "}
+          {debSemConta > 0.005 && <>débito de <b>{brl(debSemConta)}</b></>}
+          {debSemConta > 0.005 && creSemConta > 0.005 && " e "}
+          {creSemConta > 0.005 && <>crédito de <b>{brl(creSemConta)}</b></>}.
+          Esse valor entra no total acima, mas não aparece em nenhuma conta da tabela — é uma
+          das origens típicas de diferença que "some" quando se soma conta por conta.
         </div>
       )}
 
