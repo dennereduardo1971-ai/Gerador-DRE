@@ -1,0 +1,66 @@
+name: Verificar e publicar
+
+# `docs/` fica fora do gatilho de propósito: o job de publicação commita
+# nessa pasta, e sem essa exclusão cada publicação dispararia uma nova
+# execução, que publicaria de novo, em loop.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "data/historico.json"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verificar:
+    name: Testes e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npx oxlint src/
+      - name: Testes
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  publicar:
+    name: Publicar no GitHub Pages
+    needs: verificar
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # O Pages deste repositório serve a pasta docs/ da main, então
+      # publicar é commitar o build ali. Só commita se algo mudou de fato —
+      # o hash dos assets muda a cada build, mas se o conteúdo for idêntico
+      # o git não vê diferença e o passo vira no-op.
+      - name: Atualizar docs/
+        run: |
+          rm -rf docs
+          cp -r dist docs
+          if [ -z "$(git status --porcelain docs)" ]; then
+            echo "Nada mudou em docs/; nada a publicar."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          git commit -m "build: publica docs/ [skip ci]"
+          git push
