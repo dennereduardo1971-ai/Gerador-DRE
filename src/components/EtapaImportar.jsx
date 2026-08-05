@@ -14,8 +14,14 @@ export function EtapaImportar({ carregando, progresso, onImportar }) {
     <>
       <div
         className="drop"
+        role="button"
+        tabIndex={0}
+        aria-label="Escolher o arquivo do razão contábil"
         data-over={over ? "1" : "0"}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); }
+        }}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); onImportar(e.dataTransfer.files[0]); }}
@@ -56,16 +62,24 @@ export function EtapaImportar({ carregando, progresso, onImportar }) {
           a primeira que tiver dados. Arquivos grandes (dezenas de milhares de linhas) são lidos
           em partes, sem travar a página.
         </p>
-        <table>
+        <table className="tabela-cartao">
           <thead>
             <tr><th>Coluna</th><th>Serve para</th><th>Obrigatória</th></tr>
           </thead>
           <tbody>
-            <tr><td className="code">Cta. Debito / Cta. Credito</td><td>Identificar a conta de cada lado</td><td>Sim</td></tr>
-            <tr><td className="code">Valor Debito / Valor Credito</td><td>Somar o saldo da conta</td><td>Sim</td></tr>
-            <tr><td className="code">Historico</td><td>Sugerir a classificação e nomear a conta</td><td>Não</td></tr>
-            <tr><td className="code">Dia/Mes + Ano</td><td>Filtrar o período e montar a análise horizontal</td><td>Não</td></tr>
-            <tr><td className="code">C.Custo</td><td>Filtrar por centro de custo</td><td>Não</td></tr>
+            {[
+              ["Cta. Debito / Cta. Credito", "Identificar a conta de cada lado", "Sim"],
+              ["Valor Debito / Valor Credito", "Somar o saldo da conta", "Sim"],
+              ["Historico", "Sugerir a classificação e nomear a conta", "Não"],
+              ["Dia/Mes + Ano", "Filtrar o período e montar a análise horizontal", "Não"],
+              ["C.Custo", "Filtrar por centro de custo", "Não"],
+            ].map(([coluna, serve, obrig]) => (
+              <tr key={coluna}>
+                <td className="code" data-rotulo="Coluna">{coluna}</td>
+                <td className="desc" data-rotulo="Serve para">{serve}</td>
+                <td data-rotulo="Obrigatória">{obrig}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

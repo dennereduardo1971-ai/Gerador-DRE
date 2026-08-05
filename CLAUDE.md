@@ -53,20 +53,76 @@ src/
     useTema.js                    # tema claro/escuro
   components/
     Etapa*.jsx                  # uma etapa do fluxo por arquivo
-    LinhaDRE.jsx                 # Linha/Secao/Detalhe reutilizados na DRE
-    SincronizacaoGitHub.jsx       # painel de config da sincronização
+    LinhaDRE.jsx                 # Linha/Secao/Cabecalho/Detalhe da DRE
+    Eixo.jsx                      # Canal e Balanca — o eixo visual
+                                   # compartilhado (ver "Sistema visual")
+    SincronizacaoGitHub.jsx         # painel de config da sincronização
   App.jsx                        # dono de todo o estado; as Etapas são
                                   # "burras" (recebem props, chamam callbacks)
-  App.css                        # design system em variáveis CSS (--ink,
-                                  # --paper, --viridian etc.) — tema escuro é
-                                  # um seletor `:root[data-tema="dark"]` que
-                                  # sobrescreve as mesmas variáveis
+  App.css                        # design system em variáveis CSS (--papel,
+                                  # --tinta, --marca, --barra-* etc.) — tema
+                                  # escuro é um seletor
+                                  # `:root[data-tema="dark"]` que sobrescreve
+                                  # as mesmas variáveis
 ```
 
 Fluxo do app: Importar → Conferir → Classificar → DRE, com Balanço,
 Horizontal e Histórico como abas paralelas que dependem do mesmo
 estado agregado (`contas`, calculado uma vez em `App.jsx` via
 `agregarPorConta`).
+
+## Sistema visual ("Razão")
+
+A referência é o papel de razão contábil (green-bar paper): daí o
+neutro verde-acinzentado e a listra de linha alternada nas tabelas.
+Duas regras que não devem ser desfeitas sem motivo:
+
+1. **A cor de marca (índigo) nunca é verde nem vermelha.** Verde e
+   vermelho pertencem ao dado — saldo, resultado, diferença que não
+   fecha. Se um dia a marca virar verde, a semântica contábil da tela
+   deixa de funcionar.
+2. **Mono (`Spline Sans Mono`) é só para código de conta.** Valores em
+   R$ e percentuais usam Archivo com `font-variant-numeric: tabular-nums`
+   (verificado: Archivo tem a feature `tnum`; NÃO tem `zero`, então não
+   adianta pedir zero cortado). Mono em coluna de valor engorda a tabela
+   e dá cara de editor de código.
+
+### O canal (elemento de assinatura)
+
+`Eixo.jsx` exporta duas primitivas puramente visuais:
+
+- **`Canal`** — a coluna de cascata dentro da própria DRE. Cada linha
+  desenha seu segmento começando onde o subtotal anterior parou:
+  deduções e custos andam para a esquerda a partir do saldo corrente,
+  adições para a direita. O fundo pálido é o nível ANTES da linha (sem
+  ele a mordida vermelha flutua no vazio). Subtotais desenham barra
+  cheia do zero até o valor.
+- **`Balanca`** — o mesmo eixo espelhado, usado em Conferir (débito ×
+  crédito) e Balanço (Ativo × Passivo + PL). Os dois braços são índigo
+  neutro; **o único trecho vermelho é o excesso de um lado sobre o
+  outro**, ou seja, literalmente o que não fecha.
+
+Os números da cascata são calculados em `montarLinhas()` dentro de
+`EtapaDRE.jsx`, percorrendo a demonstração em ordem — e **cada subtotal
+reancora no valor autoritativo vindo de `montarDRE`**, nunca numa soma
+própria. Isso é de propósito: o desenho não pode divergir do número
+impresso ao lado se algum grupo for exibido condicionalmente.
+
+Uma tentação a evitar: já existiu uma barrinha de variação divergente
+na Análise Horizontal e ela foi removida. Com uma variação atípica
+(+424% num mês) a escala compartilhada esmaga todas as outras e as
+barras viram slivers invisíveis — o número já dizia tudo.
+
+### Piso de qualidade
+
+Responsivo até 390px (tabelas com descrição textual viram cartões
+empilhados via `.tabela-cartao` + `data-rotulo`; tabelas curtas e
+numéricas rolam na horizontal), foco de teclado visível em todo
+interativo, `prefers-reduced-motion` respeitado, `@media print`
+preservando só a demonstração. A dropzone é operável por teclado
+(Enter/Espaço) e os `<select>` de grupo e checkboxes de tabela têm
+`aria-label` próprio, porque o cabeçalho da coluna sozinho não nomeia
+o controle.
 
 ## O coração do projeto: classificação de contas
 

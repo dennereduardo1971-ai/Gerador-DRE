@@ -1,7 +1,8 @@
 import { brl, competenciaLegivel } from "../lib/parse.js";
+import { Balanca } from "./Eixo.jsx";
 
 export function EtapaConferir({
-  arquivo, nLinhas, contas, dif, meses, ccs, filtroMes, filtroCC,
+  arquivo, nLinhas, contas, dif, tDeb, tCre, meses, ccs, filtroMes, filtroCC,
   competenciasDisponiveis, filtroCompetencia, onFiltroCompetencia,
   empresa, cnpj, map, cols, nomes, onFiltroMes, onFiltroCC,
   onEmpresa, onCnpj, onMap, onIrClassificar,
@@ -19,6 +20,19 @@ export function EtapaConferir({
           <div className="k">Débito x crédito</div>
           <div className="v">{Math.abs(dif) < 0.01 ? "Confere" : brl(dif)}</div>
         </div>
+      </div>
+
+      <div className="card">
+        <h2>Partidas dobradas</h2>
+        <p className="hint">
+          Débito de um lado do eixo, crédito do outro. Quando o razão fecha, os dois braços
+          têm o mesmo comprimento — o trecho em vermelho, se aparecer, é exatamente a
+          diferença que sobrou.
+        </p>
+        <Balanca
+          esquerda={tDeb} direita={tCre}
+          rotuloEsq={`Débito ${brl(tDeb)}`} rotuloDir={`Crédito ${brl(tCre)}`}
+        />
       </div>
 
       {Math.abs(dif) >= 0.01 && (
@@ -104,7 +118,7 @@ export function EtapaConferir({
           Todas as contas movimentadas no período. Saldo credor positivo, devedor negativo.
         </p>
         <div className="scroll">
-          <table>
+          <table className="tabela-cartao">
             <thead>
               <tr>
                 <th>Conta</th><th>Descrição</th><th className="num">Débito</th>
@@ -114,14 +128,14 @@ export function EtapaConferir({
             <tbody>
               {contas.map((c) => (
                 <tr key={c.conta}>
-                  <td className="code">{c.conta}</td>
-                  <td style={{ fontSize: 12.5, color: "var(--soft)" }}>
+                  <td className="code" data-rotulo="Conta">{c.conta}</td>
+                  <td className="desc" data-rotulo="Descrição">
                     {nomes[c.conta] || (c.historico.trim().split(",")[0] || "").slice(0, 40)}
                   </td>
-                  <td className="num">{brl(c.deb)}</td>
-                  <td className="num">{brl(c.cre)}</td>
-                  <td className={"num " + (c.saldo < 0 ? "neg" : "")}>{brl(c.saldo)}</td>
-                  <td className="num">{c.n}</td>
+                  <td className="num" data-rotulo="Débito">{brl(c.deb)}</td>
+                  <td className="num" data-rotulo="Crédito">{brl(c.cre)}</td>
+                  <td className={"num destaque " + (c.saldo < 0 ? "neg" : "")} data-rotulo="Saldo">{brl(c.saldo)}</td>
+                  <td className="num" data-rotulo="Lanç.">{c.n}</td>
                 </tr>
               ))}
             </tbody>

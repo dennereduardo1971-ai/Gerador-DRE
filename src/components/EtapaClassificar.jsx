@@ -18,6 +18,7 @@ export function EtapaClassificar({
           Marque quais grupos são contas de resultado. Só eles entram na DRE — o resto é
           patrimonial. O padrão assume 1 e 2 como ativo e passivo.
         </p>
+        <div className="scroll" style={{ maxHeight: "none" }}>
         <table>
           <thead>
             <tr>
@@ -28,14 +29,15 @@ export function EtapaClassificar({
           <tbody>
             {grupos1.map((g) => (
               <tr key={g.digito}>
-                <td className="code">{g.digito}</td>
-                <td className="num">{g.n}</td>
-                <td className="num">{brl(g.deb)}</td>
-                <td className="num">{brl(g.cre)}</td>
-                <td className={"num " + (g.cre - g.deb < 0 ? "neg" : "")}>{brl(g.cre - g.deb)}</td>
-                <td>
+                <td className="code" data-rotulo="Grupo">{g.digito}</td>
+                <td className="num" data-rotulo="Contas">{g.n}</td>
+                <td className="num" data-rotulo="Débito">{brl(g.deb)}</td>
+                <td className="num" data-rotulo="Crédito">{brl(g.cre)}</td>
+                <td className={"num " + (g.cre - g.deb < 0 ? "neg" : "")} data-rotulo="Saldo">{brl(g.cre - g.deb)}</td>
+                <td data-rotulo="Entra na DRE">
                   <input
                     type="checkbox"
+                    aria-label={`Grupo ${g.digito} entra na DRE`}
                     checked={digitosResultado.includes(g.digito)}
                     onChange={(e) => onResultadoManual({ ...resultadoManual, [g.digito]: e.target.checked })}
                   />
@@ -44,6 +46,7 @@ export function EtapaClassificar({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="card">
@@ -77,7 +80,7 @@ export function EtapaClassificar({
           aparece nas etapas Conferir e DRE.)
         </p>
         <div className="scroll">
-          <table>
+          <table className="tabela-cartao">
             <thead>
               <tr>
                 <th>Conta</th><th>Descrição</th><th className="num">Saldo</th>
@@ -89,17 +92,18 @@ export function EtapaClassificar({
                 .filter((c) => !busca || (c.conta + " " + c.historico + " " + (nomes[c.conta] || "")).toLowerCase().includes(busca.toLowerCase()))
                 .map((c) => (
                   <tr key={c.conta}>
-                    <td className="code">{c.conta}</td>
-                    <td style={{ fontSize: 12.5, color: "var(--soft)" }}>
+                    <td className="code" data-rotulo="Conta">{c.conta}</td>
+                    <td className="desc" data-rotulo="Descrição">
                       {(c.historico.trim().split(",")[0] || "").slice(0, 38)}
                     </td>
-                    <td className={"num " + (c.saldo < 0 ? "neg" : "")}>{brl(c.saldo)}</td>
-                    <td>
-                      <select value={grupoDe(c.conta)} onChange={(e) => onClassificar(c.conta, e.target.value)}>
+                    <td className={"num destaque " + (c.saldo < 0 ? "neg" : "")} data-rotulo="Saldo">{brl(c.saldo)}</td>
+                    <td data-rotulo="">
+                      <select value={grupoDe(c.conta)} aria-label={`Grupo da conta ${c.conta} na DRE`}
+                        onChange={(e) => onClassificar(c.conta, e.target.value)}>
                         {GRUPOS.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
                       </select>
                     </td>
-                    <td>
+                    <td data-rotulo="Origem">
                       <span className="tag" data-s={tocadas[c.conta] ? "edit" : "auto"}>
                         {tocadas[c.conta] ? "manual" : "sugerido"}
                       </span>

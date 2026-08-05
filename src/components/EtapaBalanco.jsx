@@ -1,4 +1,5 @@
 import { brl, competenciaLegivel } from "../lib/parse.js";
+import { Balanca } from "./Eixo.jsx";
 
 export function EtapaBalanco({ balanco, filtroCompetencia }) {
   if (!balanco.temDados) {
@@ -34,18 +35,31 @@ export function EtapaBalanco({ balanco, filtroCompetencia }) {
       </div>
 
       <div className="card">
+        <h2>Ativo e Passivo no mesmo eixo</h2>
+        <p className="hint">
+          O mesmo eixo da tela Conferir, agora com Ativo de um lado e Passivo + Patrimônio
+          Líquido do outro. Se um braço passar do outro, o excesso aparece em vermelho.
+        </p>
+        <Balanca
+          esquerda={balanco.somaAtivo} direita={balanco.somaPassivo}
+          rotuloEsq={`Ativo ${brl(balanco.somaAtivo)}`}
+          rotuloDir={`Passivo + PL ${brl(balanco.somaPassivo)}`}
+        />
+      </div>
+
+      <div className="card">
         <h2>Ativo (conta 1)</h2>
         <p className="hint">Saldo calculado como débito − crédito (natureza devedora).</p>
         <div className="scroll">
-          <table>
+          <table className="tabela-cartao">
             <thead><tr><th>Conta</th><th className="num">Débito</th><th className="num">Crédito</th><th className="num">Saldo</th></tr></thead>
             <tbody>
               {balanco.ativo.map((c) => (
                 <tr key={c.conta}>
-                  <td className="code">{c.conta}</td>
-                  <td className="num">{brl(c.deb)}</td>
-                  <td className="num">{brl(c.cre)}</td>
-                  <td className={"num " + (c.saldoBalanco < 0 ? "neg" : "")}>{brl(c.saldoBalanco)}</td>
+                  <td className="code" data-rotulo="Conta">{c.conta}</td>
+                  <td className="num" data-rotulo="Débito">{brl(c.deb)}</td>
+                  <td className="num" data-rotulo="Crédito">{brl(c.cre)}</td>
+                  <td className={"num destaque " + (c.saldoBalanco < 0 ? "neg" : "")} data-rotulo="Saldo">{brl(c.saldoBalanco)}</td>
                 </tr>
               ))}
             </tbody>
@@ -57,15 +71,15 @@ export function EtapaBalanco({ balanco, filtroCompetencia }) {
         <h2>Passivo + Patrimônio Líquido (conta 2)</h2>
         <p className="hint">Saldo calculado como crédito − débito (natureza credora).</p>
         <div className="scroll">
-          <table>
+          <table className="tabela-cartao">
             <thead><tr><th>Conta</th><th className="num">Débito</th><th className="num">Crédito</th><th className="num">Saldo</th></tr></thead>
             <tbody>
               {balanco.passivo.map((c) => (
                 <tr key={c.conta}>
-                  <td className="code">{c.conta}</td>
-                  <td className="num">{brl(c.deb)}</td>
-                  <td className="num">{brl(c.cre)}</td>
-                  <td className={"num " + (c.saldoBalanco < 0 ? "neg" : "")}>{brl(c.saldoBalanco)}</td>
+                  <td className="code" data-rotulo="Conta">{c.conta}</td>
+                  <td className="num" data-rotulo="Débito">{brl(c.deb)}</td>
+                  <td className="num" data-rotulo="Crédito">{brl(c.cre)}</td>
+                  <td className={"num destaque " + (c.saldoBalanco < 0 ? "neg" : "")} data-rotulo="Saldo">{brl(c.saldoBalanco)}</td>
                 </tr>
               ))}
             </tbody>

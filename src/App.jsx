@@ -18,14 +18,21 @@ import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
 import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
 
-const ABAS = [
-  ["importar", "1 · Importar"],
-  ["conferir", "2 · Conferir"],
-  ["classificar", "3 · Classificar"],
-  ["dre", "4 · DRE"],
-  ["balanco", "5 · Balanço"],
-  ["horizontal", "6 · Horizontal"],
-  ["historico", "7 · Histórico"],
+/** O fluxo é sequencial de verdade (1 → 4), então numeração aqui
+ *  carrega informação. Balanço, Horizontal e Histórico são vistas
+ *  paralelas sobre o mesmo estado — recebem outro marcador, não um
+ *  número, pra não fingirem ser passos 5, 6 e 7. */
+const FLUXO = [
+  ["importar", "Importar"],
+  ["conferir", "Conferir"],
+  ["classificar", "Classificar"],
+  ["dre", "DRE"],
+];
+
+const VISTAS = [
+  ["balanco", "Balanço"],
+  ["horizontal", "Horizontal"],
+  ["historico", "Histórico"],
 ];
 
 export default function App() {
@@ -152,84 +159,115 @@ export default function App() {
               aria-label="Alternar tema claro/escuro">
               {tema === "dark" ? "Modo claro" : "Modo escuro"}
             </button>
-            <div className="stamp">Partidas dobradas · CPC 26</div>
+            <div className="selo rotulo">Partidas dobradas · CPC 26</div>
           </div>
         </header>
 
-        <nav className="tabs">
-          {ABAS.map(([id, nome]) => (
-            <button key={id} className="tab" data-on={aba === id ? "1" : "0"}
-              disabled={!["importar", "historico"].includes(id) && !temDados} onClick={() => setAba(id)}>
-              {nome}
-            </button>
-          ))}
-        </nav>
+        <div className="app-grid">
+          <nav className="trilha" aria-label="Etapas e vistas">
+            <div className="trilha-grupo">
+              <div className="rotulo">Fluxo</div>
+              {FLUXO.map(([id, nome], i) => (
+                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
+                  data-feito={id === "importar" && temDados ? "1" : "0"}
+                  aria-current={aba === id ? "step" : undefined}
+                  disabled={id !== "importar" && !temDados} onClick={() => setAba(id)}>
+                  <span className="etapa-num">{i + 1}</span>
+                  <span className="etapa-txt">
+                    <span className="etapa-nome">{nome}</span>
+                    {id === "importar" && arquivo && <span className="etapa-sub">{arquivo}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
 
-        {erro && <div className="err">{erro}</div>}
+            <div className="trilha-grupo">
+              <div className="rotulo">Análises</div>
+              {VISTAS.map(([id, nome]) => (
+                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
+                  aria-current={aba === id ? "page" : undefined}
+                  disabled={id !== "historico" && !temDados} onClick={() => setAba(id)}>
+                  <span className="etapa-marca" />
+                  <span className="etapa-txt">
+                    <span className="etapa-nome">{nome}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </nav>
 
-        {aba === "importar" && <EtapaImportar carregando={carregando} progresso={progresso} onImportar={importar} />}
+          <main className="painel">
+            {erro && <div className="err">{erro}</div>}
 
-        {aba === "conferir" && temDados && (
-          <EtapaConferir
-            arquivo={arquivo} nLinhas={nLinhas} contas={contas} dif={dif}
-            meses={meses} ccs={ccs} filtroMes={filtroMes} filtroCC={filtroCC}
-            competenciasDisponiveis={competenciasDisponiveis} filtroCompetencia={filtroCompetencia}
-            onFiltroCompetencia={setFiltroCompetencia}
-            empresa={empresa} cnpj={cnpj} map={map} cols={cols} nomes={nomes}
-            onFiltroMes={setFiltroMes} onFiltroCC={setFiltroCC}
-            onEmpresa={setEmpresa} onCnpj={setCnpj} onMap={setMap}
-            onIrClassificar={() => setAba("classificar")}
-          />
-        )}
+            {aba === "importar" && <EtapaImportar carregando={carregando} progresso={progresso} onImportar={importar} />}
 
-        {aba === "classificar" && temDados && (
-          <EtapaClassificar
-            grupos1={grupos1} digitosResultado={digitosResultado}
-            resultadoManual={resultadoManual} onResultadoManual={setResultadoManual}
-            contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas} nomes={nomes}
-            busca={busca} onBusca={setBusca}
-            onClassificar={(conta, grupo) => {
-              setClassif({ ...classif, [conta]: grupo });
-              setTocadas({ ...tocadas, [conta]: true });
-            }}
-            onImportarPlano={importarPlano}
-            onGerarDRE={() => setAba("dre")}
-            onLimparManuais={() => { setClassif({}); setTocadas({}); }}
-          />
-        )}
+            {aba === "conferir" && temDados && (
+              <EtapaConferir
+                arquivo={arquivo} nLinhas={nLinhas} contas={contas} dif={dif} tDeb={tDeb} tCre={tCre}
+                meses={meses} ccs={ccs} filtroMes={filtroMes} filtroCC={filtroCC}
+                competenciasDisponiveis={competenciasDisponiveis} filtroCompetencia={filtroCompetencia}
+                onFiltroCompetencia={setFiltroCompetencia}
+                empresa={empresa} cnpj={cnpj} map={map} cols={cols} nomes={nomes}
+                onFiltroMes={setFiltroMes} onFiltroCC={setFiltroCC}
+                onEmpresa={setEmpresa} onCnpj={setCnpj} onMap={setMap}
+                onIrClassificar={() => setAba("classificar")}
+              />
+            )}
 
-        {aba === "dre" && temDados && (
-          <EtapaDRE
-            dre={dre} empresa={empresa} cnpj={cnpj} filtroMes={filtroMes} meses={meses}
-            filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
-            detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
-            onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes })}
-            contasIgnoradas={contasIgnoradas}
-            onSalvarHistorico={() => {
-              const periodo = filtroCompetencia !== "todas"
-                ? competenciaLegivel(filtroCompetencia)
-                : (filtroMes === "todos" ? meses.join(", ") : filtroMes);
-              salvarNoHistorico({ empresa, cnpj, periodo, dre });
-              setHistorico(listarHistorico());
-            }}
-          />
-        )}
+            {aba === "classificar" && temDados && (
+              <EtapaClassificar
+                grupos1={grupos1} digitosResultado={digitosResultado}
+                resultadoManual={resultadoManual} onResultadoManual={setResultadoManual}
+                contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas} nomes={nomes}
+                busca={busca} onBusca={setBusca}
+                onClassificar={(conta, grupo) => {
+                  setClassif({ ...classif, [conta]: grupo });
+                  setTocadas({ ...tocadas, [conta]: true });
+                }}
+                onImportarPlano={importarPlano}
+                onGerarDRE={() => setAba("dre")}
+                onLimparManuais={() => { setClassif({}); setTocadas({}); }}
+              />
+            )}
 
-        {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia} />}
+            {aba === "dre" && temDados && (
+              <EtapaDRE
+                dre={dre} empresa={empresa} cnpj={cnpj} filtroMes={filtroMes} meses={meses}
+                filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
+                detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
+                onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes })}
+                contasIgnoradas={contasIgnoradas}
+                onSalvarHistorico={() => {
+                  const periodo = filtroCompetencia !== "todas"
+                    ? competenciaLegivel(filtroCompetencia)
+                    : (filtroMes === "todos" ? meses.join(", ") : filtroMes);
+                  salvarNoHistorico({ empresa, cnpj, periodo, dre });
+                  setHistorico(listarHistorico());
+                }}
+              />
+            )}
 
-        {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
+            {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia} />}
 
-        {aba === "historico" && (
-          <EtapaHistorico
-            historico={historico}
-            onRemover={async (id) => { await removerDoHistorico(id); setHistorico(listarHistorico()); }}
-            onSincronizado={() => setHistorico(listarHistorico())}
-          />
-        )}
+            {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
 
-        {!temDados && !["importar", "historico"].includes(aba) && (
-          <div className="empty"><b>Nenhum razão carregado</b>Importe um arquivo na etapa 1.</div>
-        )}
+            {aba === "historico" && (
+              <EtapaHistorico
+                historico={historico}
+                onRemover={async (id) => { await removerDoHistorico(id); setHistorico(listarHistorico()); }}
+                onSincronizado={() => setHistorico(listarHistorico())}
+              />
+            )}
+
+            {!temDados && !["importar", "historico"].includes(aba) && (
+              <div className="empty">
+                <b>Nenhum razão carregado</b>
+                Comece pela etapa 1, Importar — as outras telas se abrem sozinhas assim que o
+                arquivo entrar.
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

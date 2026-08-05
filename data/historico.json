@@ -1,25 +1,6 @@
 {
   "historico": [
     {
-      "id": "1785882243752-l8v88b",
-      "criadoEm": 1785882243752,
-      "empresa": "",
-      "cnpj": "",
-      "periodo": "Jun/2026",
-      "totais": {
-        "receitaBruta": 22937134.510000005,
-        "deducoes": 14463230.120000001,
-        "receitaLiq": 8473904.390000004,
-        "resultadoOperBruto": 4116428.9300000025,
-        "despOper": 4708164.879999996,
-        "resultadoFin": -79287.7799999998,
-        "resultadoOper": -671023.7299999935,
-        "naoOper": 1224457.4,
-        "antesIR": 553433.6700000064,
-        "liquido": 512069.00000000646
-      }
-    },
-    {
       "id": "1785871253307-m1gpad",
       "criadoEm": 1785871253307,
       "empresa": "",
@@ -39,5 +20,5 @@
       }
     }
   ],
-  "atualizadoEm": "2026-08-05T11:34:49.979Z"
+  "atualizadoEm": "2026-08-04T21:43:42.421Z"
 }

@@ -55,10 +55,11 @@ export function EtapaHistorico({ historico, onRemover, onSincronizado }) {
               <tbody>
                 {historico.map((h) => (
                   <tr key={h.id}>
-                    <td><input type="checkbox" checked={selecionados.includes(h.id)} onChange={() => alternar(h.id)} /></td>
+                    <td><input type="checkbox" aria-label={`Comparar ${h.periodo || "esta DRE"}`}
+                      checked={selecionados.includes(h.id)} onChange={() => alternar(h.id)} /></td>
                     <td>{h.empresa || "—"}</td>
                     <td>{h.periodo || "—"}</td>
-                    <td style={{ fontSize: 12, color: "var(--soft)" }}>{formatarData(h.criadoEm)}</td>
+                    <td className="desc">{formatarData(h.criadoEm)}</td>
                     <td className="num">{brl(h.totais.receitaLiq)}</td>
                     <td className={"num " + (h.totais.liquido < 0 ? "neg" : "")}>{brl(h.totais.liquido)}</td>
                     <td><button className="btn ghost" onClick={() => onRemover(h.id)}>Remover</button></td>
@@ -78,7 +79,7 @@ export function EtapaHistorico({ historico, onRemover, onSincronizado }) {
             {comparar[1].periodo || "—"} ({formatarData(comparar[1].criadoEm)})
           </p>
           <div className="scroll">
-            <table>
+            <table className="tabela-larga">
               <thead>
                 <tr><th>Linha</th><th className="num">{comparar[0].periodo || "A"}</th><th className="num">{comparar[1].periodo || "B"}</th><th className="num">Variação</th></tr>
               </thead>

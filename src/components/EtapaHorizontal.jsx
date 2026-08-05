@@ -27,9 +27,12 @@ export function EtapaHorizontal({ dresPorCompetencia }) {
   return (
     <div className="card">
       <h2>Análise horizontal</h2>
-      <p className="hint">Variação percentual de cada linha em relação ao mês anterior.</p>
+      <p className="hint">
+        Variação percentual de cada linha em relação ao mês anterior. Role a tabela para o
+        lado se o arquivo cobrir muitos meses.
+      </p>
       <div className="scroll">
-        <table>
+        <table className="tabela-larga">
           <thead>
             <tr>
               <th>Linha</th>
