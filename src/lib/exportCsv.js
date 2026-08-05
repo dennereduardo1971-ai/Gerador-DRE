@@ -1,4 +1,4 @@
-import { GRUPOS } from "./classify.js";
+import { GRUPOS, SINAL_GRUPO } from "./classify.js";
 
 /** Gera e dispara o download do CSV da DRE, no mesmo layout visto na tela. */
 export function baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes }) {
@@ -46,10 +46,14 @@ export function baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes }) {
   add("", "");
   add("DETALHAMENTO POR CONTA", "");
   L.push(["Grupo", "Conta", "Descrição", "Valor"]);
+  // Valor com sinal, na mesma orientação do total do grupo — igual à tela.
+  // Em módulo, as contas de um grupo que mistura provisão e reversão não
+  // fechavam com o total da linha correspondente.
   GRUPOS.forEach((g) => {
     if (g.id === "IGNORAR") return;
+    const sinal = SINAL_GRUPO[g.id] ?? 1;
     dre.bal[g.id].contas.forEach((c) =>
-      L.push([g.nome, c.conta, nomes[c.conta] || "", c.val.toFixed(2).replace(".", ",")])
+      L.push([g.nome, c.conta, nomes[c.conta] || "", (c.saldo * sinal).toFixed(2).replace(".", ",")])
     );
   });
 

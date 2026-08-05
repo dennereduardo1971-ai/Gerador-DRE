@@ -1,4 +1,5 @@
 import { brl, pct } from "../lib/parse.js";
+import { SINAL_GRUPO } from "../lib/classify.js";
 import { Canal } from "./Eixo.jsx";
 
 /** Mostra uma linha da DRE. `val` já deve vir no sinal contábil real da
@@ -47,17 +48,52 @@ export function Cabecalho() {
   );
 }
 
+const LIMITE_DETALHE = 40;
+
+/** Contas de um grupo, abaixo da linha.
+ *
+ *  O valor sai COM SINAL, na mesma orientação do total do grupo — não em
+ *  módulo. `montarDRE` soma o líquido (uma reversão de provisão reduz a
+ *  despesa do mês), então listar tudo em módulo fazia as contas não
+ *  fecharem com o total impresso logo acima: o contador via seis linhas
+ *  que somavam diferente do número da própria linha e, com razão, parava
+ *  de confiar na tela. Aqui a conta que anda contra a natureza do grupo
+ *  aparece com o sinal invertido, e a soma fecha. */
 export function Detalhe({ dre, id, nomes, base, mostrar }) {
   if (!mostrar) return null;
-  return dre.bal[id].contas.slice(0, 40).map((c) => (
-    <div className="line" data-k="det" key={id + c.conta}>
-      <div className="lbl">
-        <span className="code">{c.conta}</span>{" "}
-        {nomes[c.conta] || (c.historico.trim().split(",")[0] || "").slice(0, 42)}
-      </div>
-      <div className="canal" />
-      <div className="val">{brl(c.val)}</div>
-      <div className="av">{pct(c.val / base)}</div>
-    </div>
-  ));
+  const grupo = dre.bal[id];
+  const contas = grupo.contas;
+  const sinal = SINAL_GRUPO[id] ?? 1;
+  const sobraram = contas.length - LIMITE_DETALHE;
+
+  return (
+    <>
+      {contas.slice(0, LIMITE_DETALHE).map((c) => {
+        const valor = c.saldo * sinal;
+        return (
+          <div className="line" data-k="det" key={id + c.conta}>
+            <div className="lbl">
+              <span className="code">{c.conta}</span>{" "}
+              {nomes[c.conta] || (c.historico.trim().split(",")[0] || "").slice(0, 42)}
+            </div>
+            <div className="canal" />
+            <div className={"val " + (valor < 0 ? "neg" : "")}>
+              {valor < 0 ? "(" + brl(Math.abs(valor)) + ")" : brl(valor)}
+            </div>
+            <div className="av">{pct(valor / base)}</div>
+          </div>
+        );
+      })}
+      {sobraram > 0 && (
+        <div className="line" data-k="det" key={id + "-corte"}>
+          <div className="lbl">
+            <i>+ {sobraram} {sobraram === 1 ? "conta não exibida" : "contas não exibidas"} — todas saem no CSV</i>
+          </div>
+          <div className="canal" />
+          <div className="val" />
+          <div className="av" />
+        </div>
+      )}
+    </>
+  );
 }

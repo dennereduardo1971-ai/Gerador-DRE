@@ -34,7 +34,14 @@ const PAT_PROUNI = /PROUNI/i;
 const PAT_DEVOLU = /DEVOLU|\bDEV\d/i;
 const PAT_DESCONTO = /DESCONTO|CANCELAD|\bCANC\b/i;
 const PAT_IMPOSTO = /\bPIS\b|COFINS|\bISS\b/i;
-const PAT_FOPAG = /FOPAG|SAL[ÁA]RIO|FOLHA DE PAG|\bFGTS\b|\bINSS\b|F[ÉE]RIAS|13[º°O]?\s|D[ÉE]CIMO TERCEIRO|RESCIS[ÃA]O|VALE TRANSP|VALE ALIMENT|PR[ÓO].?LABORE|ENCARGOS SOCIAIS|\bPESSOAL\b|DOCENTES?\b/i;
+/* O "DE" era obrigatório em "FOLHA DE PAG", então "PIS S/FOLHA PAGAMENTO"
+ * — grafia comum em plano de contas — NÃO batia com Fopag e caía em
+ * `\bPIS\b`, indo parar em Deduções da Receita como se fosse imposto sobre
+ * faturamento, quando é encargo trabalhista. A prioridade Fopag-antes-de-
+ * Impostos já existia e estava documentada; o que não funcionava era o
+ * padrão em si. (Com o plano do IESB importado a camada por código já
+ * acertava essas contas — o defeito só aparecia no fallback por texto.) */
+const PAT_FOPAG = /FOPAG|SAL[ÁA]RIO|FOLHA\s*(?:DE\s*)?PAG|\bFGTS\b|\bINSS\b|F[ÉE]RIAS|13[º°O]?\s|D[ÉE]CIMO TERCEIRO|RESCIS[ÃA]O|VALE TRANSP|VALE ALIMENT|PR[ÓO].?LABORE|ENCARGOS SOCIAIS|\bPESSOAL\b|DOCENTES?\b/i;
 const PAT_DEPREC = /DEPRECIA|AMORTIZ/i;
 const PAT_PROVISAO = /PROVIS[ÃA]O|PCLD|CONTING[ÊE]NCIA/i;
 const PAT_PCLD = /PCLD|CR[ÉE]D.{0,15}LIQUIDA[ÇC][ÃA]O DUVIDOSA|PERDAS? ESTIMADAS?/i;
@@ -302,7 +309,7 @@ export function agruparPorDigito(contas) {
   return Object.values(g).sort((a, b) => a.digito.localeCompare(b.digito));
 }
 
-const SINAL_GRUPO = Object.fromEntries(GRUPOS.map((g) => [g.id, g.sinal || 1]));
+export const SINAL_GRUPO = Object.fromEntries(GRUPOS.map((g) => [g.id, g.sinal || 1]));
 
 /** Monta a DRE completa a partir das contas de resultado já classificadas.
  *
