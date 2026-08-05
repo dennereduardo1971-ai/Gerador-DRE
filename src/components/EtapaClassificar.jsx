@@ -1,14 +1,32 @@
 import { useRef, useState } from "react";
 import { brl } from "../lib/parse.js";
 import { GRUPOS } from "../lib/classify.js";
+import { cobertura, lerPerfil } from "../lib/perfil.js";
 
 export function EtapaClassificar({
   grupos1, digitosResultado, resultadoManual, onResultadoManual,
   contasResultado, grupoDe, tocadas, nomes, busca, onBusca,
   onClassificar, onImportarPlano, onGerarDRE, onLimparManuais,
+  avisoPerfil, onAvisoPerfil, onSalvarPerfil, onAplicarPerfil,
 }) {
   const [buscaLocal, setBuscaLocal] = useState(busca);
   const planoRef = useRef(null);
+  const perfilRef = useRef(null);
+  const manuais = Object.values(tocadas).filter(Boolean).length;
+
+  function carregarPerfil(file) {
+    if (!file) return;
+    file.text().then((txt) => {
+      const r = lerPerfil(txt);
+      if (!r.ok) { onAvisoPerfil(r.erro); return; }
+      const c = cobertura(r.perfil, contasResultado);
+      onAplicarPerfil(r.perfil);
+      const sobra = r.ignoradas ? ` ${r.ignoradas} conta(s) do perfil usavam um grupo que não existe mais e foram ignoradas.` : "";
+      onAvisoPerfil(
+        `Perfil "${r.perfil.nome}" aplicado: ${c.presentes} das ${c.total} contas de resultado deste razão já vieram classificadas.` + sobra
+      );
+    }).catch(() => onAvisoPerfil("Não consegui ler esse arquivo de perfil."));
+  }
 
   return (
     <>
@@ -48,6 +66,34 @@ export function EtapaClassificar({
         </table>
         </div>
       </div>
+
+      <div className="card">
+        <h2>Perfil de classificação</h2>
+        <p className="hint">
+          Salva as classificações que você fez à mão num arquivo, para reaproveitar no mês
+          seguinte em vez de refazer tudo. O perfil guarda só as <b>decisões</b> (conta → grupo)
+          e os nomes das contas — nenhum valor, nenhum lançamento —, então dá para guardar junto
+          do projeto ou levar para outro computador sem carregar dado financeiro de cliente.
+        </p>
+        <div className="row">
+          <button className="btn ghost" onClick={onSalvarPerfil} disabled={!manuais}>
+            Salvar perfil{manuais ? ` (${manuais} contas)` : ""}
+          </button>
+          <button className="btn ghost" onClick={() => perfilRef.current?.click()}>
+            Carregar perfil
+          </button>
+          <input ref={perfilRef} type="file" accept=".json" style={{ display: "none" }}
+            onChange={(e) => { carregarPerfil(e.target.files[0]); e.target.value = ""; }} />
+        </div>
+        {!manuais && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            Ainda não há classificação manual para salvar — ajuste algum grupo na tabela abaixo
+            e o botão libera.
+          </p>
+        )}
+      </div>
+
+      {avisoPerfil && <div className="warn">{avisoPerfil}</div>}
 
       <div className="card">
         <h2>Contas de resultado</h2>

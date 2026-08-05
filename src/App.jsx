@@ -9,6 +9,8 @@ import { baixarCSV } from "./lib/exportCsv.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
 import { lerConfigGitHub } from "./lib/githubApi.js";
+import { lerSessao, limparSessao, salvarSessao } from "./lib/sessao.js";
+import { baixarPerfil, montarPerfil } from "./lib/perfil.js";
 
 import { EtapaImportar } from "./components/EtapaImportar.jsx";
 import { EtapaConferir } from "./components/EtapaConferir.jsx";
@@ -57,6 +59,50 @@ export default function App() {
   const [progresso, setProgresso] = useState(null);
   const [tema, setTema] = useTema();
   const [historico, setHistorico] = useState(() => listarHistorico());
+  const [sessaoCarregada, setSessaoCarregada] = useState(false);
+  const [avisoPerfil, setAvisoPerfil] = useState("");
+
+  /* Restaura a sessão anterior antes de qualquer outra coisa. Enquanto
+     isso não termina, nada é gravado — senão o estado vazio inicial
+     sobrescreveria a sessão salva no primeiro render. */
+  useEffect(() => {
+    let vivo = true;
+    lerSessao().then((s) => {
+      if (!vivo) return;
+      if (s) {
+        setLinhas(s.linhas || []);
+        setCols(s.cols || []);
+        setMap(s.map || {});
+        setArquivo(s.arquivo || "");
+        setClassif(s.classif || {});
+        setTocadas(s.tocadas || {});
+        setNomes(s.nomes || {});
+        setResultadoManual(s.resultadoManual || {});
+        setEmpresa(s.empresa || "");
+        setCnpj(s.cnpj || "");
+        setFiltroMes(s.filtroMes || "todos");
+        setFiltroCC(s.filtroCC || "todos");
+        setFiltroCompetencia(s.filtroCompetencia || "todas");
+        setAba("conferir");
+      }
+      setSessaoCarregada(true);
+    });
+    return () => { vivo = false; };
+  }, []);
+
+  /* Grava a sessão a cada mudança relevante, com um respiro para não
+     gravar a cada tecla digitada em Empresa/CNPJ. */
+  useEffect(() => {
+    if (!sessaoCarregada || !linhas.length) return;
+    const t = setTimeout(() => {
+      salvarSessao({
+        linhas, cols, map, arquivo, classif, tocadas, nomes, resultadoManual,
+        empresa, cnpj, filtroMes, filtroCC, filtroCompetencia,
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [sessaoCarregada, linhas, cols, map, arquivo, classif, tocadas, nomes,
+      resultadoManual, empresa, cnpj, filtroMes, filtroCC, filtroCompetencia]);
 
   useEffect(() => {
     if (lerConfigGitHub()) {
@@ -91,11 +137,49 @@ export default function App() {
     setProgresso(null);
   }
 
+  function salvarPerfil() {
+    baixarPerfil(montarPerfil({ nome: empresa || arquivo || "Perfil", classif, nomes }));
+  }
+
+  function aplicarPerfil(perfil) {
+    // O perfil sobrescreve a sugestão automática, e cada conta que ele
+    // traz passa a contar como decisão manual — porque é isso que ela é:
+    // alguém já decidiu, num mês anterior, para onde essa conta vai.
+    setClassif((p) => ({ ...p, ...perfil.contas }));
+    setTocadas((p) => {
+      const novo = { ...p };
+      Object.keys(perfil.contas).forEach((c) => { novo[c] = true; });
+      return novo;
+    });
+    if (perfil.nomes && Object.keys(perfil.nomes).length) {
+      setNomes((p) => ({ ...perfil.nomes, ...p }));
+    }
+  }
+
+  async function limparTudo() {
+    await limparSessao();
+    setLinhas([]); setCols([]); setMap({}); setArquivo("");
+    setClassif({}); setTocadas({}); setNomes({}); setResultadoManual({});
+    setEmpresa(""); setCnpj("");
+    setFiltroMes("todos"); setFiltroCC("todos"); setFiltroCompetencia("todas");
+    setErro(""); setAvisoPerfil(""); setAba("importar");
+  }
+
   function importarPlano(file) {
     if (!file) return;
-    importarLinhasSimples(file).then((linhasBrutas) => {
-      setNomes((p) => ({ ...p, ...parsearPlanoDeContas(linhasBrutas) }));
-    });
+    setAvisoPerfil("");
+    importarLinhasSimples(file)
+      .then((linhasBrutas) => {
+        const novos = parsearPlanoDeContas(linhasBrutas);
+        const quantos = Object.keys(novos).length;
+        if (!quantos) {
+          setAvisoPerfil("Não achei nenhum par código/descrição nesse arquivo. O plano de contas precisa ter o código na primeira coluna e a descrição na segunda.");
+          return;
+        }
+        setNomes((p) => ({ ...p, ...novos }));
+        setAvisoPerfil(`Plano de contas importado: ${quantos} contas nomeadas.`);
+      })
+      .catch(() => setAvisoPerfil("Não consegui ler esse arquivo de plano de contas."));
   }
 
   const {
@@ -164,6 +248,12 @@ export default function App() {
               aria-label="Alternar tema claro/escuro">
               {tema === "dark" ? "Modo claro" : "Modo escuro"}
             </button>
+            {temDados && (
+              <button className="btn ghost" onClick={limparTudo}
+                title="Apaga o razão, as classificações e os dados da empresa deste navegador">
+                Limpar tudo
+              </button>
+            )}
             <div className="selo rotulo">Partidas dobradas · CPC 26</div>
           </div>
         </header>
@@ -233,6 +323,8 @@ export default function App() {
                 onImportarPlano={importarPlano}
                 onGerarDRE={() => setAba("dre")}
                 onLimparManuais={() => { setClassif({}); setTocadas({}); }}
+                avisoPerfil={avisoPerfil} onAvisoPerfil={setAvisoPerfil}
+                onSalvarPerfil={salvarPerfil} onAplicarPerfil={aplicarPerfil}
               />
             )}
 
