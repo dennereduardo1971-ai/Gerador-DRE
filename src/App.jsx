@@ -3,7 +3,7 @@ import "./App.css";
 
 import { agregarPorConta, avisosDoMapeamento, competenciaLegivel, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
 import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
-import { agruparPorDigito, montarDRE, sugerirClassificacao } from "./lib/classify.js";
+import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { baixarCSV } from "./lib/exportCsv.js";
 import { useTema } from "./lib/useTema.js";
@@ -11,6 +11,8 @@ import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHist
 import { lerConfigGitHub } from "./lib/githubApi.js";
 import { lerSessao, limparSessao, salvarSessao } from "./lib/sessao.js";
 import { baixarPerfil, montarPerfil } from "./lib/perfil.js";
+import { escolherPlano } from "./lib/planoPerfil.js";
+import { PLANOS_EMBUTIDOS } from "./lib/planos/iesb.js";
 
 import { EtapaImportar } from "./components/EtapaImportar.jsx";
 import { EtapaConferir } from "./components/EtapaConferir.jsx";
@@ -18,6 +20,7 @@ import { EtapaClassificar } from "./components/EtapaClassificar.jsx";
 import { EtapaDRE } from "./components/EtapaDRE.jsx";
 import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
 import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
+import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
 
 /** O fluxo é sequencial de verdade (1 → 4), então numeração aqui
@@ -34,6 +37,7 @@ const FLUXO = [
 const VISTAS = [
   ["balanco", "Balanço"],
   ["horizontal", "Horizontal"],
+  ["comparativo", "Comparativa"],
   ["historico", "Histórico"],
 ];
 
@@ -61,6 +65,11 @@ export default function App() {
   const [historico, setHistorico] = useState(() => listarHistorico());
   const [sessaoCarregada, setSessaoCarregada] = useState(false);
   const [avisoPerfil, setAvisoPerfil] = useState("");
+  // Perfis carregados pelo usuário entram na frente dos embutidos, para
+  // dar para corrigir um perfil embutido sem precisar de novo build.
+  const [planosExtras, setPlanosExtras] = useState([]);
+  const planos = useMemo(() => [...planosExtras, ...PLANOS_EMBUTIDOS], [planosExtras]);
+  const planoAtivo = useMemo(() => escolherPlano(planos, nomes), [planos, nomes]);
 
   /* Restaura a sessão anterior antes de qualquer outra coisa. Enquanto
      isso não termina, nada é gravado — senão o estado vazio inicial
@@ -207,8 +216,8 @@ export default function App() {
   );
 
   const sugestao = useMemo(
-    () => (contasResultado.length ? sugerirClassificacao(contasResultado, nomes) : {}),
-    [contasResultado, nomes]
+    () => (contasResultado.length ? sugerirClassificacao(contasResultado, nomes, planos) : {}),
+    [contasResultado, nomes, planos]
   );
   const grupoDe = (conta) => classif[conta] ?? sugestao[conta] ?? "IGNORAR";
 
@@ -230,7 +239,7 @@ export default function App() {
 
   const dif = tDeb - tCre;
   const temDados = contas.length > 0;
-  const contasIgnoradas = contasResultado.filter((c) => grupoDe(c.conta) === "IGNORAR").length;
+  const prova = useMemo(() => provaIntegridade(contasResultado, grupoDe), [contasResultado, grupoDe]);
 
   return (
     <div className="dre-app">
@@ -325,6 +334,7 @@ export default function App() {
                 onLimparManuais={() => { setClassif({}); setTocadas({}); }}
                 avisoPerfil={avisoPerfil} onAvisoPerfil={setAvisoPerfil}
                 onSalvarPerfil={salvarPerfil} onAplicarPerfil={aplicarPerfil}
+                onAplicarPlano={(p) => setPlanosExtras((ps) => [p, ...ps])} planoAtivo={planoAtivo}
               />
             )}
 
@@ -334,7 +344,7 @@ export default function App() {
                 filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
                 detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
                 onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes })}
-                contasIgnoradas={contasIgnoradas}
+                prova={prova}
                 onSalvarHistorico={() => {
                   const periodo = filtroCompetencia !== "todas"
                     ? competenciaLegivel(filtroCompetencia)
@@ -348,6 +358,8 @@ export default function App() {
             {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia} />}
 
             {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
+
+            {aba === "comparativo" && temDados && <EtapaComparativo dresPorCompetencia={dresPorCompetencia} />}
 
             {aba === "historico" && (
               <EtapaHistorico

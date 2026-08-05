@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRUPOS, agruparPorDigito, montarDRE, sugerirClassificacao } from "../classify.js";
+import { GRUPOS, agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "../classify.js";
 
 /* Plano de contas reduzido com a assinatura do IESB — o suficiente para
  * ligar a camada de classificação por código exato. Se a assinatura
@@ -170,5 +170,22 @@ describe("agruparPorDigito", () => {
     expect(g.map((x) => x.digito)).toEqual(["1", "3"]);
     expect(g[1].cre).toBeCloseTo(700, 2);
     expect(g[1].n).toBe(2);
+  });
+});
+
+describe("provaIntegridade", () => {
+  it("soma classificado + ignorado e confirma que fecha com o razão", () => {
+    const contas = [conta("3110101", 1000), conta("4120101", -400), conta("9999", -50)];
+    const p = provaIntegridade(contas, (c) => (c === "9999" ? "IGNORAR" : "DESP_ADM"));
+    expect(p.total).toBeCloseTo(1450, 2);
+    expect(p.classificado).toBeCloseTo(1400, 2);
+    expect(p.ignorado).toBeCloseTo(50, 2);
+    expect(p.nIgnoradas).toBe(1);
+    expect(p.fecha).toBe(true);
+  });
+
+  it("informa o VALOR do que ficou de fora, não só a contagem", () => {
+    const p = provaIntegridade([conta("9999", -3_000_000)], () => "IGNORAR");
+    expect(p.ignorado).toBeCloseTo(3_000_000, 2);
   });
 });
