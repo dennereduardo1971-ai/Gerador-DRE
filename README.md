@@ -109,6 +109,29 @@ movimento das contas de resultado do razão. Antes havia apenas a
 contagem de contas ignoradas — número que não diz nada sozinho, já que
 12 contas podem ser R$ 3,00 ou R$ 3 milhões.
 
+## Exportação
+
+Na tela da DRE:
+
+- **Baixar Excel** — arquivo `.xlsx` com a demonstração numa aba, as
+  contas de cada grupo em outra (com filtro automático) e, quando o razão
+  cobre mais de um mês, a comparativa numa terceira. Os números saem como
+  número, não como texto, então dá para somar e filtrar em cima.
+- **Baixar CSV** — mesma estrutura, para quem prefere texto puro.
+- **Imprimir / PDF** — abre a impressão do navegador; em "Destino",
+  escolha "Salvar como PDF".
+
+## Balancete de abertura
+
+Na aba Balanço dá para carregar um **balancete de abertura**: os saldos
+de cada conta no início do período, que o razão sozinho não traz. Sem
+ele, o Balanço mostra a movimentação do período; com ele, mostra
+abertura + movimentação = saldo final, que é o Balanço de verdade.
+
+Formato: código da conta na primeira coluna e saldo na segunda (devedor
+positivo, credor negativo), ou débito e crédito em duas colunas. Aceita
+CSV, TXT e Excel.
+
 ## Testes
 
 ```bash

@@ -57,6 +57,8 @@ src/
     planos/iesb.js                # o plano do IESB, como DADO
     linhasDRE.js                  # a estrutura da DRE (rótulos, sinais,
                                    #  cascata, soma por seção)
+    abertura.js                   # balancete de abertura (saldo inicial)
+    exportacao.js                 # CSV e Excel, ambos a partir de linhasDRE
     sessao.js                     # persistência da sessão em IndexedDB
     perfil.js                     # perfil de classificação (conta → grupo)
                                    # salvável em arquivo
@@ -304,11 +306,15 @@ Duas camadas, e as duas importam:
 
 ## Build e publicação
 
+Desde a integração contínua, **publicar é só dar push na `main`**: o
+workflow builda e commita `docs/` sozinho. O passo manual abaixo continua
+valendo para quem quer conferir o build localmente antes:
+
 ```bash
 npm install
+npm test             # 79 testes
 npm run build        # gera dist/
-rm -rf docs && cp -r dist docs
-git add -A && git commit -m "..." && git push   # se tiver credenciais
+rm -rf docs && cp -r dist docs   # normalmente desnecessário: o CI faz
 ```
 
 O `vite.config.js` usa `base: './'` (caminho relativo) de propósito —
@@ -373,6 +379,41 @@ mapa não resolveu.
 Ao mexer aqui, os testes de `planoPerfil.test.js` cobrem a mecânica, mas
 **só `fixtures/validar.mjs` prova que o perfil do IESB continua certo.**
 
+## Exportação
+
+`exportacao.js` gera CSV e Excel a partir de `montarLinhas` — a mesma
+função que desenha a tela. Antes o CSV reconstruía a DRE à mão, com os
+rótulos digitados de novo: no dia em que alguém mudasse a estrutura e
+esquecesse do segundo lugar, o arquivo entregue ao cliente divergiria
+silenciosamente da tela conferida. **Não volte a escrever a estrutura da
+DRE em nenhum outro lugar.**
+
+O PDF é a impressão do navegador (o CSS de impressão já existia), não uma
+biblioteca. É menos configurável, mas não adiciona 300 kB ao bundle nem
+um segundo motor de layout para manter em sincronia com a tela.
+
+## Balancete de abertura
+
+`abertura.js` resolve pela raiz a limitação do Balanço que antes só se
+podia avisar: o razão de um mês não carrega saldo inicial, então o
+Balanço era a variação do período. Com o balancete carregado,
+`montarBalanco` passa a calcular abertura + movimentação = saldo final, e
+`comAbertura` diz em qual dos dois modos o resultado está — a tela usa
+isso para não mostrar o aviso errado.
+
+Duas decisões que parecem detalhe e não são: código repetido **soma** (há
+sistemas que quebram a mesma conta por centro de custo, e sobrescrever
+perderia dinheiro calado), e conta que só existe no balancete **entra**
+no Balanço com movimento zero (se sumisse, o Balanço continuaria errado,
+que é o problema que o balancete veio corrigir).
+
+## Integração contínua
+
+`.github/workflows/ci.yml` roda lint, testes e build em todo push e PR, e
+publica `docs/` automaticamente na `main`. `docs/**` está no
+`paths-ignore` de propósito: o job de publicação commita nessa pasta, e
+sem a exclusão cada publicação dispararia outra, em loop.
+
 ## Ideias de expansão (backlog, não compromissos)
 
 Na ordem que eu (Claude) priorizaria, já sem o que foi feito:
@@ -383,12 +424,8 @@ Na ordem que eu (Claude) priorizaria, já sem o que foi feito:
    das classificações feitas por código fecharia o ciclo.
 2. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
    aba com dados; já devolve `abas`, falta UI.
-3. **Balanço com saldo de abertura** — aceitar um balancete de abertura
-   opcional (código;saldo) resolveria a limitação hoje documentada com
-   aviso na tela.
-4. **Exportar DRE em Excel/PDF formatado** — o SheetJS já está no
-   bundle quando se importa planilha.
-5. **Deploy automático via GitHub Actions** — hoje `docs/` é commitado
-   na mão a cada mudança.
-6. **Agregar durante a importação** em vez de guardar `linhas` cru em
+3. **Circulante × Não Circulante no Balanço** — agora que existe saldo de
+   abertura, o passo seguinte é classificar por hierarquia do plano de
+   contas e transportar o resultado do exercício para o PL.
+4. **Agregar durante a importação** em vez de guardar `linhas` cru em
    memória — tiraria o teto de tamanho de arquivo.
