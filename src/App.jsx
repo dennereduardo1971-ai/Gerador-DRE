@@ -5,7 +5,8 @@ import { agregarPorConta, avisosDoMapeamento, competenciaLegivel, listarCompeten
 import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
-import { baixarCSV } from "./lib/exportCsv.js";
+import { parsearAbertura } from "./lib/abertura.js";
+import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
 import { lerConfigGitHub } from "./lib/githubApi.js";
@@ -68,6 +69,7 @@ export default function App() {
   // Perfis carregados pelo usuário entram na frente dos embutidos, para
   // dar para corrigir um perfil embutido sem precisar de novo build.
   const [planosExtras, setPlanosExtras] = useState([]);
+  const [abertura, setAbertura] = useState({ saldos: {}, arquivo: "", aviso: "" });
   const planos = useMemo(() => [...planosExtras, ...PLANOS_EMBUTIDOS], [planosExtras]);
   const planoAtivo = useMemo(() => escolherPlano(planos, nomes), [planos, nomes]);
 
@@ -92,6 +94,7 @@ export default function App() {
         setFiltroMes(s.filtroMes || "todos");
         setFiltroCC(s.filtroCC || "todos");
         setFiltroCompetencia(s.filtroCompetencia || "todas");
+        setAbertura(s.abertura || { saldos: {}, arquivo: "", aviso: "" });
         setAba("conferir");
       }
       setSessaoCarregada(true);
@@ -106,12 +109,12 @@ export default function App() {
     const t = setTimeout(() => {
       salvarSessao({
         linhas, cols, map, arquivo, classif, tocadas, nomes, resultadoManual,
-        empresa, cnpj, filtroMes, filtroCC, filtroCompetencia,
+        empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura,
       });
     }, 800);
     return () => clearTimeout(t);
   }, [sessaoCarregada, linhas, cols, map, arquivo, classif, tocadas, nomes,
-      resultadoManual, empresa, cnpj, filtroMes, filtroCC, filtroCompetencia]);
+      resultadoManual, empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura]);
 
   useEffect(() => {
     if (lerConfigGitHub()) {
@@ -165,11 +168,31 @@ export default function App() {
     }
   }
 
+  function importarAbertura(file) {
+    if (!file) return;
+    importarLinhasSimples(file)
+      .then((linhasBrutas) => {
+        const r = parsearAbertura(linhasBrutas);
+        if (!r.lidas) {
+          setAbertura({ saldos: {}, arquivo: "", aviso: "Não achei nenhuma conta nesse arquivo. O balancete precisa ter o código da conta na primeira coluna e o saldo na segunda (ou débito e crédito na segunda e terceira)." });
+          return;
+        }
+        setAbertura({
+          saldos: r.saldos,
+          arquivo: file.name,
+          aviso: `Balancete de abertura carregado: ${r.lidas} contas.` +
+            (r.ignoradas ? ` ${r.ignoradas} linha(s) sem código numérico foram ignoradas (cabeçalho e títulos).` : ""),
+        });
+      })
+      .catch(() => setAbertura({ saldos: {}, arquivo: "", aviso: "Não consegui ler esse arquivo de balancete." }));
+  }
+
   async function limparTudo() {
     await limparSessao();
     setLinhas([]); setCols([]); setMap({}); setArquivo("");
     setClassif({}); setTocadas({}); setNomes({}); setResultadoManual({});
     setEmpresa(""); setCnpj("");
+    setAbertura({ saldos: {}, arquivo: "", aviso: "" });
     setFiltroMes("todos"); setFiltroCC("todos"); setFiltroCompetencia("todas");
     setErro(""); setAvisoPerfil(""); setAba("importar");
   }
@@ -226,7 +249,7 @@ export default function App() {
     [contasResultado, classif, sugestao]
   );
 
-  const balanco = useMemo(() => montarBalanco(contas), [contas]);
+  const balanco = useMemo(() => montarBalanco(contas, abertura.saldos), [contas, abertura]);
 
   const dresPorCompetencia = useMemo(() => {
     return competencias.map((comp) => {
@@ -343,7 +366,8 @@ export default function App() {
                 dre={dre} empresa={empresa} cnpj={cnpj} filtroMes={filtroMes} meses={meses}
                 filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
                 detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
-                onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes })}
+                onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes, filtroCompetencia })}
+                onBaixarExcel={() => baixarExcel({ dre, empresa, cnpj, filtroMes, meses, nomes, filtroCompetencia, dresPorCompetencia })}
                 prova={prova}
                 onSalvarHistorico={() => {
                   const periodo = filtroCompetencia !== "todas"
@@ -355,7 +379,8 @@ export default function App() {
               />
             )}
 
-            {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia} />}
+            {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia}
+                abertura={abertura} onImportarAbertura={importarAbertura} />}
 
             {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
 

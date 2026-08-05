@@ -5,7 +5,7 @@ import { montarLinhas } from "../lib/linhasDRE.js";
 
 export function EtapaDRE({
   dre, empresa, cnpj, filtroMes, meses, filtroCC, filtroCompetencia, tDeb, tCre, dif,
-  nomes, detalhado, onToggleDetalhado, onBaixarCSV, prova, onSalvarHistorico,
+  nomes, detalhado, onToggleDetalhado, onBaixarCSV, onBaixarExcel, prova, onSalvarHistorico,
 }) {
   const base = dre.receitaLiq || 1;
   const { itens, escala } = montarLinhas(dre);
@@ -13,8 +13,12 @@ export function EtapaDRE({
   return (
     <>
       <div className="row" style={{ marginBottom: 14 }}>
-        <button className="btn" onClick={onBaixarCSV}>Baixar CSV</button>
-        <button className="btn ghost" onClick={() => window.print()}>Imprimir</button>
+        <button className="btn" onClick={onBaixarExcel}>Baixar Excel</button>
+        <button className="btn ghost" onClick={onBaixarCSV}>Baixar CSV</button>
+        {/* Impressão do navegador: em "Destino", escolher "Salvar como PDF".
+            É o caminho que não exige biblioteca nenhuma e usa o CSS de
+            impressão que a demonstração já tem. */}
+        <button className="btn ghost" onClick={() => window.print()}>Imprimir / PDF</button>
         <button className="btn ghost" onClick={onToggleDetalhado}>
           {detalhado ? "Ocultar contas" : "Mostrar contas"}
         </button>

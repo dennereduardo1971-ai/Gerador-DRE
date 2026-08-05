@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PLANO_IESB } from "../planos/iesb.js";
 import { escolherPlano, grupoPorPlano, lerPlano, planoCombina } from "../planoPerfil.js";
 import { montarLinhas } from "../linhasDRE.js";
+import { matrizDRE } from "../exportacao.js";
 import { montarDRE, sugerirClassificacao } from "../classify.js";
 
 const NOMES_IESB = {
@@ -151,5 +152,38 @@ describe("montarLinhas — soma por seção", () => {
       expect(typeof s.val).toBe("number");
       expect(Number.isNaN(s.val)).toBe(false);
     });
+  });
+});
+
+describe("matrizDRE — o que sai no CSV e no Excel", () => {
+  const contas = [
+    { conta: "3110101", saldo: 10000, historico: "" },
+    { conta: "3210001", saldo: -1000, historico: "" },
+    { conta: "4120101", saldo: -1500, historico: "" },
+  ];
+  const mapa = sugerirClassificacao(contas, NOMES_IESB);
+  const linhas = matrizDRE(montarDRE(contas, (c) => mapa[c]));
+  const acha = (lbl) => linhas.find((l) => l.lbl === lbl);
+
+  it("exporta exatamente a mesma estrutura que a tela desenha", () => {
+    // O CSV reconstruía a DRE à mão, com os rótulos digitados de novo:
+    // uma mudança de estrutura exigia lembrar de dois lugares. Agora as
+    // duas saídas leem montarLinhas, então não há como divergir.
+    const { itens } = montarLinhas(montarDRE(contas, (c) => mapa[c]));
+    expect(linhas.map((l) => l.lbl)).toEqual(itens.map((i) => i.lbl));
+  });
+
+  it("leva os totais de seção para o arquivo exportado", () => {
+    expect(acha("Receita Operacional Bruta").val).toBeCloseTo(10000, 2);
+    expect(acha("Deduções à Receita Operacional").val).toBeCloseTo(-1000, 2);
+  });
+
+  it("calcula a análise vertical sobre a receita líquida", () => {
+    expect(acha("Receita Operacional Líquida").av).toBeCloseTo(1, 4);
+  });
+
+  it("marca o tipo da linha, para o Excel formatar sem adivinhar pelo texto", () => {
+    expect(acha("Lucro Líquido do Exercício").t).toBe("final");
+    expect(acha("Receita Operacional Bruta").t).toBe("secao");
   });
 });
