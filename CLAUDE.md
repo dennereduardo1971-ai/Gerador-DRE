@@ -50,6 +50,9 @@ src/
                                  # sincronização com githubApi.js
     githubApi.js                 # lê/grava um arquivo JSON no repo via API do
                                   # GitHub — o "banco de dados" do histórico
+    sessao.js                     # persistência da sessão em IndexedDB
+    perfil.js                     # perfil de classificação (conta → grupo)
+                                   # salvável em arquivo
     useTema.js                    # tema claro/escuro
   components/
     Etapa*.jsx                  # uma etapa do fluxo por arquivo
@@ -276,11 +279,21 @@ seguro que reescrever a hierarquia de subtotais.
 
 ## Como testar
 
-Não tem framework de teste formal ainda (ver "Ideias de expansão"
-abaixo — Vitest seria o próximo passo natural, já que `src/lib` é
-puro e fácil de testar). O jeito atual é escrever um script Node ESM
-ad-hoc que importa direto de `src/lib` e roda contra um arquivo real
-em `fixtures/`. Ver a skill `testar-com-arquivo-real` para o padrão.
+Duas camadas, e as duas importam:
+
+1. **Vitest** (`npm test`) — testes em `src/lib/__tests__/`, com razão
+   sintético. Rodam em qualquer máquina, sem dado real. Eles congelam
+   de propósito as decisões que já custaram caro: o cabeçalho real do
+   razão do IESB, a separação custo/fopag, Prouni fora de Bolsas,
+   provisões em duas linhas, a soma líquida (reversão reduz despesa) e
+   a hierarquia de subtotais. Se um deles ficar vermelho depois de uma
+   mudança sua, presuma regressão até provar o contrário.
+2. **`node fixtures/validar.mjs`** — a validação contra a DRE real, mês
+   a mês, centavo a centavo. Insubstituível: o Vitest prova que a lógica
+   não mudou, mas só o arquivo real prova que ela está certa. Rode
+   sempre que mexer em `classify.js` ou `parse.js`. Precisa dos arquivos
+   em `fixtures/`, que estão no `.gitignore` — se você está numa máquina
+   sem eles, diga isso ao usuário em vez de fingir que validou.
 
 ## Build e publicação
 
@@ -306,22 +319,56 @@ aberto localmente, sem precisar reconfigurar nada.
 - `.claude/skills/build-e-publicar/` — o fluxo de build + deploy,
   adaptado conforme você tiver ou não acesso a terminal/git push.
 
+## Persistência e perfil
+
+`sessao.js` guarda a sessão inteira (razão, mapeamento, classificações,
+empresa/CNPJ, filtros) em **IndexedDB** — não localStorage, que é
+síncrono e não aguenta o volume do razão. Duas sutilezas que não devem
+ser desfeitas:
+
+- A gravação só começa depois que a restauração termina
+  (`sessaoCarregada`). Sem essa trava, o estado vazio do primeiro render
+  sobrescreve a sessão salva e o usuário perde tudo justamente ao abrir.
+- Como isso deixa dado financeiro real no disco da máquina — e o Denner
+  usa PC de empresa —, **"Limpar tudo" tem que continuar sendo um botão
+  visível**, não uma opção escondida.
+
+`perfil.js` serializa o mapa conta → grupo num arquivo JSON. Ele guarda
+**só decisões e nomes de conta, nunca valores** — de propósito, para
+poder ser versionado ou compartilhado sem carregar número de cliente
+nenhum. Ao carregar, `cobertura()` responde "esse perfil serve para este
+razão?" antes de aplicar. Contas vindas do perfil entram como `tocadas`
+(manuais), porque é o que elas são: alguém já decidiu antes.
+
+Esse é também o caminho previsto para generalizar o app: um plano de
+contas que não seja o do IESB deve ser atendido por um perfil, **não**
+por mais um mapa hardcoded em `classify.js`.
+
 ## Ideias de expansão (backlog, não compromissos)
 
-Coisas que fariam sentido crescer, na ordem que eu (Claude) priorizaria:
+Na ordem que eu (Claude) priorizaria, já sem o que foi feito:
 
-1. **Testes automatizados (Vitest)** para `src/lib` — hoje toda
-   validação é manual via script ad-hoc; formalizar isso pegaria
-   regressão de graça a cada mudança em `classify.js`.
-2. **Seletor de aba do Excel** — hoje `importarExcel.js` escolhe a
-   primeira aba com dados automaticamente; se um arquivo real vier com
-   mais de uma aba relevante, precisa de UI pra escolher.
-3. **Balanço Patrimonial mais fiel** — hoje é só a movimentação do
-   arquivo importado (documentado, com aviso na tela). Para ficar
-   fiel de verdade precisaria de saldo de abertura por conta, o que é
-   um tipo de dado que o razão sozinho não traz.
-4. **Deploy automático via GitHub Actions** — hoje o `docs/` é
-   commitado manualmente a cada mudança; um workflow que builda e
-   publica sozinho a cada push na `main` eliminaria esse passo.
-5. **Exportar a DRE em PDF/Excel formatado**, não só CSV — mais
-   apresentável para portfólio.
+1. **Perfil de plano de contas orientado a dados** — tirar
+   `MAPA_CODIGO_IESB`/`EXCECOES_CODIGO_IESB`/`assinaturaPlanoIESB` do
+   código-fonte e transformá-los num perfil (o `perfil.js` já é a
+   metade do caminho: falta o mapa por CÓDIGO-SÍNTESE, não só por conta
+   folha). Hoje atender um segundo cliente exige editar `classify.js` e
+   refazer o build; e os dados de um cliente real moram no repositório
+   público.
+2. **DRE multi-coluna + linha de prova de integridade** — contador quer
+   12 meses lado a lado; `dresPorCompetencia` já calcula o dado, falta
+   a tabela aceitar N colunas. E falta na tela a linha que prova que
+   nada se perdeu: soma dos grupos + ignorado = soma das contas de
+   resultado, em R$ (hoje só se mostra a CONTAGEM de contas ignoradas,
+   não o valor — que é o número que faz um contador confiar).
+3. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
+   aba com dados; já devolve `abas`, falta UI.
+4. **Balanço com saldo de abertura** — aceitar um balancete de abertura
+   opcional (código;saldo) resolveria a limitação hoje documentada com
+   aviso na tela.
+5. **Exportar DRE em Excel/PDF formatado** — o SheetJS já está no
+   bundle quando se importa planilha.
+6. **Deploy automático via GitHub Actions** — hoje `docs/` é commitado
+   na mão a cada mudança.
+7. **Agregar durante a importação** em vez de guardar `linhas` cru em
+   memória — tiraria o teto de tamanho de arquivo.

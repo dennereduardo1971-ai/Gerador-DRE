@@ -23,6 +23,8 @@ conta e valor de débito/crédito em colunas separadas.
    **competência** (mês/ano — isola a DRE e o Balanço num mês só) e por
    dia específico ou centro de custo, mapeamento manual de colunas.
 3. **Classificar** — sugestão automática de grupo por conta, ajustável.
+   As classificações feitas à mão podem ser salvas num **perfil** (arquivo
+   JSON) e recarregadas no mês seguinte, em vez de refazer tudo.
 4. **DRE** — demonstração final, com opção de salvar no histórico local.
 5. **Balanço** — contas 1 (ativo) e 2 (passivo/PL), com aviso claro de que
    reflete a movimentação do arquivo, não necessariamente o saldo
@@ -57,6 +59,37 @@ nada de nenhum dos dois lados) e grava o resultado de volta — tanto
 localmente quanto no GitHub. Isso dá um jeito rápido de ter o mesmo
 histórico em mais de um navegador/computador, sem montar um backend de
 verdade.
+
+## Sessão salva no navegador
+
+O trabalho em andamento (razão importado, mapeamento de colunas,
+classificações, empresa/CNPJ e filtros) fica guardado no próprio
+navegador, em IndexedDB — então fechar a aba ou recarregar a página não
+faz perder a importação. Nada é enviado para lugar nenhum.
+
+Como isso deixa dados financeiros gravados na máquina, há um botão
+**"Limpar tudo"** no cabeçalho que apaga a sessão inteira — vale usar ao
+terminar, especialmente em computador compartilhado ou de empresa.
+
+## Perfil de classificação
+
+Na etapa 3, "Salvar perfil" gera um arquivo JSON com as classificações
+que você fez à mão; "Carregar perfil" aplica esse arquivo a um razão
+novo e informa quantas contas daquele arquivo já vieram classificadas.
+
+O perfil guarda **só as decisões** (código da conta → grupo da DRE) e os
+nomes das contas — nenhum valor, nenhum lançamento. Isso é de propósito:
+o arquivo pode ser versionado no Git ou levado para outro computador sem
+carregar nenhum dado financeiro de cliente.
+
+## Testes
+
+```bash
+npm test
+```
+
+Testes de `src/lib` com Vitest, usando um razão sintético — rodam em
+qualquer máquina, sem precisar de arquivo real.
 
 ## Rodando localmente
 
