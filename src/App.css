@@ -915,3 +915,214 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
     animation: none !important;
   }
 }
+
+/* ============================================================
+   BALANÇO PATRIMONIAL — a partir do balancete completo
+   ============================================================ */
+
+/* A equação patrimonial. É o elemento de assinatura desta tela: em vez de
+   esconder o desequilíbrio entre Ativo e Passivo (ou pior, chamá-lo de
+   erro), escreve a identidade contábil que o explica, com o resultado do
+   exercício como terceiro termo. */
+.equacao {
+  border: 1px solid var(--regua-forte);
+  border-radius: 10px;
+  background: var(--papel);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+.equacao-linha {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.equacao-termo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+.equacao-termo .k {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+.equacao-termo .v {
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta);
+}
+.equacao-termo.destaque .v { color: var(--positivo); }
+.equacao-op {
+  align-self: center;
+  font-size: 18px;
+  color: var(--tinta-2);
+  opacity: .6;
+}
+.equacao-nota {
+  margin: 14px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid var(--regua);
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--tinta-2);
+}
+
+/* Cabeçalho de card com controle à direita */
+.bal-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.bal-cab h2 { margin-bottom: 4px; }
+
+/* Alternador de visão. Duas perguntas diferentes (ler × conferir), não
+   duas aparências da mesma tabela. */
+.segmentado {
+  display: inline-flex;
+  border: 1px solid var(--regua-forte);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.segmentado button {
+  border: 0;
+  background: transparent;
+  color: var(--tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.segmentado button + button { border-left: 1px solid var(--regua-forte); }
+.segmentado button[data-on="1"] { background: var(--tinta); color: var(--papel); font-weight: 600; }
+
+/* Balanço em duas colunas: Ativo | Passivo + PL */
+.bp {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-top: 18px;
+}
+.bp-titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 9px;
+  border-bottom: 2px solid var(--regua-forte);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--tinta);
+}
+.bp-grupo { margin-top: 14px; }
+.bp-grupo-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--regua);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tinta);
+}
+.bp-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0 5px 14px;
+  font-size: 12px;
+  color: var(--tinta-2);
+  border-bottom: 1px solid var(--regua);
+}
+.bp-nome { min-width: 0; overflow-wrap: anywhere; }
+.bp-num { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.bp-av { font-size: 10px; opacity: .7; font-style: normal; }
+
+.cifra { font-variant-numeric: tabular-nums; }
+.cifra.neg { color: var(--negativo); }
+.cifra.forte { font-size: 15px; font-weight: 700; }
+.cifra.zerada { opacity: .35; }
+
+/* Barra de controles do balancete */
+.bal-barra {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.bal-barra .busca { flex: 1 1 220px; min-width: 180px; }
+.bal-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--tinta-2);
+  cursor: pointer;
+}
+
+/* Árvore do balancete. A hierarquia é dada pelo recuo e pelo peso do
+   texto — não por cor de fundo em cada nível, que a 263 linhas vira
+   zebra e cansa antes da metade da tabela. */
+.balancete td { font-size: 12px; }
+.balancete td.num { text-align: right; white-space: nowrap; }
+.balancete .bal-conta { overflow-wrap: anywhere; }
+.balancete tr[data-tipo="s"] td { font-weight: 600; }
+.balancete tr[data-nivel="0"] td {
+  font-size: 12.5px;
+  font-weight: 700;
+  border-top: 2px solid var(--regua-forte);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.balancete tr[data-nivel="1"] td { border-top: 1px solid var(--regua-forte); }
+.balancete tr[data-tipo="a"] td { color: var(--tinta-2); }
+.balancete tr:hover td { background: var(--papel); }
+.balancete td.destaque { color: var(--tinta); font-weight: 600; }
+
+.bal-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-right: 7px;
+  padding: 0;
+  border: 1px solid var(--regua-forte);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tinta-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.bal-toggle:hover { background: var(--papel); color: var(--tinta); }
+.bal-toggle.vazio { border-color: transparent; background: none; cursor: default; }
+
+.check .sub {
+  margin-top: 5px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+  opacity: .85;
+}
+
+@media (max-width: 860px) {
+  .bp { grid-template-columns: 1fr; gap: 26px; }
+  .equacao-op { display: none; }
+  .equacao-linha { gap: 18px; }
+  .equacao-termo { min-width: 100%; }
+}

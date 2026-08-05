@@ -57,7 +57,9 @@ src/
     planos/iesb.js                # o plano do IESB, como DADO
     linhasDRE.js                  # a estrutura da DRE (rótulos, sinais,
                                    #  cascata, soma por seção)
-    abertura.js                   # balancete de abertura (saldo inicial)
+    abertura.js                   # balancete simples (código;saldo)
+    balancete.js                  # balancete de verificação hierárquico
+                                   #  (traz o Balanço inteiro pronto)
     exportacao.js                 # CSV e Excel, ambos a partir de linhasDRE
     sessao.js                     # persistência da sessão em IndexedDB
     perfil.js                     # perfil de classificação (conta → grupo)
@@ -406,6 +408,34 @@ sistemas que quebram a mesma conta por centro de custo, e sobrescrever
 perderia dinheiro calado), e conta que só existe no balancete **entra**
 no Balanço com movimento zero (se sumisse, o Balanço continuaria errado,
 que é o problema que o balancete veio corrigir).
+
+## Balancete de verificação
+
+`balancete.js` lê o relatório que o sistema contábil emite de verdade
+(`ctbr041`): código pontuado em vários níveis, saldo anterior, débito,
+crédito, movimento e saldo atual, com a natureza indicada por "D"/"C" no
+fim do número. Quando esse formato é reconhecido, ele vira a FONTE do
+Balanço e o razão passa a ser a contraprova — não o contrário.
+
+Quatro armadilhas deste formato, todas cobertas por teste:
+
+- **Os níveis não têm largura fixa** (1, 2, 3, 5 e 7 dígitos no plano do
+  IESB) e **um nível pode ser pulado**: `1.3.40.0` pendura direto em
+  `1.3`, porque `1.3.4` não existe. Por isso o pai é o *prefixo mais
+  longo que existe*, nunca "um nível acima".
+- **As sintéticas já vêm somadas.** Totalizar tudo dá o dobro; só as
+  folhas entram em qualquer soma calculada aqui.
+- **O ponto é ambíguo dentro do mesmo arquivo**: colunas formatadas vêm
+  em pt-BR (`393.899.653,88`) e colunas numéricas cruas vêm com ponto
+  decimal (`393899653.88`). Quem desempata é a vírgula, igual a
+  `numeroBR`. Tratar ponto como milhar nos dois casos multiplicava o
+  movimento do período por cem.
+- **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
+  diferença entre Ativo e Passivo + PL é o resultado do exercício, que
+  está nas contas 3 a 7. No arquivo real: 253.582.263,93 − 252.651.704,84
+  = 930.559,09, idêntico a débitos − créditos do período. **Nunca trate
+  isso como erro de importação.** A tela escreve a identidade e, havendo
+  razão do mesmo período, confronta o valor com o Lucro Líquido da DRE.
 
 ## Integração contínua
 

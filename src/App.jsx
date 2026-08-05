@@ -6,6 +6,7 @@ import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js
 import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { parsearAbertura } from "./lib/abertura.js";
+import { parsearBalancete } from "./lib/balancete.js";
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
@@ -20,6 +21,7 @@ import { EtapaConferir } from "./components/EtapaConferir.jsx";
 import { EtapaClassificar } from "./components/EtapaClassificar.jsx";
 import { EtapaDRE } from "./components/EtapaDRE.jsx";
 import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
+import { BalancoCompleto } from "./components/BalancoCompleto.jsx";
 import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
 import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
@@ -172,6 +174,25 @@ export default function App() {
     if (!file) return;
     importarLinhasSimples(file)
       .then((linhasBrutas) => {
+        /* Tenta primeiro o balancete completo (hierárquico, com saldo
+           anterior/débito/crédito/atual). Se o arquivo for esse, ele traz
+           o Balanço inteiro pronto e vira a fonte da tela. Só se não for é
+           que cai no formato simples código;saldo. O usuário não precisa
+           saber qual dos dois tem em mãos. */
+        const completo = parsearBalancete(linhasBrutas);
+        if (completo) {
+          setAbertura({
+            saldos: completo.saldosAbertura,
+            arquivo: file.name,
+            balancete: completo,
+            aviso: `Balancete de verificação carregado: ${completo.resumo.nContas} contas ` +
+              `(${completo.resumo.nFolhas} analíticas).` +
+              (completo.resumo.integro
+                ? " Conferência interna do arquivo: anterior + movimento = atual em todas as linhas, e cada conta sintética bate com suas filhas."
+                : ` Atenção: ${completo.resumo.inconsistentes} linha(s) e ${completo.resumo.sinteticasErradas} sintética(s) não fecham dentro do próprio arquivo.`),
+          });
+          return;
+        }
         const r = parsearAbertura(linhasBrutas);
         if (!r.lidas) {
           setAbertura({ saldos: {}, arquivo: "", aviso: "Não achei nenhuma conta nesse arquivo. O balancete precisa ter o código da conta na primeira coluna e o saldo na segunda (ou débito e crédito na segunda e terceira)." });
@@ -180,6 +201,7 @@ export default function App() {
         setAbertura({
           saldos: r.saldos,
           arquivo: file.name,
+          balancete: null,
           aviso: `Balancete de abertura carregado: ${r.lidas} contas.` +
             (r.ignoradas ? ` ${r.ignoradas} linha(s) sem código numérico foram ignoradas (cabeçalho e títulos).` : ""),
         });
@@ -192,7 +214,7 @@ export default function App() {
     setLinhas([]); setCols([]); setMap({}); setArquivo("");
     setClassif({}); setTocadas({}); setNomes({}); setResultadoManual({});
     setEmpresa(""); setCnpj("");
-    setAbertura({ saldos: {}, arquivo: "", aviso: "" });
+    setAbertura({ saldos: {}, arquivo: "", aviso: "", balancete: null });
     setFiltroMes("todos"); setFiltroCC("todos"); setFiltroCompetencia("todas");
     setErro(""); setAvisoPerfil(""); setAba("importar");
   }
@@ -262,6 +284,9 @@ export default function App() {
 
   const dif = tDeb - tCre;
   const temDados = contas.length > 0;
+  // O balancete completo desenha o Balanço sozinho, sem razão — então a
+  // vista Balanço não pode depender de ter havido importação de razão.
+  const temBalancete = !!abertura.balancete;
   const prova = useMemo(() => provaIntegridade(contasResultado, grupoDe), [contasResultado, grupoDe]);
 
   return (
@@ -313,7 +338,8 @@ export default function App() {
               {VISTAS.map(([id, nome]) => (
                 <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
                   aria-current={aba === id ? "page" : undefined}
-                  disabled={id !== "historico" && !temDados} onClick={() => setAba(id)}>
+                  disabled={id !== "historico" && !temDados && !(id === "balanco" && temBalancete)}
+                  onClick={() => setAba(id)}>
                   <span className="etapa-marca" />
                   <span className="etapa-txt">
                     <span className="etapa-nome">{nome}</span>
@@ -326,7 +352,8 @@ export default function App() {
           <main className="painel">
             {erro && <div className="err">{erro}</div>}
 
-            {aba === "importar" && <EtapaImportar carregando={carregando} progresso={progresso} onImportar={importar} />}
+            {aba === "importar" && <EtapaImportar carregando={carregando} progresso={progresso} onImportar={importar}
+                onImportarBalancete={importarAbertura} abertura={abertura} />}
 
             {aba === "conferir" && temDados && (
               <EtapaConferir
@@ -379,8 +406,14 @@ export default function App() {
               />
             )}
 
-            {aba === "balanco" && temDados && <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia}
-                abertura={abertura} onImportarAbertura={importarAbertura} />}
+            {aba === "balanco" && (temDados || temBalancete) && (
+              abertura.balancete
+                ? <BalancoCompleto bal={abertura.balancete} arquivo={abertura.arquivo}
+                    lucroLiquido={temDados ? dre.liquido : null}
+                    onTrocar={() => setAbertura({ saldos: {}, arquivo: "", aviso: "", balancete: null })} />
+                : <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia}
+                    abertura={abertura} onImportarAbertura={importarAbertura} />
+            )}
 
             {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
 
@@ -394,7 +427,7 @@ export default function App() {
               />
             )}
 
-            {!temDados && !["importar", "historico"].includes(aba) && (
+            {!temDados && !(aba === "balanco" && temBalancete) && !["importar", "historico"].includes(aba) && (
               <div className="empty">
                 <b>Nenhum razão carregado</b>
                 Comece pela etapa 1, Importar — as outras telas se abrem sozinhas assim que o

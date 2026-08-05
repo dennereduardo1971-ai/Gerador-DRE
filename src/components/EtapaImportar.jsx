@@ -6,9 +6,10 @@ function formatarBytes(n) {
   return (n / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export function EtapaImportar({ carregando, progresso, onImportar }) {
+export function EtapaImportar({ carregando, progresso, onImportar, onImportarBalancete, abertura }) {
   const [over, setOver] = useState(false);
   const inputRef = useRef(null);
+  const balRef = useRef(null);
 
   return (
     <>
@@ -52,6 +53,30 @@ export function EtapaImportar({ carregando, progresso, onImportar }) {
           onChange={(e) => onImportar(e.target.files[0])}
         />
       </div>
+      {/* O balancete é opcional e independente do razão: ele sozinho já
+          desenha o Balanço inteiro, e há quem só queira olhar isso. Por
+          isso entra aqui, e não escondido dentro da aba Balanço — que
+          antes só existia depois de importar um razão. */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="bal-cab">
+          <div>
+            <h2>Balancete de verificação <span className="rotulo">opcional</span></h2>
+            <p className="hint" style={{ margin: 0 }}>
+              Traz o Balanço Patrimonial pronto, com saldo anterior, movimento e saldo atual de
+              cada conta. Pode ser carregado sozinho, sem razão nenhum — e, se houver razão do
+              mesmo período, o app confere o resultado do exercício contra o Lucro Líquido da DRE.
+            </p>
+          </div>
+          <button className="btn ghost" onClick={() => balRef.current?.click()}>
+            {abertura?.balancete ? "Trocar balancete" : "Carregar balancete"}
+          </button>
+        </div>
+        <input ref={balRef} type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb,.ods"
+          style={{ display: "none" }}
+          onChange={(e) => { onImportarBalancete(e.target.files[0]); e.target.value = ""; }} />
+        {abertura?.aviso && <p className="hint" style={{ marginTop: 12 }}>{abertura.aviso}</p>}
+      </div>
+
       <div className="card" style={{ marginTop: 16 }}>
         <h2>O que o arquivo precisa ter</h2>
         <p className="hint">

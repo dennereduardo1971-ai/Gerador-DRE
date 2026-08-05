@@ -121,6 +121,26 @@ Na tela da DRE:
 - **Imprimir / PDF** — abre a impressão do navegador; em "Destino",
   escolha "Salvar como PDF".
 
+## Balancete de verificação
+
+Se o arquivo carregado for um **balancete de verificação completo** (o
+relatório com código hierárquico, saldo anterior, débito, crédito e saldo
+atual), o app reconhece sozinho e monta o Balanço Patrimonial inteiro a
+partir dele — inclusive sem razão nenhum importado.
+
+A tela tem duas visões:
+
+- **Estrutura** — Ativo de um lado, Passivo + Patrimônio Líquido do
+  outro, com Circulante e Não Circulante, para leitura.
+- **Balancete completo** — a árvore inteira, expansível, com os cinco
+  valores de cada conta, busca e opção de ocultar contas paradas.
+
+No topo, a equação patrimonial: *Ativo = Passivo + PL + Resultado do
+exercício*. Um balancete só das contas 1 e 2 não fecha, e não deve
+fechar — a diferença entre os dois lados é o resultado do período, que
+mora nas contas 3 a 7. Se houver um razão do mesmo período importado, o
+app confere esse valor contra o Lucro Líquido da DRE.
+
 ## Balancete de abertura
 
 Na aba Balanço dá para carregar um **balancete de abertura**: os saldos
