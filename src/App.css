@@ -733,6 +733,19 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
   color: var(--tinta-3, var(--tinta-2));
 }
 
+/* Nota afirmativa — o contraponto do .warn: informa que algo está no modo
+   bom (balancete carregado), sem o alarme visual do aviso. */
+.checks-nota {
+  padding: 13px 16px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--regua-forte);
+  background: var(--positivo-fraca);
+  color: var(--tinta-2);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
 /* ============================================================
    PROVA DE INTEGRIDADE
    ============================================================ */

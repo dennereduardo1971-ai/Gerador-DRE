@@ -1,7 +1,9 @@
+import { useRef } from "react";
 import { brl, competenciaLegivel } from "../lib/parse.js";
 import { Balanca } from "./Eixo.jsx";
 
-export function EtapaBalanco({ balanco, filtroCompetencia }) {
+export function EtapaBalanco({ balanco, filtroCompetencia, abertura = {}, onImportarAbertura }) {
+  const aberturaRef = useRef(null);
   if (!balanco.temDados) {
     return (
       <div className="empty">
@@ -14,15 +16,45 @@ export function EtapaBalanco({ balanco, filtroCompetencia }) {
 
   return (
     <>
-      <div className="warn">
-        {filtroCompetencia && filtroCompetencia !== "todas" ? (
-          <>Isolado em <b>{competenciaLegivel(filtroCompetencia)}</b>. </>
-        ) : null}
-        Isto reflete a <b>movimentação das contas dentro deste arquivo</b>{filtroCompetencia && filtroCompetencia !== "todas" ? " (e do período filtrado)" : ""}, não necessariamente
-        o saldo patrimonial acumulado da empresa. Se o razão não trouxer o saldo de abertura de
-        cada conta — comum quando se importa só um mês —, os totais abaixo são a variação do
-        período, não o saldo final real. Para um Balanço fiel, o arquivo precisa cobrir desde a
-        abertura da conta ou incluir lançamentos de saldo inicial.
+      {balanco.comAbertura ? (
+        <div className="checks-nota">
+          Saldo de abertura carregado de <b>{abertura.arquivo}</b>. Os valores abaixo são
+          <b> abertura + movimentação do período = saldo final</b>
+          {filtroCompetencia && filtroCompetencia !== "todas"
+            ? <> — atenção: o razão está filtrado em <b>{competenciaLegivel(filtroCompetencia)}</b>,
+                então o saldo final é o do fim dessa competência.</>
+            : "."}
+        </div>
+      ) : (
+        <div className="warn">
+          {filtroCompetencia && filtroCompetencia !== "todas" ? (
+            <>Isolado em <b>{competenciaLegivel(filtroCompetencia)}</b>. </>
+          ) : null}
+          Isto reflete a <b>movimentação das contas dentro deste arquivo</b>{filtroCompetencia && filtroCompetencia !== "todas" ? " (e do período filtrado)" : ""}, não necessariamente
+          o saldo patrimonial acumulado da empresa. Se o razão não trouxer o saldo de abertura de
+          cada conta — comum quando se importa só um mês —, os totais abaixo são a variação do
+          período, não o saldo final real. Carregue o balancete de abertura abaixo para o Balanço
+          virar saldo real.
+        </div>
+      )}
+
+      <div className="card">
+        <h2>Balancete de abertura</h2>
+        <p className="hint">
+          Os saldos de cada conta no início do período — o dado que o razão sozinho não carrega.
+          Com ele, o Balanço deixa de ser a variação do período e passa a ser o saldo
+          patrimonial de verdade. Formato: código da conta na primeira coluna e saldo na
+          segunda (devedor positivo, credor negativo), ou débito e crédito em duas colunas.
+          CSV, TXT ou Excel.
+        </p>
+        <div className="row">
+          <button className="btn ghost" onClick={() => aberturaRef.current?.click()}>
+            {balanco.comAbertura ? "Trocar balancete" : "Carregar balancete de abertura"}
+          </button>
+          <input ref={aberturaRef} type="file" accept=".csv,.txt,.xlsx,.xls" style={{ display: "none" }}
+            onChange={(e) => { onImportarAbertura(e.target.files[0]); e.target.value = ""; }} />
+        </div>
+        {abertura.aviso && <p className="hint" style={{ marginTop: 10 }}>{abertura.aviso}</p>}
       </div>
 
       <div className="checks">
@@ -49,7 +81,11 @@ export function EtapaBalanco({ balanco, filtroCompetencia }) {
 
       <div className="card">
         <h2>Ativo (conta 1)</h2>
-        <p className="hint">Saldo calculado como débito − crédito (natureza devedora).</p>
+        <p className="hint">
+          {balanco.comAbertura
+            ? "Saldo final = abertura + (débito − crédito) do período. Natureza devedora."
+            : "Saldo calculado como débito − crédito (natureza devedora)."}
+        </p>
         <div className="scroll">
           <table className="tabela-cartao">
             <thead><tr><th>Conta</th><th className="num">Débito</th><th className="num">Crédito</th><th className="num">Saldo</th></tr></thead>
@@ -69,7 +105,11 @@ export function EtapaBalanco({ balanco, filtroCompetencia }) {
 
       <div className="card">
         <h2>Passivo + Patrimônio Líquido (conta 2)</h2>
-        <p className="hint">Saldo calculado como crédito − débito (natureza credora).</p>
+        <p className="hint">
+          {balanco.comAbertura
+            ? "Saldo final = abertura + (crédito − débito) do período. Natureza credora."
+            : "Saldo calculado como crédito − débito (natureza credora)."}
+        </p>
         <div className="scroll">
           <table className="tabela-cartao">
             <thead><tr><th>Conta</th><th className="num">Débito</th><th className="num">Crédito</th><th className="num">Saldo</th></tr></thead>
