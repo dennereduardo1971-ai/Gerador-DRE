@@ -171,6 +171,26 @@ Formato: código da conta na primeira coluna e saldo na segunda (devedor
 positivo, credor negativo), ou débito e crédito em duas colunas. Aceita
 CSV, TXT e Excel.
 
+## Imagem do painel
+
+No Painel, **"Baixar imagem"** gera um PNG com os indicadores, a cascata
+do resultado, a evolução mensal e o ranking de despesas — pronto para
+anexar num relatório ou compartilhar. **"Salvar no GitHub"** manda a
+mesma imagem para o repositório (ver "Arquivos" abaixo), com um aviso de
+confirmação a cada uso porque a imagem traz valores financeiros reais.
+
+## Arquivos
+
+A aba **Arquivos** guarda imagens e outros documentos do projeto dentro
+do próprio repositório, usando a mesma sincronização com o GitHub já
+configurada na aba Histórico — mesmo token, sem serviço novo.
+
+**Importante:** se o repositório for público (o normal de um projeto
+publicado no GitHub Pages), todo arquivo enviado aqui fica acessível a
+qualquer pessoa, sem login, e continua no histórico do Git mesmo depois
+de excluído. A tela avisa isso antes de qualquer envio. Limite de 1 MB
+por arquivo.
+
 ## Testes
 
 ```bash

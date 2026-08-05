@@ -23,6 +23,7 @@ import { EtapaDRE } from "./components/EtapaDRE.jsx";
 import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
 import { BalancoCompleto } from "./components/BalancoCompleto.jsx";
 import { Painel } from "./components/Painel.jsx";
+import { Arquivos } from "./components/Arquivos.jsx";
 import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
 import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
@@ -44,6 +45,7 @@ const VISTAS = [
   ["horizontal", "Horizontal"],
   ["comparativo", "Comparativa"],
   ["historico", "Histórico"],
+  ["arquivos", "Arquivos"],
 ];
 
 export default function App() {
@@ -340,7 +342,7 @@ export default function App() {
               {VISTAS.map(([id, nome]) => (
                 <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
                   aria-current={aba === id ? "page" : undefined}
-                  disabled={id !== "historico" && !temDados && !(["balanco", "painel"].includes(id) && temBalancete)}
+                  disabled={!["historico", "arquivos"].includes(id) && !temDados && !(["balanco", "painel"].includes(id) && temBalancete)}
                   onClick={() => setAba(id)}>
                   <span className="etapa-marca" />
                   <span className="etapa-txt">
@@ -428,6 +430,8 @@ export default function App() {
 
             {aba === "comparativo" && temDados && <EtapaComparativo dresPorCompetencia={dresPorCompetencia} />}
 
+            {aba === "arquivos" && <Arquivos />}
+
             {aba === "historico" && (
               <EtapaHistorico
                 historico={historico}
@@ -436,7 +440,7 @@ export default function App() {
               />
             )}
 
-            {!temDados && !(["balanco", "painel"].includes(aba) && temBalancete) && !["importar", "historico"].includes(aba) && (
+            {!temDados && !(["balanco", "painel"].includes(aba) && temBalancete) && !["importar", "historico", "arquivos"].includes(aba) && (
               <div className="empty">
                 <b>Nenhum razão carregado</b>
                 Comece pela etapa 1, Importar — as outras telas se abrem sozinhas assim que o

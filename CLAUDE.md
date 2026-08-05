@@ -59,6 +59,9 @@ src/
                                    #  cascata, soma por seção)
     abertura.js                   # balancete simples (código;saldo)
     indicadores.js                # margens, índices e séries do painel
+                                   #  (inclui cascataPassos, fonte única
+                                   #  compartilhada pelo SVG e pelo PNG)
+    imagemPainel.js                # gera o PNG do painel via <canvas>
     balancete.js                  # balancete de verificação hierárquico
                                    #  (traz o Balanço inteiro pronto)
     exportacao.js                 # CSV e Excel, ambos a partir de linhasDRE
@@ -471,6 +474,46 @@ Feito com transformações CSS, não com three.js: uma biblioteca 3D
 custaria mais de 600 kB num app cujo bundle tem 300, para desenhar
 caixas. Todo o painel — indicadores, três gráficos SVG e as torres —
 somou 15 kB.
+
+## Armazenamento de arquivos (imagens e outros)
+
+`githubApi.js` ganhou `listarPasta`/`enviarArquivo`/`excluirArquivo`,
+que usam a mesma API de Conteúdo do GitHub que já sincroniza o
+`historico.json` — mesmo token, mesmo repositório, sem serviço novo.
+Arquivos ficam em `data/arquivos/` e a interface é `Arquivos.jsx`.
+
+**O aviso de repositório público não é opcional e não é rodapé.** Se o
+repo for público (o normal de um projeto no GitHub Pages), todo arquivo
+enviado por aqui fica acessível a qualquer pessoa, sem login, e continua
+no histórico do Git mesmo depois de excluído pela interface. `Arquivos.jsx`
+mostra esse aviso ANTES de liberar qualquer envio, e o botão "Salvar no
+GitHub" do Painel pede confirmação explícita a cada uso — não é um "aceitar
+uma vez e esquecer". Isso importa mais aqui do que no `historico.json`
+porque a imagem do painel carrega valores financeiros reais legíveis
+direto na miniatura, não só um número dentro de um JSON.
+
+Limite de 1 MB por arquivo: é o teto prático da API de Conteúdo em
+base64 num único request. Arquivos maiores precisariam do fluxo de blobs
+da Git Data API, que não foi implementado por não ser necessário para o
+que o próprio app gera.
+
+## Imagem do painel
+
+`imagemPainel.js` desenha o PNG em `<canvas>`, não captura o DOM.
+Capturar exigiria uma biblioteca tipo html2canvas (~50 kB) e ainda assim
+tropeçaria nas variáveis CSS e nas transformações 3D das torres
+patrimoniais. Desenhar do zero usa os MESMOS dados computados que a tela
+(`indicadores.js`) — a cascata da imagem é `cascataPassos()`, a mesma
+função que desenha o SVG da tela, extraída de propósito para as duas
+técnicas de desenho não poderem divergir sobre o que a cascata representa.
+
+**As torres 3D não entram na imagem.** Um retrato estático da perspectiva
+exigiria reimplementar a projeção 3D em canvas só para uma imagem — não
+paga o esforço. A imagem cobre indicadores, cascata, evolução e ranking.
+
+A paleta usa cores concretas (`PALETAS.claro`/`escuro`), não variáveis
+CSS: um arquivo exportado precisa se bastar sozinho, sem depender de uma
+folha de estilos que não vai junto com o PNG.
 
 ## Integração contínua
 
