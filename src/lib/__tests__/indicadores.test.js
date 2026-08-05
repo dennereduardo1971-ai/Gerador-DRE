@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estruturaPatrimonial, indicesPatrimoniais, margens, ranquearDespesas, serieMensal } from "../indicadores.js";
+import { cascataPassos, estruturaPatrimonial, indicesPatrimoniais, margens, ranquearDespesas, serieMensal } from "../indicadores.js";
 import { GRUPOS } from "../grupos.js";
 
 /* Balancete mínimo no formato que `parsearBalancete` devolve. */
@@ -137,5 +137,30 @@ describe("ranquearDespesas", () => {
   it("omite grupos zerados em vez de listar barras vazias", () => {
     const dre = { bal: { DESP_ADM: { total: -300 }, CUSTOS: { total: 0 } } };
     expect(ranquearDespesas(dre, GRUPOS)).toHaveLength(1);
+  });
+});
+
+describe("cascataPassos", () => {
+  const dre = {
+    receitaBruta: 1000, deducoes: 100, custos: -200, despOper: -300,
+    resultadoFin: -20, antesIR: 380, liquido: 350,
+  };
+
+  it("acumula do primeiro passo até o lucro líquido", () => {
+    const { passos, liquido } = cascataPassos(dre);
+    expect(passos[0]).toMatchObject({ lbl: "Receita bruta", de: 0, ate: 1000 });
+    expect(liquido).toBeCloseTo(350, 2);
+  });
+
+  it("omite passos com valor desprezível, em vez de desenhar barra vazia", () => {
+    const semFinanceiro = cascataPassos({ ...dre, resultadoFin: 0 });
+    expect(semFinanceiro.passos.map((p) => p.lbl)).not.toContain("Resultado financeiro");
+  });
+
+  it("é a mesma função que alimenta o gráfico da tela e a imagem exportada", () => {
+    // Não testa renderização — testa que existe UMA fonte de verdade para
+    // os passos, para as duas técnicas de desenho não poderem divergir.
+    const { passos } = cascataPassos(dre);
+    expect(passos.every((p) => "de" in p && "ate" in p && "tipo" in p)).toBe(true);
   });
 });

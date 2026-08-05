@@ -107,6 +107,33 @@ export function serieMensal(dresPorCompetencia = []) {
   }));
 }
 
+/** Os passos da cascata do resultado (receita bruta → lucro líquido),
+ *  com o acumulado antes e depois de cada um.
+ *
+ *  Função pura e compartilhada entre o gráfico SVG da tela (`Graficos.jsx`)
+ *  e o gerador de imagem PNG (`imagemPainel.js`): as duas técnicas de
+ *  desenho consomem exatamente os mesmos passos, então não têm como
+ *  divergir sobre o que a cascata representa. */
+export function cascataPassos(dre) {
+  const passos = [
+    { lbl: "Receita bruta", val: dre.receitaBruta, tipo: "base" },
+    { lbl: "Deduções", val: -Math.abs(dre.deducoes), tipo: "sai" },
+    { lbl: "Custos", val: -Math.abs(dre.custos ?? 0), tipo: "sai" },
+    { lbl: "Despesas operacionais", val: -Math.abs(dre.despOper), tipo: "sai" },
+    { lbl: "Resultado financeiro", val: dre.resultadoFin, tipo: dre.resultadoFin >= 0 ? "entra" : "sai" },
+    { lbl: "IRPJ / CSLL", val: -Math.abs(dre.antesIR - dre.liquido), tipo: "sai" },
+  ].filter((p) => Math.abs(p.val) > 0.005);
+
+  let corrente = 0;
+  const comAcumulado = passos.map((p) => {
+    const de = corrente;
+    corrente += p.val;
+    return { ...p, de, ate: corrente };
+  });
+
+  return { passos: comAcumulado, liquido: corrente };
+}
+
 /** As linhas de despesa da DRE, da maior para a menor, para o ranking.
  *  Devolve valores POSITIVOS: aqui a pergunta é tamanho, não sinal. */
 export function ranquearDespesas(dre, grupos) {

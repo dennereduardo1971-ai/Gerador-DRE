@@ -1,4 +1,5 @@
 import { brl, competenciaLegivel, pct } from "../lib/parse.js";
+import { cascataPassos } from "../lib/indicadores.js";
 
 /* Gráficos do painel — 2D e precisos de propósito.
  *
@@ -24,27 +25,13 @@ const curto = (n) => {
 /* ---------- Cascata do resultado ---------- */
 
 export function Cascata({ dre }) {
-  const passos = [
-    { lbl: "Receita bruta", val: dre.receitaBruta, tipo: "base" },
-    { lbl: "Deduções", val: -Math.abs(dre.deducoes), tipo: "sai" },
-    { lbl: "Custos", val: -Math.abs(dre.custos ?? 0), tipo: "sai" },
-    { lbl: "Despesas operacionais", val: -Math.abs(dre.despOper), tipo: "sai" },
-    { lbl: "Resultado financeiro", val: dre.resultadoFin, tipo: dre.resultadoFin >= 0 ? "entra" : "sai" },
-    { lbl: "IRPJ / CSLL", val: -Math.abs(dre.antesIR - dre.liquido), tipo: "sai" },
-  ].filter((p) => Math.abs(p.val) > 0.005);
+  const { passos: barras, liquido: corrente } = cascataPassos(dre);
 
   const L = 92, R = 16, T = 18, B = 46, alturaBarra = 34, gap = 12;
-  const linhas = passos.length + 1;
+  const linhas = barras.length + 1;
   const H = T + linhas * (alturaBarra + gap) + B;
   const W = 720;
   const larguraUtil = W - L - R;
-
-  let corrente = 0;
-  const barras = passos.map((p) => {
-    const de = corrente;
-    corrente += p.val;
-    return { ...p, de, ate: corrente };
-  });
   const teto = Math.max(dre.receitaBruta, corrente, 1);
   const x = (v) => L + (v / teto) * larguraUtil;
 
@@ -75,7 +62,7 @@ export function Cascata({ dre }) {
           );
         })}
         {(() => {
-          const y = T + passos.length * (alturaBarra + gap);
+          const y = T + barras.length * (alturaBarra + gap);
           return (
             <g>
               <text x={L - 10} y={y + alturaBarra / 2 + 4} className="gr-lbl forte" textAnchor="end">
