@@ -64,7 +64,13 @@ export async function lerSessao() {
     const dados = await transacao(db, "readonly", (loja) => loja.get(CHAVE));
     db.close();
     if (!dados || dados.versaoFormato !== VERSAO_FORMATO) return null;
-    if (!Array.isArray(dados.linhas) || !dados.linhas.length) return null;
+    /* Uma sessão vale se tiver QUALQUER uma das duas fontes. Exigir razão
+       aqui descartaria silenciosamente a sessão de quem trabalha só com
+       balancete — que é o fluxo principal desde que o balancete passou a
+       montar a DRE sozinho. */
+    const temRazao = Array.isArray(dados.linhas) && dados.linhas.length > 0;
+    const temBalancete = !!dados.abertura?.balancete;
+    if (!temRazao && !temBalancete) return null;
     return dados;
   } catch {
     return null;

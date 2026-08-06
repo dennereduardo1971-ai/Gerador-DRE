@@ -6,7 +6,7 @@ import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js
 import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { parsearAbertura } from "./lib/abertura.js";
-import { parsearBalancete } from "./lib/balancete.js";
+import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalancete } from "./lib/balancete.js";
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
@@ -24,6 +24,7 @@ import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
 import { BalancoCompleto } from "./components/BalancoCompleto.jsx";
 import { Painel } from "./components/Painel.jsx";
 import { Arquivos } from "./components/Arquivos.jsx";
+import { FonteDados } from "./components/FonteDados.jsx";
 import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
 import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
@@ -76,8 +77,19 @@ export default function App() {
   // dar para corrigir um perfil embutido sem precisar de novo build.
   const [planosExtras, setPlanosExtras] = useState([]);
   const [abertura, setAbertura] = useState({ saldos: {}, arquivo: "", aviso: "" });
+  // "auto" resolve para balancete quando ele cobre as contas de resultado.
+  const [fonte, setFonte] = useState("auto");
+  /* O balancete traz o plano de contas junto — código e descrição de
+     todas as contas, sintéticas inclusive. Como a classificação por
+     código reconhece o plano pela ASSINATURA (o nome das contas-síntese
+     de topo), carregar o balancete dispensa o arquivo separado de plano
+     de contas. Entram por baixo do que o usuário importou à mão, que
+     continua tendo a última palavra. */
+  const nomesBalancete = useMemo(() => nomesDoBalancete(abertura.balancete), [abertura.balancete]);
+  const nomesEfetivos = useMemo(() => ({ ...nomesBalancete, ...nomes }), [nomesBalancete, nomes]);
+
   const planos = useMemo(() => [...planosExtras, ...PLANOS_EMBUTIDOS], [planosExtras]);
-  const planoAtivo = useMemo(() => escolherPlano(planos, nomes), [planos, nomes]);
+  const planoAtivo = useMemo(() => escolherPlano(planos, nomesEfetivos), [planos, nomesEfetivos]);
 
   /* Restaura a sessão anterior antes de qualquer outra coisa. Enquanto
      isso não termina, nada é gravado — senão o estado vazio inicial
@@ -100,8 +112,11 @@ export default function App() {
         setFiltroMes(s.filtroMes || "todos");
         setFiltroCC(s.filtroCC || "todos");
         setFiltroCompetencia(s.filtroCompetencia || "todas");
-        setAbertura(s.abertura || { saldos: {}, arquivo: "", aviso: "" });
-        setAba("conferir");
+        setAbertura(s.abertura || { saldos: {}, arquivo: "", aviso: "", balancete: null });
+        setFonte(s.fonte || "auto");
+        // Sessão só de balancete não tem razão para conferir: leva direto
+        // ao Balanço, que é o que aquele arquivo entrega.
+        setAba((s.linhas || []).length ? "conferir" : "balanco");
       }
       setSessaoCarregada(true);
     });
@@ -111,16 +126,16 @@ export default function App() {
   /* Grava a sessão a cada mudança relevante, com um respiro para não
      gravar a cada tecla digitada em Empresa/CNPJ. */
   useEffect(() => {
-    if (!sessaoCarregada || !linhas.length) return;
+    if (!sessaoCarregada || (!linhas.length && !abertura.balancete)) return;
     const t = setTimeout(() => {
       salvarSessao({
         linhas, cols, map, arquivo, classif, tocadas, nomes, resultadoManual,
-        empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura,
+        empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura, fonte,
       });
     }, 800);
     return () => clearTimeout(t);
   }, [sessaoCarregada, linhas, cols, map, arquivo, classif, tocadas, nomes,
-      resultadoManual, empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura]);
+      resultadoManual, empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura, fonte]);
 
   useEffect(() => {
     if (lerConfigGitHub()) {
@@ -156,7 +171,7 @@ export default function App() {
   }
 
   function salvarPerfil() {
-    baixarPerfil(montarPerfil({ nome: empresa || arquivo || "Perfil", classif, nomes }));
+    baixarPerfil(montarPerfil({ nome: empresa || arquivo || "Perfil", classif, nomes: nomesEfetivos }));
   }
 
   function aplicarPerfil(perfil) {
@@ -219,6 +234,7 @@ export default function App() {
     setClassif({}); setTocadas({}); setNomes({}); setResultadoManual({});
     setEmpresa(""); setCnpj("");
     setAbertura({ saldos: {}, arquivo: "", aviso: "", balancete: null });
+    setFonte("auto");
     setFiltroMes("todos"); setFiltroCC("todos"); setFiltroCompetencia("todas");
     setErro(""); setAvisoPerfil(""); setAba("importar");
   }
@@ -240,13 +256,36 @@ export default function App() {
       .catch(() => setAvisoPerfil("Não consegui ler esse arquivo de plano de contas."));
   }
 
-  const {
-    contas, tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia,
-    debSemConta, creSemConta,
-  } = useMemo(
+  const doRazao = useMemo(
     () => agregarPorConta(linhas, map, filtroMes, filtroCC, filtroCompetencia),
     [linhas, map, filtroMes, filtroCC, filtroCompetencia]
   );
+
+  /* AS DUAS FONTES DESCREVEM O MESMO FATO.
+     O razão soma lançamento a lançamento até chegar no movimento de cada
+     conta; o balancete já traz esse movimento somado pela contabilidade.
+     Por isso as duas alimentam `contas` no mesmo formato, e a DRE pode
+     ser montada a partir de qualquer uma.
+
+     O balancete é a fonte preferida quando cobre as contas de resultado:
+     ele passou pelo fechamento, então é mais confiável que a soma que o
+     app faz por conta própria. Mas ele é um retrato de UM período
+     agregado — não tem competência mês a mês, nem centro de custo, nem
+     lançamento individual. É por isso que o razão continua existindo, e
+     não como redundância. */
+  const cobertura = useMemo(() => coberturaBalancete(abertura.balancete), [abertura.balancete]);
+  const balancetePodeDRE = cobertura.resultado;
+  // Salvo escolha explícita pelo razão, o balancete manda quando pode.
+  const fonteEfetiva = balancetePodeDRE && fonte !== "razao" ? "balancete" : "razao";
+
+  const doBalancete = useMemo(
+    () => contasDeMovimento(abertura.balancete),
+    [abertura.balancete]
+  );
+
+  const contas = fonteEfetiva === "balancete" ? doBalancete : doRazao.contas;
+  const { tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia,
+    debSemConta, creSemConta } = doRazao;
 
   const avisosMap = useMemo(() => avisosDoMapeamento(map, linhas), [map, linhas]);
 
@@ -265,8 +304,8 @@ export default function App() {
   );
 
   const sugestao = useMemo(
-    () => (contasResultado.length ? sugerirClassificacao(contasResultado, nomes, planos) : {}),
-    [contasResultado, nomes, planos]
+    () => (contasResultado.length ? sugerirClassificacao(contasResultado, nomesEfetivos, planos) : {}),
+    [contasResultado, nomesEfetivos, planos]
   );
   const grupoDe = (conta) => classif[conta] ?? sugestao[conta] ?? "IGNORAR";
 
@@ -359,14 +398,23 @@ export default function App() {
             {aba === "importar" && <EtapaImportar carregando={carregando} progresso={progresso} onImportar={importar}
                 onImportarBalancete={importarAbertura} abertura={abertura} />}
 
+            {["conferir", "classificar", "dre"].includes(aba) && (temDados || temBalancete) && (
+              <FonteDados
+                fonteEfetiva={fonteEfetiva} cobertura={cobertura}
+                temRazao={linhas.length > 0} temBalancete={temBalancete}
+                arquivoBalancete={abertura.arquivo} onFonte={setFonte}
+              />
+            )}
+
             {aba === "conferir" && temDados && (
               <EtapaConferir
                 arquivo={arquivo} nLinhas={nLinhas} contas={contas} dif={dif} tDeb={tDeb} tCre={tCre}
                 meses={meses} ccs={ccs} filtroMes={filtroMes} filtroCC={filtroCC}
                 competenciasDisponiveis={competenciasDisponiveis} filtroCompetencia={filtroCompetencia}
                 onFiltroCompetencia={setFiltroCompetencia}
-                empresa={empresa} cnpj={cnpj} map={map} cols={cols} nomes={nomes}
+                empresa={empresa} cnpj={cnpj} map={map} cols={cols} nomes={nomesEfetivos}
                 avisosMap={avisosMap} debSemConta={debSemConta} creSemConta={creSemConta}
+                semRazao={fonteEfetiva === "balancete" && linhas.length === 0}
                 onFiltroMes={setFiltroMes} onFiltroCC={setFiltroCC}
                 onEmpresa={setEmpresa} onCnpj={setCnpj} onMap={setMap}
                 onIrClassificar={() => setAba("classificar")}
@@ -377,7 +425,7 @@ export default function App() {
               <EtapaClassificar
                 grupos1={grupos1} digitosResultado={digitosResultado}
                 resultadoManual={resultadoManual} onResultadoManual={setResultadoManual}
-                contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas} nomes={nomes}
+                contasResultado={contasResultado} grupoDe={grupoDe} tocadas={tocadas} nomes={nomesEfetivos}
                 busca={busca} onBusca={setBusca}
                 onClassificar={(conta, grupo) => {
                   setClassif({ ...classif, [conta]: grupo });
@@ -395,10 +443,10 @@ export default function App() {
             {aba === "dre" && temDados && (
               <EtapaDRE
                 dre={dre} empresa={empresa} cnpj={cnpj} filtroMes={filtroMes} meses={meses}
-                filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomes}
+                filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomesEfetivos}
                 detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
-                onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes, filtroCompetencia })}
-                onBaixarExcel={() => baixarExcel({ dre, empresa, cnpj, filtroMes, meses, nomes, filtroCompetencia, dresPorCompetencia })}
+                onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes: nomesEfetivos, filtroCompetencia })}
+                onBaixarExcel={() => baixarExcel({ dre, empresa, cnpj, filtroMes, meses, nomes: nomesEfetivos, filtroCompetencia, dresPorCompetencia })}
                 prova={prova}
                 onSalvarHistorico={() => {
                   const periodo = filtroCompetencia !== "todas"

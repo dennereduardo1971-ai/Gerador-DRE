@@ -2,7 +2,7 @@ import { brl, competenciaLegivel } from "../lib/parse.js";
 import { Balanca } from "./Eixo.jsx";
 
 export function EtapaConferir({
-  arquivo, nLinhas, contas, dif, tDeb, tCre, meses, ccs, filtroMes, filtroCC,
+  arquivo, nLinhas, contas, dif, tDeb, tCre, meses, ccs, filtroMes, filtroCC, semRazao = false,
   competenciasDisponiveis, filtroCompetencia, onFiltroCompetencia,
   empresa, cnpj, map, cols, nomes, avisosMap = [], debSemConta = 0, creSemConta = 0,
   onFiltroMes, onFiltroCC,
@@ -15,19 +15,29 @@ export function EtapaConferir({
       ))}
 
       <div className="checks">
-        <div className="check"><div className="k">Arquivo</div><div className="v" style={{ fontSize: 13 }}>{arquivo}</div></div>
-        <div className="check"><div className="k">Lançamentos</div><div className="v">{nLinhas.toLocaleString("pt-BR")}</div></div>
+        {!semRazao && (
+          <div className="check"><div className="k">Arquivo</div><div className="v" style={{ fontSize: 13 }}>{arquivo}</div></div>
+        )}
+        {/* O balancete já vem somado: não há lançamento para contar, nem
+            teste de partidas dobradas a fazer — a contabilidade já fechou
+            isso antes de emitir o relatório. Mostrar "0 lançamentos" e
+            "débito x crédito: confere" seria informação falsa. */}
+        {!semRazao && (
+          <div className="check"><div className="k">Lançamentos</div><div className="v">{nLinhas.toLocaleString("pt-BR")}</div></div>
+        )}
         <div className="check"><div className="k">Contas movimentadas</div><div className="v">{contas.length}</div></div>
         {filtroCompetencia !== "todas" && (
           <div className="check" data-tone="ok"><div className="k">Competência isolada</div><div className="v">{competenciaLegivel(filtroCompetencia)}</div></div>
         )}
-        <div className="check" data-tone={Math.abs(dif) < 0.01 ? "ok" : "bad"}>
-          <div className="k">Débito x crédito</div>
-          <div className="v">{Math.abs(dif) < 0.01 ? "Confere" : brl(dif)}</div>
-        </div>
+        {!semRazao && (
+          <div className="check" data-tone={Math.abs(dif) < 0.01 ? "ok" : "bad"}>
+            <div className="k">Débito x crédito</div>
+            <div className="v">{Math.abs(dif) < 0.01 ? "Confere" : brl(dif)}</div>
+          </div>
+        )}
       </div>
 
-      <div className="card">
+      {!semRazao && <div className="card">
         <h2>Partidas dobradas</h2>
         <p className="hint">
           Débito de um lado do eixo, crédito do outro. Quando o razão fecha, os dois braços
@@ -38,7 +48,7 @@ export function EtapaConferir({
           esquerda={tDeb} direita={tCre}
           rotuloEsq={`Débito ${brl(tDeb)}`} rotuloDir={`Crédito ${brl(tCre)}`}
         />
-      </div>
+      </div>}
 
       {Math.abs(dif) >= 0.01 && (
         <div className="warn">
@@ -59,11 +69,16 @@ export function EtapaConferir({
         </div>
       )}
 
+      {/* Os filtros são do razão e já se escondem sozinhos quando as
+          listas estão vazias — mas Empresa e CNPJ vivem neste card e são
+          necessários em qualquer fonte, porque saem no cabeçalho da DRE.
+          Por isso o card fica; só o texto muda. */}
       <div className="card">
-        <h2>Filtros</h2>
+        <h2>{semRazao ? "Identificação" : "Filtros"}</h2>
         <p className="hint">
-          Recortam o razão antes de somar os saldos. A <b>competência</b> isola um mês inteiro —
-          é o jeito mais direto de ver a DRE e o Balanço de um período só.
+          {semRazao
+            ? "Sai no cabeçalho da demonstração e dos arquivos exportados."
+            : <>Recortam o razão antes de somar os saldos. A <b>competência</b> isola um mês inteiro — é o jeito mais direto de ver a DRE e o Balanço de um período só.</>}
         </p>
         <div className="filters">
           {competenciasDisponiveis.length > 0 && (
@@ -108,7 +123,7 @@ export function EtapaConferir({
         </div>
       </div>
 
-      <div className="card">
+      {!semRazao && <div className="card">
         <h2>Mapeamento das colunas</h2>
         <p className="hint">Reconhecidas automaticamente. Corrija se alguma ficou no lugar errado.</p>
         <div className="filters">
@@ -126,7 +141,7 @@ export function EtapaConferir({
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       <div className="card">
         <h2>Saldo por conta</h2>
