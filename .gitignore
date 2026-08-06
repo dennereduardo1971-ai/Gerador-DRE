@@ -11,3 +11,31 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ---------------------------------------------------------------------
+# DADOS REAIS DE CLIENTE — NUNCA VERSIONAR
+#
+# fixtures/ guarda o razão, o plano de contas e o balancete reais da
+# instituição, usados por fixtures/validar.mjs. Só o script entra no Git;
+# os dados, jamais. Sem estas linhas, um `git add -A` distraído commita
+# a movimentação financeira inteira de um cliente — e commit em Git não
+# se apaga de verdade, sobrevive no histórico e em qualquer clone.
+# ---------------------------------------------------------------------
+fixtures/*
+!fixtures/*.mjs
+!fixtures/README.md
+
+# Planilhas e extrações contábeis em qualquer lugar do projeto
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+*.ods
+*.csv
+*.tsv
+
+# Exportações geradas pelo app
+DRE_*.pdf
+painel_*.png
+perfil-dre_*.json
+plano-dre_*.json

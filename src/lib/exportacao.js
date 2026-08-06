@@ -12,6 +12,27 @@ import { GRUPOS, SINAL_GRUPO } from "./classify.js";
 import { montarLinhas } from "./linhasDRE.js";
 import { competenciaLegivel } from "./parse.js";
 
+/** Neutraliza injeção de fórmula em CSV.
+ *
+ *  Excel e LibreOffice avaliam como FÓRMULA qualquer célula que comece
+ *  com `=`, `+`, `-`, `@`, tab ou retorno de carro. Uma descrição de
+ *  conta como `=HYPERLINK("http://...&"&A1)` vira link clicável que
+ *  vaza dados da planilha ao ser aberto; `=cmd|...` chega a executar
+ *  comando no Windows com uma confirmação.
+ *
+ *  Isso importa aqui porque o texto vem do plano de contas e do
+ *  histórico do razão — dados que o app não controla e que passam por
+ *  vários sistemas antes de chegar. E o destino do CSV é justamente ser
+ *  aberto no Excel por um contador, que é quem menos espera isso.
+ *
+ *  A defesa padrão é prefixar com aspa simples, que o Excel consome ao
+ *  exibir: o texto aparece igual, mas não é avaliado. */
+export const PERIGO_FORMULA = /^[=+\-@\t\r]/;
+export function neutralizarFormula(v) {
+  const s = String(v ?? "");
+  return PERIGO_FORMULA.test(s) ? `'${s}` : s;
+}
+
 const dec = (n) => (n == null ? "" : n.toFixed(2));
 
 function cabecalho({ empresa, cnpj, filtroMes, meses, filtroCompetencia }) {
@@ -80,7 +101,7 @@ export function baixarCSV(ctx) {
   });
 
   const csv = linhas
-    .map((l) => l.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";"))
+    .map((l) => l.map((c) => `"${neutralizarFormula(c).replace(/"/g, '""')}"`).join(";"))
     .join("\r\n")
     .replace(/(\d)\.(\d\d)"/g, '$1,$2"'); // decimal com vírgula
   baixar("\uFEFF" + csv, nomeArquivo(empresa, "csv"), "text/csv;charset=utf-8");

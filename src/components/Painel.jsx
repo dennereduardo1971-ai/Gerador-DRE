@@ -143,7 +143,7 @@ export function Painel({ dre, temDados, balancete, dresPorCompetencia = [], empr
               const cfg = lerConfigGitHub();
               if (!cfg?.token) { setMsgExport("Configure a sincronização com o GitHub na aba Histórico primeiro."); return; }
               if (window.confirm(
-                "Este repositório é público: a imagem ficará acessível a qualquer pessoa, sem login, e permanece no histórico do Git mesmo se apagada depois. Ela trará valores financeiros reais do período. Continuar?"
+                "A imagem traz valores financeiros reais do período e ficará visível para quem tem acesso ao repositório. Ela permanece no histórico do Git mesmo se apagada depois — commit não se apaga de verdade. Continuar?"
               )) exportarImagem(true);
             }}
           >

@@ -10,12 +10,15 @@ import { lerConfigGitHub, listarPasta, enviarArquivo, excluirArquivo } from "../
  * um token novo só para arquivos criaria dois lugares de configuração
  * fazendo a mesma coisa.
  *
- * O AVISO DE REPOSITÓRIO PÚBLICO não é rodapé — é a primeira coisa da
- * tela, antes de qualquer envio. Um projeto publicado no GitHub Pages
- * quase sempre tem repositório público, e todo arquivo enviado aqui fica
- * acessível a qualquer pessoa, sem login, para sempre (mesmo apagado
- * depois, sobrevive no histórico do Git). Isso é especialmente relevante
- * porque a imagem do painel carrega valores financeiros reais.
+ * O AVISO DE PERMANÊNCIA não é rodapé — é a primeira coisa da tela,
+ * antes de qualquer envio, e o texto muda conforme a visibilidade REAL do
+ * repositório, consultada na API em vez de presumida. Num repositório
+ * privado o risco é quem tem acesso ao repo; num público, é qualquer
+ * pessoa da internet. Em ambos, o arquivo sobrevive no histórico do Git
+ * depois de excluído pela interface — commit não se apaga de verdade.
+ *
+ * Isso vale especialmente para a imagem do painel, que traz valores
+ * financeiros reais legíveis direto na miniatura.
  */
 
 const PASTA = "data/arquivos";
@@ -34,6 +37,7 @@ export function Arquivos() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [cienteAviso, setCienteAviso] = useState(false);
+  const [visibilidade, setVisibilidade] = useState(null); // "private" | "public" | "desconhecida"
   const [over, setOver] = useState(false);
   const inputRef = useRef(null);
 
@@ -53,6 +57,22 @@ export function Arquivos() {
   }
 
   useEffect(() => { carregar(); }, [configurado]); // eslint-disable-line
+
+  /* Consulta a visibilidade real em vez de presumir. Presumir é como o
+     aviso desta tela ficou errado antes: dizia "este repositório é
+     público" para um repositório privado, o que tanto assusta à toa
+     quanto ensina o usuário a ignorar avisos. */
+  useEffect(() => {
+    if (!configurado) return;
+    let vivo = true;
+    fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}`, {
+      headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json" },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (vivo) setVisibilidade(d ? (d.private ? "private" : "public") : "desconhecida"); })
+      .catch(() => { if (vivo) setVisibilidade("desconhecida"); });
+    return () => { vivo = false; };
+  }, [configurado, cfg]);
 
   async function enviar(files) {
     if (!files?.length) return;
@@ -103,11 +123,21 @@ export function Arquivos() {
       <div className="card">
         <h2>Arquivos do projeto</h2>
         <div className="warn">
-          <b>Este repositório é público.</b> Qualquer arquivo enviado aqui fica acessível a
-          qualquer pessoa pela internet, sem login — e continua acessível pelo histórico do Git
-          mesmo depois de excluído pela interface. Isso vale para imagens do painel, que trazem
-          valores financeiros reais da instituição. Só envie o que pode ser público, do mesmo
-          jeito que já vale para o histórico de DREs sincronizado hoje.
+          {visibilidade === "public" && (
+            <><b>Este repositório é público.</b> Qualquer arquivo enviado aqui fica acessível a
+            qualquer pessoa pela internet, sem login. </>
+          )}
+          {visibilidade === "private" && (
+            <><b>Este repositório é privado</b> — os arquivos ficam visíveis para quem tem acesso
+            ao repositório, não para a internet aberta. </>
+          )}
+          {(visibilidade === "desconhecida" || visibilidade === null) && (
+            <><b>Não consegui confirmar a visibilidade do repositório.</b> Trate como se fosse
+            público até verificar. </>
+          )}
+          Em qualquer caso, o arquivo <b>permanece no histórico do Git</b> depois de excluído por
+          esta tela — commit não se apaga de verdade. Isso vale especialmente para a imagem do
+          painel, que traz valores financeiros reais legíveis direto na miniatura.
         </div>
         <button className="btn" onClick={() => setCienteAviso(true)}>Entendi, continuar</button>
       </div>

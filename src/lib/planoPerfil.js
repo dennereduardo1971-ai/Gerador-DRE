@@ -51,10 +51,41 @@ export function escolherPlano(planos, nomes = {}) {
   return planos.find((p) => planoCombina(p, nomes)) || null;
 }
 
+/* Regex vinda de arquivo carregado pelo usuário é código executável.
+ *
+ * Um padrão como `(a+)+$` provoca backtracking catastrófico: contra 30
+ * caracteres ele leva mais de 30 segundos e, no navegador, congela a aba
+ * de vez — não há como interromper uma regex em andamento em JavaScript.
+ * Como o perfil de plano de contas é um arquivo que circula (pode vir de
+ * um colega, de um e-mail, de um repositório), o padrão precisa ser
+ * validado ANTES de virar RegExp, não depois.
+ *
+ * A defesa é conservadora de propósito: os padrões legítimos deste
+ * projeto são nomes de conta ("PROUNI", "IPTU|IMOVEL"), então basta uma
+ * lista curta do que é permitido. Quantificador aninhado — a construção
+ * que causa o problema — fica de fora, e um padrão recusado vira regra
+ * ignorada com aviso, não app travado. */
+const LIMITE_PADRAO = 120;
+const QUANTIFICADOR_ANINHADO = /[+*}]\s*\)\s*[+*{]/;
+
+export function padraoSeguro(padrao) {
+  const s = String(padrao ?? "");
+  if (!s || s.length > LIMITE_PADRAO) return false;
+  // Backtracking catastrófico exige quantificador dentro de quantificador.
+  if (QUANTIFICADOR_ANINHADO.test(s)) return false;
+  try {
+    new RegExp(s, "i");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function aplicarRegra(regra, conta, nomes, saldo) {
   if (regra.prefixo && conta.slice(0, regra.prefixo.length) !== regra.prefixo) return null;
   if (regra.tipo === "nome") {
     const alvo = (nomes[conta] || "").toUpperCase();
+    if (!padraoSeguro(regra.padrao)) return null;
     return new RegExp(regra.padrao, "i").test(alvo) ? regra.grupo : null;
   }
   if (regra.tipo === "sinal") {
@@ -114,13 +145,15 @@ export function lerPlano(texto) {
   }
   const regras = (d.regras || []).filter(
     (r) =>
-      (r.tipo === "nome" && IDS_VALIDOS.has(r.grupo)) ||
+      (r.tipo === "nome" && IDS_VALIDOS.has(r.grupo) && padraoSeguro(r.padrao)) ||
       (r.tipo === "sinal" && IDS_VALIDOS.has(r.positivo) && IDS_VALIDOS.has(r.negativo))
   );
+  const regrasRecusadas = (d.regras || []).length - regras.length;
 
   return {
     ok: true,
     ignorados,
+    regrasRecusadas,
     plano: {
       nome: d.nome || "Plano sem nome",
       assinatura: d.assinatura,
