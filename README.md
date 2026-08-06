@@ -140,6 +140,26 @@ A aba **Painel** é a leitura rápida do período:
 O painel funciona com só uma das duas fontes e diz qual falta para
 completar.
 
+## Duas fontes: balancete e razão
+
+O app aceita as duas, e elas descrevem o mesmo fato de formas
+diferentes — o razão soma lançamento a lançamento, o balancete já traz o
+movimento somado pela contabilidade. A DRE sai igual pelos dois
+caminhos.
+
+**O balancete é a fonte principal** quando traz as contas de resultado
+(3 a 7): ele passou pelo fechamento, monta DRE e Balanço de uma vez e
+ainda traz o plano de contas junto, dispensando o arquivo separado.
+
+**O razão continua valendo** para o que só ele tem: análise mês a mês
+(Comparativa e Horizontal), filtro por centro de custo e detalhe de cada
+lançamento. Com os dois carregados, há um seletor de fonte nas etapas
+Conferir, Classificar e DRE.
+
+Se o seu balancete vier filtrado apenas nas contas 1 e 2, ele monta o
+Balanço mas não a DRE — exporte o mesmo relatório sem filtrar por conta
+para o balancete fazer tudo sozinho.
+
 ## Balancete de verificação
 
 Se o arquivo carregado for um **balancete de verificação completo** (o

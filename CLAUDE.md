@@ -515,6 +515,53 @@ A paleta usa cores concretas (`PALETAS.claro`/`escuro`), não variáveis
 CSS: um arquivo exportado precisa se bastar sozinho, sem depender de uma
 folha de estilos que não vai junto com o PNG.
 
+## As duas fontes (razão × balancete)
+
+**Elas descrevem o mesmo fato por caminhos diferentes.** O razão soma
+lançamento a lançamento até chegar no movimento de cada conta; o
+balancete já traz esse movimento somado e fechado pela contabilidade.
+`contasDeMovimento()` converte as folhas do balancete para o formato de
+`agregarPorConta`, e `fontes.test.js` prova que a DRE sai idêntica pelos
+dois caminhos, linha por linha.
+
+**Atenção ao sinal.** `agregarPorConta` usa `saldo = crédito − débito`
+(natureza credora positiva, que é o que `montarDRE` espera para
+receitas); o balancete usa `movimento = débito − crédito`. Um é o
+negativo do outro. "Simplificar" isso inverte a DRE inteira sem quebrar
+mais nada visivelmente — há teste explícito guardando esse ponto.
+
+**Qual manda.** `fonteEfetiva = balancetePodeDRE && fonte !== "razao"`.
+Ou seja: o balancete vence por padrão quando cobre contas de resultado,
+porque passou pelo fechamento; o razão só assume por escolha explícita.
+
+**Não são redundantes — e é por isso que o razão fica:**
+
+| | Balancete | Razão |
+|---|---|---|
+| DRE e Balanço | sim | DRE sim, Balanço parcial |
+| Plano de contas | vem junto | arquivo separado |
+| Competência mês a mês | não (retrato de um período) | sim |
+| Centro de custo | não | sim |
+| Lançamento individual | não | sim |
+| Confiabilidade | fechado pela contabilidade | somado pelo app |
+
+Por isso Comparativa, Horizontal e o filtro de centro de custo continuam
+dependendo do razão, e `FonteDados.jsx` diz isso na tela antes de alguém
+trocar de fonte sem entender o que perde.
+
+**Balancete filtrado.** `coberturaBalancete()` detecta quais dígitos raiz
+o arquivo traz. O relatório típico de fechamento patrimonial vem filtrado
+só em 1 e 2 — aí ele monta o Balanço mas não a DRE, e a tela explica que
+basta exportar o mesmo relatório sem filtrar por conta.
+
+**O balancete traz o plano de contas de graça.** `nomesDoBalancete()`
+devolve código → descrição de todas as contas, sintéticas inclusive. Como
+a classificação por código reconhece o plano pela ASSINATURA (nome das
+contas-síntese de topo), carregar o balancete dispensa o arquivo separado
+de plano de contas. Em `App.jsx`, `nomesEfetivos` põe os nomes do
+balancete por baixo dos importados à mão — o usuário mantém a última
+palavra.
+
 ## Integração contínua
 
 `.github/workflows/ci.yml` roda lint, testes e build em todo push e PR, e
