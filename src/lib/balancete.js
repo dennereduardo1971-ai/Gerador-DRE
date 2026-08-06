@@ -201,6 +201,64 @@ export function resumir(contas, porCodigo) {
   };
 }
 
+/** Cobertura do balancete: quais lados do plano de contas ele traz.
+ *
+ *  Um balancete pode vir filtrado. O arquivo típico de fechamento
+ *  patrimonial traz só as contas 1 e 2 (Ativo e Passivo); o mesmo
+ *  relatório sem filtro traz também 3 a 7, que são as contas de
+ *  resultado — e aí ele sozinho monta DRE e Balanço.
+ *
+ *  O app precisa saber disso para dizer ao usuário o que dá e o que não
+ *  dá com o arquivo que ele carregou, em vez de gerar uma DRE zerada. */
+export function coberturaBalancete(bal) {
+  if (!bal) return { patrimonial: false, resultado: false, digitos: [] };
+  const digitos = [...new Set(bal.contas.map((c) => c.codigo[0]))].sort();
+  return {
+    digitos,
+    patrimonial: digitos.some((d) => d === "1" || d === "2"),
+    resultado: digitos.some((d) => d >= "3" && d <= "7"),
+  };
+}
+
+/** Converte as contas analíticas do balancete para o formato que o resto
+ *  do app usa (`agregarPorConta`), permitindo montar a DRE a partir do
+ *  balancete, sem razão.
+ *
+ *  As duas fontes descrevem o mesmo fato por caminhos diferentes: o razão
+ *  soma lançamento a lançamento até chegar no movimento de cada conta; o
+ *  balancete já traz esse movimento somado pela contabilidade. Por isso a
+ *  conversão é direta — e por isso o balancete é a fonte mais confiável
+ *  das duas, já que passou pelo fechamento.
+ *
+ *  Atenção ao sinal: `agregarPorConta` usa saldo = crédito − débito
+ *  (natureza credora positiva, que é o que `montarDRE` espera para
+ *  receitas), enquanto o balancete usa movimento = débito − crédito. Um é
+ *  o negativo do outro; trocar isso inverteria a DRE inteira. */
+export function contasDeMovimento(bal) {
+  if (!bal) return [];
+  return bal.folhas.map((c) => ({
+    conta: c.codigo,
+    deb: c.debito,
+    cre: c.credito,
+    saldo: c.credito - c.debito,
+    historico: c.descricao,
+    n: 0, // o balancete não conta lançamentos: ele já vem somado
+  }));
+}
+
+/** Código → descrição de TODAS as contas do balancete, sintéticas
+ *  inclusive.
+ *
+ *  As sintéticas são o que importa aqui: a classificação por código
+ *  (`planoPerfil.js`) reconhece o plano pela assinatura, que olha o nome
+ *  das contas-síntese de topo. Ou seja, carregar o balancete já entrega
+ *  o plano de contas de graça — o arquivo separado de plano de contas
+ *  deixa de ser necessário. */
+export function nomesDoBalancete(bal) {
+  if (!bal) return {};
+  return Object.fromEntries(bal.contas.map((c) => [c.codigo, c.descricao]));
+}
+
 /** Achata a árvore em ordem de leitura, respeitando quem está aberto.
  *  `abertos` é um Set de códigos; um nó fechado esconde a subárvore. */
 export function achatar(bal, abertos, { ocultarSemMovimento = false } = {}) {

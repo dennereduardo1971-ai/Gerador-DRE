@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { achatar, gruposDe, parsearBalancete, valorDC } from "../balancete.js";
+import { achatar, coberturaBalancete, contasDeMovimento, gruposDe, nomesDoBalancete, parsearBalancete, valorDC } from "../balancete.js";
 
 /* Recorte fiel do balancete real (ctbr041.xlsx): mesma estrutura de
  * cabeçalho, mesma pontuação de código, mesma mistura de colunas
@@ -158,5 +158,55 @@ describe("achatar e gruposDe", () => {
     expect(ativo[1].itens.map((i) => i.descricao)).toEqual([
       "INVESTIMENTOS", "(-)DEPRECIACAO SOCIETARIA",
     ]);
+  });
+});
+
+describe("balancete como fonte da DRE", () => {
+  const bal = parsearBalancete(BALANCETE);
+
+  it("informa que este arquivo só cobre o patrimonial", () => {
+    const c = coberturaBalancete(bal);
+    expect(c.patrimonial).toBe(true);
+    expect(c.resultado).toBe(false);
+    expect(c.digitos).toEqual(["1", "2"]);
+  });
+
+  it("reconhece contas de resultado quando o balancete não vem filtrado", () => {
+    const comResultado = parsearBalancete([
+      ...BALANCETE.slice(0, -1),
+      ["3", "RECEITAS", "0,00", 0, 5000, "5.000,00 C", "5.000,00 C"],
+      ["3.1", "MENSALIDADES", "0,00", 0, 5000, "5.000,00 C", "5.000,00 C"],
+      ["3.1.10.0", "GRADUACAO", "0,00", 0, 5000, "5.000,00 C", "5.000,00 C"],
+      ["3.1.10.00.1", "GRADUACAO PRESENCIAL", "0,00", 0, 5000, "5.000,00 C", "5.000,00 C"],
+    ]);
+    const c = coberturaBalancete(comResultado);
+    expect(c.resultado).toBe(true);
+    expect(c.digitos).toContain("3");
+  });
+
+  it("converte as folhas para o formato de agregarPorConta, invertendo o sinal", () => {
+    // agregarPorConta usa saldo = crédito − débito (natureza credora
+    // positiva, que é o que montarDRE espera para receitas); o balancete
+    // usa movimento = débito − crédito. Trocar isso inverteria a DRE.
+    const contas = contasDeMovimento(bal);
+    const fundoFixo = contas.find((c) => c.conta === "1111001");
+    expect(fundoFixo.deb).toBeCloseTo(5000, 2);
+    expect(fundoFixo.cre).toBeCloseTo(4200, 2);
+    expect(fundoFixo.saldo).toBeCloseTo(-800, 2);
+    expect(fundoFixo.saldo).toBeCloseTo(-bal.porCodigo.get("1111001").movimento, 2);
+  });
+
+  it("converte só as analíticas — as sintéticas já vêm somadas", () => {
+    expect(contasDeMovimento(bal)).toHaveLength(bal.folhas.length);
+  });
+
+  it("entrega o plano de contas de graça, sintéticas inclusive", () => {
+    // É o que permite a classificação por código funcionar sem o arquivo
+    // separado de plano de contas: a assinatura do perfil olha o nome das
+    // contas-síntese de topo.
+    const nomes = nomesDoBalancete(bal);
+    expect(nomes["1"]).toBe("ATIVO");
+    expect(nomes["11110"]).toBe("CAIXA");
+    expect(nomes["1111001"]).toBe("FUNDO FIXO");
   });
 });
