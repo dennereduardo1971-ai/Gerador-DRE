@@ -8,6 +8,9 @@ import { montarBalanco } from "./lib/balanco.js";
 import { parsearAbertura } from "./lib/abertura.js";
 import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalancete } from "./lib/balancete.js";
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
+import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
+import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
+import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
 import { lerConfigGitHub } from "./lib/githubApi.js";
@@ -28,6 +31,8 @@ import { FonteDados } from "./components/FonteDados.jsx";
 import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
 import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
+import { EtapaCPC51 } from "./components/EtapaCPC51.jsx";
+import { Cronograma51 } from "./components/Cronograma51.jsx";
 
 /** O fluxo é sequencial de verdade (1 → 4), então numeração aqui
  *  carrega informação. Balanço, Horizontal e Histórico são vistas
@@ -47,6 +52,17 @@ const VISTAS = [
   ["comparativo", "Comparativa"],
   ["historico", "Histórico"],
   ["arquivos", "Arquivos"],
+];
+
+/* O CPC 51 ganha grupo próprio na trilha, e não uma linha a mais em
+   "Análises", porque não é outra leitura dos mesmos números: é a
+   estrutura que a demonstração vai ter a partir de 2027. Misturar com
+   Horizontal e Comparativa esconderia justamente o que precisa ficar
+   visível todo dia até a virada. O plano de ação não depende de arquivo
+   nenhum — abre mesmo sem razão importado. */
+const VISTAS_CPC51 = [
+  ["cpc51", "Demonstração CPC 51"],
+  ["plano", "Plano de ação"],
 ];
 
 export default function App() {
@@ -77,6 +93,14 @@ export default function App() {
   // dar para corrigir um perfil embutido sem precisar de novo build.
   const [planosExtras, setPlanosExtras] = useState([]);
   const [abertura, setAbertura] = useState({ saldos: {}, arquivo: "", aviso: "" });
+  /* CPC 51: a política é o julgamento da empresa, `categoriaConta` são as
+     decisões conta a conta e `medidas` são as MPDA divulgadas. Os três são
+     decisão, não dado importado — por isso viajam na sessão e no perfil,
+     junto com a classificação manual. */
+  const [politica51, setPolitica51] = useState(POLITICA_PADRAO);
+  const [categoriaConta, setCategoriaConta] = useState({});
+  const [medidas51, setMedidas51] = useState([]);
+  const [planoAcao, setPlanoAcao] = useState(() => lerPlanoAcao());
   // "auto" resolve para balancete quando ele cobre as contas de resultado.
   const [fonte, setFonte] = useState("auto");
   /* O balancete traz o plano de contas junto — código e descrição de
@@ -114,6 +138,9 @@ export default function App() {
         setFiltroCompetencia(s.filtroCompetencia || "todas");
         setAbertura(s.abertura || { saldos: {}, arquivo: "", aviso: "", balancete: null });
         setFonte(s.fonte || "auto");
+        setPolitica51({ ...POLITICA_PADRAO, ...s.politica51 });
+        setCategoriaConta(s.categoriaConta || {});
+        setMedidas51(s.medidas51 || []);
         // Sessão só de balancete não tem razão para conferir: leva direto
         // ao Balanço, que é o que aquele arquivo entrega.
         setAba((s.linhas || []).length ? "conferir" : "balanco");
@@ -131,11 +158,18 @@ export default function App() {
       salvarSessao({
         linhas, cols, map, arquivo, classif, tocadas, nomes, resultadoManual,
         empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura, fonte,
+        politica51, categoriaConta, medidas51,
       });
     }, 800);
     return () => clearTimeout(t);
   }, [sessaoCarregada, linhas, cols, map, arquivo, classif, tocadas, nomes,
-      resultadoManual, empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura, fonte]);
+      resultadoManual, empresa, cnpj, filtroMes, filtroCC, filtroCompetencia, abertura, fonte,
+      politica51, categoriaConta, medidas51]);
+
+  /* O andamento do plano de ação não é dado financeiro e não pertence ao
+     arquivo aberto: fica em localStorage, sobrevive à troca de razão e
+     não é apagado por "Limpar tudo". */
+  useEffect(() => { salvarPlanoAcao(planoAcao); }, [planoAcao]);
 
   useEffect(() => {
     if (lerConfigGitHub()) {
@@ -171,7 +205,10 @@ export default function App() {
   }
 
   function salvarPerfil() {
-    baixarPerfil(montarPerfil({ nome: empresa || arquivo || "Perfil", classif, nomes: nomesEfetivos }));
+    baixarPerfil(montarPerfil({
+      nome: empresa || arquivo || "Perfil", classif, nomes: nomesEfetivos,
+      categorias: categoriaConta, politica: politica51, medidas: medidas51,
+    }));
   }
 
   function aplicarPerfil(perfil) {
@@ -187,6 +224,14 @@ export default function App() {
     if (perfil.nomes && Object.keys(perfil.nomes).length) {
       setNomes((p) => ({ ...perfil.nomes, ...p }));
     }
+    // As decisões do CPC 51 andam junto com as de classificação: quem
+    // separou juros de mora de rendimento de aplicação em janeiro não
+    // deve refazer isso em fevereiro.
+    if (perfil.categorias && Object.keys(perfil.categorias).length) {
+      setCategoriaConta((p) => ({ ...p, ...perfil.categorias }));
+    }
+    if (perfil.politica) setPolitica51((p) => ({ ...p, ...perfil.politica }));
+    if (perfil.medidas?.length) setMedidas51(perfil.medidas);
   }
 
   function importarAbertura(file) {
@@ -235,6 +280,9 @@ export default function App() {
     setEmpresa(""); setCnpj("");
     setAbertura({ saldos: {}, arquivo: "", aviso: "", balancete: null });
     setFonte("auto");
+    // Categorias, política e MPDA são decisões sobre ESTE cliente: saem
+    // junto com o resto. O plano de ação não — ele é do escritório.
+    setPolitica51(POLITICA_PADRAO); setCategoriaConta({}); setMedidas51([]);
     setFiltroMes("todos"); setFiltroCC("todos"); setFiltroCompetencia("todas");
     setErro(""); setAvisoPerfil(""); setAba("importar");
   }
@@ -314,6 +362,79 @@ export default function App() {
     [contasResultado, classif, sugestao]
   );
 
+  /* ---------- CPC 51 ----------
+     A categoria é um eixo PARALELO ao grupo: a mesma conta tem um grupo
+     (a linha da DRE atual) e uma categoria (o bloco do CPC 51). As duas
+     demonstrações leem exatamente as mesmas contas — é isso que faz o
+     lucro líquido ser idêntico nas duas, e `conciliar` prova isso a cada
+     render em vez de confiar. */
+  const categoriaDe = useMemo(
+    () => fazerCategoriaDe({ grupoDe, categoriaPorConta: categoriaConta, politica: politica51 }),
+    [classif, sugestao, categoriaConta, politica51]
+  );
+
+  const dre51 = useMemo(
+    () => montarDRE51(contasResultado, grupoDe, categoriaDe),
+    [contasResultado, classif, sugestao, categoriaDe]
+  );
+
+  const conciliacao51 = useMemo(
+    () => conciliar(dre, dre51, contasResultado, grupoDe, categoriaDe),
+    [dre, dre51, contasResultado, classif, sugestao, categoriaDe]
+  );
+
+  /* A leitura por TEXTO (sem perfil de plano de contas) serve só ao
+     detector de contas mistas: ela é a segunda opinião que se confronta
+     com a categoria efetiva. Roda apenas com a aba aberta, porque é uma
+     passada de regex por todas as contas do razão e nenhuma outra tela
+     precisa dela. */
+  const sugestaoTexto = useMemo(
+    () => (aba === "cpc51" && contasResultado.length ? sugerirClassificacao(contasResultado, nomesEfetivos, []) : {}),
+    [aba, contasResultado, nomesEfetivos]
+  );
+
+  const mistas51 = useMemo(
+    () => contasMistas(contasResultado, { grupoDe, categoriaDe, sugestaoTexto, politica: politica51 }),
+    [contasResultado, classif, sugestao, categoriaDe, sugestaoTexto, politica51]
+  );
+
+  const cobertura51 = useMemo(
+    () => coberturaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica: politica51 }),
+    [contasResultado, classif, sugestao, categoriaConta, politica51]
+  );
+
+  const dePara51 = useMemo(
+    () => deParaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica: politica51, nomes: nomesEfetivos }),
+    [contasResultado, classif, sugestao, categoriaConta, politica51, nomesEfetivos]
+  );
+
+  const ctxExport51 = {
+    dre, dre51, conciliacao: conciliacao51, dePara: dePara51, medidas: medidas51,
+    politica: politica51, empresa, cnpj, filtroMes, meses, filtroCompetencia, nomes: nomesEfetivos,
+  };
+
+  function definirCategoria(conta, categoria) {
+    setCategoriaConta((p) => {
+      const novo = { ...p };
+      if (categoria) novo[conta] = categoria;
+      else delete novo[conta]; // volta ao padrão do grupo
+      return novo;
+    });
+  }
+
+  /* Um ajuste por grupo, no máximo: pedir "excluir Depreciação" numa
+     medida que já a inclui é trocar de intenção, não empilhar duas
+     linhas que se anulam na conciliação. */
+  function ajustarMedida(id, grupo, modo) {
+    setMedidas51((ms) =>
+      ms.map((m) =>
+        m.id === id
+          ? { ...m, ajustes: [...(m.ajustes || []).filter((a) => a.id !== grupo), { tipo: "grupo", id: grupo, modo }] }
+          : m
+      )
+    );
+  }
+
   const balanco = useMemo(() => montarBalanco(contas, abertura.saldos), [contas, abertura]);
 
   const dresPorCompetencia = useMemo(() => {
@@ -382,6 +503,21 @@ export default function App() {
                 <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
                   aria-current={aba === id ? "page" : undefined}
                   disabled={!["historico", "arquivos"].includes(id) && !temDados && !(["balanco", "painel"].includes(id) && temBalancete)}
+                  onClick={() => setAba(id)}>
+                  <span className="etapa-marca" />
+                  <span className="etapa-txt">
+                    <span className="etapa-nome">{nome}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="trilha-grupo">
+              <div className="rotulo">CPC 51 · 2027</div>
+              {VISTAS_CPC51.map(([id, nome]) => (
+                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
+                  aria-current={aba === id ? "page" : undefined}
+                  disabled={id !== "plano" && !temDados}
                   onClick={() => setAba(id)}>
                   <span className="etapa-marca" />
                   <span className="etapa-txt">
@@ -478,6 +614,39 @@ export default function App() {
 
             {aba === "comparativo" && temDados && <EtapaComparativo dresPorCompetencia={dresPorCompetencia} />}
 
+            {aba === "cpc51" && temDados && (
+              <EtapaCPC51
+                dre={dre} dre51={dre51} conciliacao={conciliacao51} mistas={mistas51}
+                cobertura={cobertura51} politica={politica51} categoriaPorConta={categoriaConta}
+                contasResultado={contasResultado} grupoDe={grupoDe} categoriaDe={categoriaDe}
+                nomes={nomesEfetivos} empresa={empresa} cnpj={cnpj}
+                filtroMes={filtroMes} meses={meses} filtroCompetencia={filtroCompetencia}
+                detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
+                medidas={medidas51}
+                onPolitica={setPolitica51}
+                onCategoriaConta={definirCategoria}
+                onLimparCategorias={() => setCategoriaConta({})}
+                onAdicionarMedida={(modelo) => setMedidas51((ms) => [...ms, { ...modelo }])}
+                onRemoverMedida={(id) => setMedidas51((ms) => ms.filter((m) => m.id !== id))}
+                onAjusteMedida={ajustarMedida}
+                onRemoverAjuste={(id, grupo) =>
+                  setMedidas51((ms) => ms.map((m) =>
+                    m.id === id ? { ...m, ajustes: (m.ajustes || []).filter((a) => a.id !== grupo) } : m))}
+                onBaixarExcel={() => baixarExcelCPC51(ctxExport51)}
+                onBaixarDePara={() => baixarCSVDePara(dePara51, ctxExport51)}
+                onBaixarNota={() => baixarNotaMPDA(medidas51, dre51, ctxExport51)}
+                onIrAoPlano={() => setAba("plano")}
+              />
+            )}
+
+            {aba === "plano" && (
+              <Cronograma51
+                status={planoAcao}
+                onStatus={(chave, valor) => setPlanoAcao((p) => ({ ...p, [chave]: valor }))}
+                onLimpar={() => setPlanoAcao({})}
+              />
+            )}
+
             {aba === "arquivos" && <Arquivos />}
 
             {aba === "historico" && (
@@ -488,7 +657,7 @@ export default function App() {
               />
             )}
 
-            {!temDados && !(["balanco", "painel"].includes(aba) && temBalancete) && !["importar", "historico", "arquivos"].includes(aba) && (
+            {!temDados && !(["balanco", "painel"].includes(aba) && temBalancete) && !["importar", "historico", "arquivos", "plano"].includes(aba) && (
               <div className="empty">
                 <b>Nenhum razão carregado</b>
                 Comece pela etapa 1, Importar — as outras telas se abrem sozinhas assim que o

@@ -1461,3 +1461,195 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
 }
 .fonte-txt + .fonte-txt { margin-top: 9px; }
 .segmentado button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ============================================================
+   CPC 51 — a DRE em cinco categorias, e o plano de virada
+   ------------------------------------------------------------
+   Nenhum elemento visual novo aqui: a demonstração do CPC 51 usa a
+   MESMA tabela .dre, o mesmo canal e os mesmos subtotais da DRE
+   tradicional. Isso é de propósito — quem confere as duas lado a lado
+   precisa reconhecer a estrutura de imediato; se a tela nova parecesse
+   outro produto, a comparação viraria trabalho de leitura em vez de
+   conferência. O que existe abaixo é só o que a DRE não tinha: cartões
+   de julgamento, glossário e a lista do plano de ação.
+   ============================================================ */
+
+.cpc-topo { border-left: 3px solid var(--marca); }
+
+.cpc-escolha {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.cpc-escolha input { margin-top: 3px; flex: 0 0 auto; }
+.cpc-escolha b { display: block; font-size: 13px; font-weight: 600; }
+.cpc-escolha i {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tinta-2);
+}
+
+.cpc-grupos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 10px;
+}
+.cpc-grupo {
+  border: 1px solid var(--regua);
+  border-radius: var(--r-p);
+  background: var(--superficie-2);
+  padding: 11px 13px;
+}
+/* Amarelo = decisão pendente de um humano, mesma semântica do resto do
+   app (a tag "manual", o aviso .warn). Não é erro: é julgamento. */
+.cpc-grupo[data-revisar="1"] {
+  border-color: var(--atencao);
+  background: var(--atencao-fraca);
+}
+.cpc-grupo-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cpc-grupo-nome { font-size: 12.5px; font-weight: 600; }
+.cpc-motivo {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tinta-2);
+}
+
+.cpc-glossario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.cpc-verbete b { display: block; font-size: 12.5px; margin-bottom: 3px; }
+.cpc-verbete span { font-size: 12px; line-height: 1.6; color: var(--tinta-2); }
+
+.cpc-x {
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 1px solid var(--regua-forte);
+  border-radius: 4px;
+  background: none;
+  color: var(--tinta-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.cpc-x:hover { color: var(--negativo); border-color: var(--negativo); }
+
+/* ---------- MPDA ---------- */
+
+.mpda {
+  border: 1px solid var(--regua);
+  border-radius: var(--r-p);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--superficie-2);
+}
+.mpda-cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.mpda-cab h3 { margin: 0; font-size: 14.5px; font-weight: 600; }
+.mpda-valor {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.015em;
+}
+.mpda-porque {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--tinta-2);
+  max-width: 78ch;
+}
+.mpda-conc { margin-top: 12px; }
+.mpda-conc .line { grid-template-columns: minmax(0, 1fr) 0 150px 0; }
+
+/* ---------- plano de ação ---------- */
+
+.cron-fase[data-atual="1"] { border-left: 3px solid var(--marca); }
+.cron-cab {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cron-num {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--marca-fraca);
+  color: var(--marca);
+  font-size: 12px;
+  font-weight: 600;
+}
+.cron-titulo { flex: 1 1 auto; min-width: 0; }
+.cron-titulo b { display: block; font-size: 13.5px; font-weight: 600; }
+.cron-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--tinta-2);
+}
+.cron-prazo[data-e="vencido"] { color: var(--negativo); font-weight: 600; }
+.cron-prazo[data-e="perto"] { color: var(--atencao); font-weight: 600; }
+.cron-pct {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta-2);
+}
+.cron-pct[data-completa="1"] { color: var(--positivo); font-weight: 600; }
+
+.cron-corpo { margin-top: 14px; }
+.cron-corpo .rotulo { margin: 14px 0 8px; }
+.cron-lista { margin: 0; padding: 0; list-style: none; }
+.cron-item {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 9px 0;
+  border-top: 1px solid var(--regua);
+}
+.cron-item select { flex: 0 0 auto; width: 140px; font-size: 12px; }
+.cron-txt { font-size: 12.5px; line-height: 1.6; }
+.cron-item[data-e="feito"] .cron-txt { color: var(--tinta-2); text-decoration: line-through; }
+.cron-n { font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+.cron-apoio {
+  display: block;
+  margin-top: 4px;
+  padding-left: 9px;
+  border-left: 2px solid var(--marca);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tinta-2);
+}
+
+@media (max-width: 560px) {
+  .cron-item { flex-direction: column; gap: 6px; }
+  .cron-item select { width: 100%; }
+}
