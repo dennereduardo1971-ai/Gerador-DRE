@@ -108,6 +108,24 @@ Corrigido de quebra: o cabeçalho de período das exportações fazia
 `join(" a ")` entre TODOS os meses ("jan a fev a mar a abr"); agora, com
 mais de dois, mostra primeiro e último.
 
+Ainda no mesmo dia, saiu o **relatório técnico para a diretoria** (PDF de
+19 páginas: regras da norma, impacto na DRE com exemplo numérico
+conciliado, as dez fases e as decisões que dependem da diretoria). Ele
+não mora no repositório — é entregável do escritório, não do app.
+
+Escrevê-lo levantou uma dúvida de produto que precisa ser resolvida:
+
+- **O modelo "EBITDA" que o app oferece como MPDA pode não ser MPDA.** A
+  norma exclui expressamente da definição alguns subtotais de uso
+  corrente, entre eles o resultado operacional antes de depreciação,
+  amortização e perdas por redução ao valor recuperável — que é
+  exatamente como `MODELOS[0]` está definido em `mpda.js`. Já o "EBITDA
+  ajustado" e o "resultado recorrente" são MPDA sem dúvida. Se
+  confirmado, o modelo EBITDA deve trazer um aviso na tela em vez de ser
+  oferecido como se exigisse nota. **Confirmar na redação final do
+  CPC 51 antes de mexer** — errar para o lado de exigir nota demais é
+  menos grave que o contrário, mas os dois lados desinformam.
+
 Ficou de fora, de propósito:
 
 - Efeito tributário e de não controladores por item de conciliação da
@@ -134,13 +152,16 @@ Ficou de fora, de propósito:
 3. **Extrair um `useCPC51` de `App.jsx`.** O componente passou de 500
    para 672 linhas e concentra oito estados novos. Não é urgente, mas é
    o arquivo que mais cresce a cada funcionalidade.
-4. **Efeito tributário por item de MPDA**, com campo editável por ajuste
+4. **Resolver o enquadramento do EBITDA puro como MPDA** (ver registro de
+   10/08). É correção de conteúdo normativo, não de código: se confirmado,
+   vira um aviso na tela e um parágrafo a mais na minuta da nota.
+5. **Efeito tributário por item de MPDA**, com campo editável por ajuste
    — fecha a exigência da norma que hoje sai como lacuna.
-5. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
+6. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
    falta UI).
-6. **Agregar durante a importação**, em vez de guardar `linhas` cru em
+7. **Agregar durante a importação**, em vez de guardar `linhas` cru em
    memória — tira o teto de tamanho de arquivo.
-7. **Limpeza barata:** `historico.js` tem `lerSha` morto e uma expressão
+8. **Limpeza barata:** `historico.js` tem `lerSha` morto e uma expressão
    sem uso; são os dois únicos avisos de lint do projeto.
 
 ## Hipóteses ainda não confirmadas
