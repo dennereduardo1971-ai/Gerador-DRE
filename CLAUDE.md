@@ -45,7 +45,6 @@ src/
     classify.js               # GRUPOS da DRE + sugerirClassificacao()
                               # (o coração do projeto — ver seção própria)
     balanco.js                 # Balanço Patrimonial simplificado (contas 1/2)
-    exportCsv.js               # exportação da DRE final em CSV
     historico.js                # histórico local de DREs (localStorage) +
                                  # sincronização com githubApi.js
     githubApi.js                 # lê/grava um arquivo JSON no repo via API do
@@ -64,6 +63,14 @@ src/
     imagemPainel.js                # gera o PNG do painel via <canvas>
     balancete.js                  # balancete de verificação hierárquico
                                    #  (traz o Balanço inteiro pronto)
+    cpc51.js                      # as cinco categorias do CPC 51, a
+                                   #  política de julgamento e a
+                                   #  conciliação com a estrutura atual
+    linhasCPC51.js                # a demonstração do CPC 51 como dados
+    mpda.js                       # medidas de desempenho da administração
+    cronograma51.js               # o cronograma de implementação, como dado
+    planoAcao.js                  # andamento do plano (localStorage)
+    exportacaoCPC51.js            # Excel de seis abas + De-Para + nota
     exportacao.js                 # CSV e Excel, ambos a partir de linhasDRE
     sessao.js                     # persistência da sessão em IndexedDB
     perfil.js                     # perfil de classificação (conta → grupo)
@@ -71,6 +78,10 @@ src/
     useTema.js                    # tema claro/escuro
   components/
     Etapa*.jsx                  # uma etapa do fluxo por arquivo
+    EtapaCPC51.jsx               # a DRE em cinco categorias + conciliação
+    CategoriasCPC51.jsx           # política, De-Para dos grupos, contas mistas
+    MedidasMPDA.jsx                # MPDA com a conciliação sempre aberta
+    Cronograma51.jsx                # o plano de ação, fase a fase
     LinhaDRE.jsx                 # Linha/Secao/Cabecalho/Detalhe da DRE
     Eixo.jsx                      # Canal e Balanca — o eixo visual
                                    # compartilhado (ver "Sistema visual")
@@ -87,7 +98,9 @@ src/
 Fluxo do app: Importar → Conferir → Classificar → DRE, com Balanço,
 Horizontal e Histórico como abas paralelas que dependem do mesmo
 estado agregado (`contas`, calculado uma vez em `App.jsx` via
-`agregarPorConta`).
+`agregarPorConta`). A trilha tem um terceiro grupo, "CPC 51 · 2027":
+a Demonstração CPC 51 lê as mesmas contas por outro eixo, e o Plano de
+ação não depende de arquivo nenhum.
 
 ## Sistema visual ("Razão")
 
@@ -227,7 +240,7 @@ desfeitas por acidente:
    conta, como o código fazia antes, perde esse líquido e infla o
    grupo. Por isso `bal[g].total` acumula `saldo * sinalDoGrupo`, não
    `Math.abs(saldo)` — e a tela (`EtapaDRE.jsx`) e o CSV
-   (`exportCsv.js`) mostram o valor líquido de verdade (podendo aparecer
+   (`exportacao.js`) mostram o valor líquido de verdade (podendo aparecer
    uma despesa "positiva" num mês de reversão forte), em vez de forçar
    parênteses de despesa sempre.
 4. **Provisões é, na DRE oficial, DUAS linhas, não uma**: "Provisões/
@@ -300,8 +313,9 @@ Duas camadas, e as duas importam:
    sintético. Rodam em qualquer máquina, sem dado real. Eles congelam
    de propósito as decisões que já custaram caro: o cabeçalho real do
    razão do IESB, a separação custo/fopag, Prouni fora de Bolsas,
-   provisões em duas linhas, a soma líquida (reversão reduz despesa) e
-   a hierarquia de subtotais. Se um deles ficar vermelho depois de uma
+   provisões em duas linhas, a soma líquida (reversão reduz despesa), a
+   hierarquia de subtotais e — desde o CPC 51 — a igualdade entre o lucro
+   líquido das duas estruturas. Se um deles ficar vermelho depois de uma
    mudança sua, presuma regressão até provar o contrário.
 2. **`node fixtures/validar.mjs`** — a validação contra a DRE real, mês
    a mês, centavo a centavo. Insubstituível: o Vitest prova que a lógica
@@ -318,7 +332,7 @@ valendo para quem quer conferir o build localmente antes:
 
 ```bash
 npm install
-npm test             # 79 testes
+npm test             # 198 testes (conferir em EVOLUCAO.md)
 npm run build        # gera dist/
 rm -rf docs && cp -r dist docs   # normalmente desnecessário: o CI faz
 ```
@@ -329,14 +343,27 @@ aberto localmente, sem precisar reconfigurar nada.
 
 ## Skills deste projeto
 
-- `.claude/skills/testar-com-arquivo-real/` — como validar mudanças em
-  `parse.js`/`classify.js` contra um razão e plano de contas reais,
-  sem quebrar nada silenciosamente.
-- `.claude/skills/ajustar-classificacao-dre/` — como adicionar ou
-  recalibrar um padrão de classificação com segurança (ordem de
-  prioridade, os testes que rodar antes de aceitar).
-- `.claude/skills/build-e-publicar/` — o fluxo de build + deploy,
-  adaptado conforme você tiver ou não acesso a terminal/git push.
+- `.claude/skills/manter-evolucao/` — como fechar uma sessão de trabalho:
+  medir, registrar em `EVOLUCAO.md` e corrigir este arquivo no mesmo
+  commit quando alguma frase daqui deixar de ser verdade.
+
+Três outras skills já foram descritas aqui (`testar-com-arquivo-real`,
+`ajustar-classificacao-dre`, `build-e-publicar`) mas **nunca foram
+versionadas** — o conteúdo delas vive nas seções "Como testar",
+"O coração do projeto" e "Build e publicação" deste arquivo. Se um dia
+forem escritas de verdade, é aqui que a lista se atualiza.
+
+## Memória de trabalho: `EVOLUCAO.md`
+
+Este arquivo é doutrina: como o projeto é e por quê. `EVOLUCAO.md` é o
+diário: onde ele está agora, o que já foi medido (testes, bundle,
+tamanho dos arquivos), o que ficou pendente e em que ordem atacar.
+
+A divisão importa na prática. Quando você descobrir uma armadilha que
+custaria caro repetir, ela vem para "Armadilhas conhecidas" **aqui** —
+não para o diário, porque é este arquivo que a próxima sessão lê antes
+de mexer em qualquer coisa. O diário registra que a armadilha apareceu,
+o que foi medido e o que sobrou para depois.
 
 ## Persistência e perfil
 
@@ -352,7 +379,9 @@ ser desfeitas:
   usa PC de empresa —, **"Limpar tudo" tem que continuar sendo um botão
   visível**, não uma opção escondida.
 
-`perfil.js` serializa o mapa conta → grupo num arquivo JSON. Ele guarda
+`perfil.js` serializa o mapa conta → grupo num arquivo JSON (versão 2:
+leva junto a categoria do CPC 51 por conta, a política de atividade
+principal e as MPDA; perfis versão 1 continuam sendo lidos). Ele guarda
 **só decisões e nomes de conta, nunca valores** — de propósito, para
 poder ser versionado ou compartilhado sem carregar número de cliente
 nenhum. Ao carregar, `cobertura()` responde "esse perfil serve para este
@@ -618,18 +647,66 @@ publica `docs/` automaticamente na `main`. `docs/**` está no
 `paths-ignore` de propósito: o job de publicação commita nessa pasta, e
 sem a exclusão cada publicação dispararia outra, em loop.
 
+## CPC 51 — a estrutura que entra em 2027
+
+O CPC 51 (versão brasileira do IFRS 18) vale para exercícios iniciados
+em **1º de janeiro de 2027**, com 2026 reapresentado como comparativo. A
+DRE passa a ter **cinco categorias** (operacional, investimento,
+financiamento, tributos sobre o lucro, operações descontinuadas) e **dois
+subtotais obrigatórios** (resultado operacional; resultado antes do
+financiamento e dos tributos sobre o lucro). Some o "não operacional": o
+operacional vira a categoria RESIDUAL.
+
+Cinco coisas que não devem ser desfeitas por acidente:
+
+1. **A categoria é um eixo PARALELO ao grupo, não um grupo novo.** Cada
+   conta tem um grupo (a linha da DRE atual) e uma categoria (o bloco do
+   CPC 51). Criar grupos novos em `grupos.js` quebraria a DRE validada
+   centavo a centavo e faria dinheiro sumir da tela no dia em que uma
+   conta caísse num grupo que a hierarquia de subtotais não soma.
+2. **O lucro líquido é idêntico nas duas estruturas por construção.** A
+   contribuição de cada conta para o resultado é o próprio `saldo`
+   (crédito − débito) nos dois caminhos; mudar de categoria muda a linha,
+   nunca o total. `conciliar()` mede isso a cada render e há teste
+   congelando a garantia. Se algum dia essa igualdade quebrar, o defeito
+   está no mapeamento de categorias — não é "diferença de arredondamento".
+3. **A política de atividade principal é decisão contábil, não
+   configuração.** Quem investe ou financia clientes como negócio
+   principal apresenta aquele resultado dentro do operacional. Ela muda a
+   demonstração inteira, viaja no perfil e sai na planilha exportada
+   porque é o que a auditoria vai pedir primeiro.
+4. **Receitas e Despesas Financeiras são os grupos que mais precisam de
+   revisão.** `REC_FIN` mistura rendimento de aplicação (investimento)
+   com juros de mora de aluno (operacional); `DESP_FIN` mistura juros de
+   empréstimo (financiamento) com tarifa bancária (operacional). O padrão
+   escolhe o caso mais comum e MARCA para revisão — não finge certeza.
+5. **A minuta da nota de MPDA deixa lacuna onde não sabe.** A norma exige
+   efeito tributário e de não controladores por item de conciliação; o
+   app não tem esses dados. Sai `[__________]`, nunca zero — zero é uma
+   afirmação.
+
+O cronograma de implementação (10 fases, 49 passos, go-live em
+jan-fev/2027) está em `cronograma51.js` e aparece na aba "Plano de ação",
+com o andamento em localStorage. Ele sobrevive a "Limpar tudo" de
+propósito: não guarda dado financeiro nenhum, e é do escritório, não do
+arquivo aberto.
+
 ## Ideias de expansão (backlog, não compromissos)
 
-Na ordem que eu (Claude) priorizaria, já sem o que foi feito:
+Na ordem que eu (Claude) priorizaria, já sem o que foi feito. A lista
+viva, com o que foi medido em cada sessão, está em `EVOLUCAO.md`:
 
-1. **Editor de perfil de plano na própria interface** — hoje dá para
+1. **Comparativa na estrutura do CPC 51** — a norma exige 2027 contra
+   2026 reapresentado (Fase 8, passo 36). Hoje `EtapaComparativo` só
+   monta colunas na estrutura antiga.
+2. **Editor de perfil de plano na própria interface** — hoje dá para
    CARREGAR um perfil de plano, mas para criar um do zero ainda é
    preciso escrever o JSON à mão. Uma tela que gere o perfil a partir
    das classificações feitas por código fecharia o ciclo.
-2. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
+3. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
    aba com dados; já devolve `abas`, falta UI.
-3. **Circulante × Não Circulante no Balanço** — agora que existe saldo de
+4. **Circulante × Não Circulante no Balanço** — agora que existe saldo de
    abertura, o passo seguinte é classificar por hierarquia do plano de
    contas e transportar o resultado do exercício para o PL.
-4. **Agregar durante a importação** em vez de guardar `linhas` cru em
+5. **Agregar durante a importação** em vez de guardar `linhas` cru em
    memória — tiraria o teto de tamanho de arquivo.

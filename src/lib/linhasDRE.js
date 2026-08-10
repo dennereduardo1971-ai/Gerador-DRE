@@ -63,19 +63,32 @@ export function montarLinhas(dre) {
   itens.push({ t: "l", lbl: "( – ) IRPJ e CSLL", val: -b.IRPJ_CSLL.total, id: "IRPJ_CSLL" });
   itens.push({ t: "final", lbl: "Lucro Líquido do Exercício", val: dre.liquido });
 
-  // Total de cada seção: soma das linhas comuns logo abaixo dela, até a
-  // próxima seção ou subtotal. É a leitura de "bateu o olho no título, já
-  // sei o total" para quem não conhece a estrutura da DRE de cor.
+  totalizarSecoes(itens);
+  return { itens, escala: aplicarCascata(itens) };
+}
+
+/** Total de cada seção: soma das linhas comuns logo abaixo dela, até a
+ *  próxima seção ou subtotal. É a leitura de "bateu o olho no título, já
+ *  sei o total" para quem não conhece a estrutura da DRE de cor. */
+export function totalizarSecoes(itens) {
   for (let i = 0; i < itens.length; i++) {
     if (itens[i].t !== "secao") continue;
     let soma = 0;
     for (let j = i + 1; j < itens.length && itens[j].t === "l"; j++) soma += itens[j].val;
     itens[i].val = soma;
   }
+  return itens;
+}
 
-  // A cascata: cada linha comum move o saldo corrente; cada subtotal
-  // reancora no valor autoritativo vindo de montarDRE, para o desenho
-  // nunca derivar de uma soma própria.
+/** A cascata: cada linha comum move o saldo corrente; cada subtotal
+ *  reancora no valor autoritativo vindo de quem montou a demonstração,
+ *  para o desenho nunca derivar de uma soma própria.
+ *
+ *  Vive fora de `montarLinhas` porque a demonstração do CPC 51
+ *  (`linhasCPC51.js`) é outra estrutura de linhas lendo as mesmas contas:
+ *  duas cópias desse laço acabariam divergindo no dia em que uma das duas
+ *  ganhasse um tipo de linha novo. */
+export function aplicarCascata(itens) {
   let acumulado = 0;
   const pontos = [0];
   for (const it of itens) {
@@ -90,10 +103,7 @@ export function montarLinhas(dre) {
       pontos.push(it.val);
     }
   }
-
   const min = Math.min(...pontos);
   const max = Math.max(...pontos);
-  const escala = max > min ? { min, max } : null;
-
-  return { itens, escala };
+  return max > min ? { min, max } : null;
 }

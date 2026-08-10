@@ -63,3 +63,47 @@ describe("cobertura", () => {
     expect(c).toEqual({ presentes: 2, total: 3, noPerfil: 3 });
   });
 });
+
+describe("perfil versão 2 — as decisões do CPC 51 viajam junto", () => {
+  const perfil = montarPerfil({
+    nome: "Cliente X",
+    classif: { "4210201": "REC_FIN" },
+    categorias: { "4210201": "OPERACIONAL", "9999": "INVENTADA" },
+    politica: { investirEhAtividadePrincipal: true },
+    medidas: [{ id: "EBITDA", nome: "EBITDA", base: "OPERACIONAL", ajustes: [{ tipo: "grupo", id: "DEPRECIACAO", modo: "excluir" }] }],
+  });
+
+  it("guarda categoria por conta, política e medidas — e nenhum valor", () => {
+    expect(perfil.versao).toBe(2);
+    expect(perfil.categorias).toEqual({ "4210201": "OPERACIONAL" }); // categoria inválida fora
+    expect(perfil.politica.investirEhAtividadePrincipal).toBe(true);
+    expect(perfil.politica.financiarClientesEhAtividadePrincipal).toBe(false);
+    expect(JSON.stringify(perfil)).not.toMatch(/saldo|valor|R\$/);
+  });
+
+  it("volta inteiro na releitura", () => {
+    const r = lerPerfil(JSON.stringify(perfil));
+    expect(r.ok).toBe(true);
+    expect(r.perfil.categorias).toEqual({ "4210201": "OPERACIONAL" });
+    expect(r.perfil.politica.investirEhAtividadePrincipal).toBe(true);
+    expect(r.perfil.medidas).toHaveLength(1);
+  });
+
+  it("continua lendo perfil versão 1, sem os campos novos", () => {
+    const r = lerPerfil(JSON.stringify({
+      formato: "gerador-dre/perfil", versao: 1, contas: { "1": "CUSTOS" },
+    }));
+    expect(r.ok).toBe(true);
+    expect(r.perfil.categorias).toEqual({});
+    expect(r.perfil.politica).toBe(null);
+    expect(r.perfil.medidas).toEqual([]);
+  });
+
+  it("descarta medida sem ajuste: sem ajuste ela é o próprio subtotal da norma", () => {
+    const r = lerPerfil(JSON.stringify({
+      formato: "gerador-dre/perfil", versao: 2, contas: {},
+      medidas: [{ nome: "Vazia", base: "OPERACIONAL", ajustes: [] }],
+    }));
+    expect(r.perfil.medidas).toEqual([]);
+  });
+});

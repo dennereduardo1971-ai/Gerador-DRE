@@ -33,39 +33,52 @@ export function neutralizarFormula(v) {
   return PERIGO_FORMULA.test(s) ? `'${s}` : s;
 }
 
-const dec = (n) => (n == null ? "" : n.toFixed(2));
+export const dec = (n) => (n == null ? "" : n.toFixed(2));
 
-function cabecalho({ empresa, cnpj, filtroMes, meses, filtroCompetencia }) {
-  const periodo =
-    filtroCompetencia && filtroCompetencia !== "todas"
-      ? competenciaLegivel(filtroCompetencia)
-      : filtroMes === "todos"
-        ? (meses || []).join(" a ")
-        : filtroMes;
+/* "jan a fev a mar a abr" era o que saía no cabeçalho de todo arquivo
+   exportado quando o razão cobria mais de dois meses — o `join(" a ")`
+   entre TODOS os meses. Com um razão diário, virava uma linha de
+   quinhentos caracteres. Período é intervalo: com mais de dois pontos,
+   o que interessa é o primeiro e o último. */
+export function periodoLegivel({ filtroMes, meses, filtroCompetencia }) {
+  if (filtroCompetencia && filtroCompetencia !== "todas") return competenciaLegivel(filtroCompetencia);
+  if (filtroMes !== "todos") return filtroMes;
+  const lista = meses || [];
+  return lista.length > 2 ? `${lista[0]} a ${lista[lista.length - 1]}` : lista.join(" a ");
+}
+
+export function cabecalho({ empresa, cnpj, filtroMes, meses, filtroCompetencia, titulo }) {
   return [
-    ["DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO"],
+    [titulo || "DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO"],
     [empresa || "Empresa"],
     [cnpj ? `CNPJ ${cnpj}` : ""],
-    ["Período", periodo],
+    ["Período", periodoLegivel({ filtroMes, meses, filtroCompetencia })],
     [],
   ];
 }
 
-/** A demonstração como matriz: rótulo, valor, análise vertical, tipo.
- *  O tipo viaja junto para o Excel poder formatar seção/subtotal/final
- *  sem ter de adivinhar pelo texto do rótulo. */
-export function matrizDRE(dre) {
-  const { itens } = montarLinhas(dre);
-  const base = dre.receitaLiq || 1;
+/** Uma demonstração já montada em linhas vira matriz: rótulo, valor,
+ *  análise vertical, tipo. O tipo viaja junto para o Excel poder formatar
+ *  seção/subtotal/final sem ter de adivinhar pelo texto do rótulo.
+ *
+ *  Separado de `matrizDRE` porque a demonstração do CPC 51 é outra
+ *  estrutura de linhas com a mesma forma — e as duas exportações têm que
+ *  formatar igual, hoje e depois de qualquer mudança. */
+export function matrizLinhas(itens, base) {
+  const b = base || 1;
   return itens.map((it) => ({
     lbl: it.lbl,
     val: it.val,
-    av: it.val == null ? null : it.val / base,
+    av: it.val == null ? null : it.val / b,
     t: it.t,
   }));
 }
 
-function baixar(conteudo, nome, tipo) {
+export function matrizDRE(dre) {
+  return matrizLinhas(montarLinhas(dre).itens, dre.receitaLiq || 1);
+}
+
+export function baixar(conteudo, nome, tipo) {
   const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
   const a = document.createElement("a");
   a.href = url;

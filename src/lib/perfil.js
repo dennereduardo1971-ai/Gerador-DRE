@@ -13,17 +13,32 @@
  * número de cliente nenhum. */
 
 import { GRUPOS } from "./grupos.js";
+import { IDS_CATEGORIA, POLITICA_PADRAO } from "./cpc51.js";
 
-const VERSAO = 1;
+/* Versão 2: o perfil passou a levar também as decisões do CPC 51 —
+ * categoria por conta, política de atividade principal e as MPDA
+ * divulgadas. Continuam sendo só DECISÕES, nenhum valor, então a regra
+ * de o arquivo poder ser versionado e compartilhado segue valendo.
+ *
+ * Perfis versão 1 continuam sendo lidos: os campos novos simplesmente
+ * chegam vazios. Quem separou juros de mora de rendimento de aplicação
+ * em janeiro não deve ter de refazer isso em fevereiro — e essa era a
+ * razão de o perfil existir desde o início. */
+const VERSAO = 2;
 const IDS_VALIDOS = new Set(GRUPOS.map((g) => g.id));
+const CATEGORIAS_VALIDAS = new Set(IDS_CATEGORIA);
 
 /** Monta o objeto do perfil a partir do estado atual da classificação.
  *  `classif` são as escolhas manuais; `nomes`, o plano de contas
  *  importado. Só entram contas com grupo reconhecido. */
-export function montarPerfil({ nome, classif = {}, nomes = {} }) {
+export function montarPerfil({ nome, classif = {}, nomes = {}, categorias = {}, politica, medidas = [] }) {
   const contas = {};
   for (const [conta, grupo] of Object.entries(classif)) {
     if (IDS_VALIDOS.has(grupo)) contas[conta] = grupo;
+  }
+  const cats = {};
+  for (const [conta, categoria] of Object.entries(categorias)) {
+    if (CATEGORIAS_VALIDAS.has(categoria)) cats[conta] = categoria;
   }
   return {
     formato: "gerador-dre/perfil",
@@ -32,6 +47,9 @@ export function montarPerfil({ nome, classif = {}, nomes = {} }) {
     criadoEm: new Date().toISOString(),
     contas,
     nomes,
+    categorias: cats,
+    politica: { ...POLITICA_PADRAO, ...politica },
+    medidas,
   };
 }
 
@@ -59,6 +77,20 @@ export function lerPerfil(texto) {
     else ignoradas++;
   }
 
+  const categorias = {};
+  for (const [conta, categoria] of Object.entries(dados.categorias || {})) {
+    if (CATEGORIAS_VALIDAS.has(categoria)) categorias[conta] = categoria;
+    else ignoradas++;
+  }
+
+  /* Medida sem ajuste nenhum é igual ao próprio subtotal do CPC 51 — não
+     é MPDA. Entra a validação estrutural mínima aqui, na leitura do
+     arquivo, porque depois disso a medida vai direto para a nota
+     explicativa. */
+  const medidas = (dados.medidas || []).filter(
+    (m) => m && typeof m === "object" && m.nome && m.base && Array.isArray(m.ajustes) && m.ajustes.length
+  );
+
   return {
     ok: true,
     ignoradas,
@@ -67,6 +99,9 @@ export function lerPerfil(texto) {
       criadoEm: dados.criadoEm || null,
       contas,
       nomes: dados.nomes && typeof dados.nomes === "object" ? dados.nomes : {},
+      categorias,
+      politica: dados.politica && typeof dados.politica === "object" ? dados.politica : null,
+      medidas,
     },
   };
 }
