@@ -115,16 +115,28 @@ não mora no repositório — é entregável do escritório, não do app.
 
 Escrevê-lo levantou uma dúvida de produto que precisa ser resolvida:
 
-- **O modelo "EBITDA" que o app oferece como MPDA pode não ser MPDA.** A
-  norma exclui expressamente da definição alguns subtotais de uso
-  corrente, entre eles o resultado operacional antes de depreciação,
-  amortização e perdas por redução ao valor recuperável — que é
-  exatamente como `MODELOS[0]` está definido em `mpda.js`. Já o "EBITDA
-  ajustado" e o "resultado recorrente" são MPDA sem dúvida. Se
-  confirmado, o modelo EBITDA deve trazer um aviso na tela em vez de ser
-  oferecido como se exigisse nota. **Confirmar na redação final do
-  CPC 51 antes de mexer** — errar para o lado de exigir nota demais é
-  menos grave que o contrário, mas os dois lados desinformam.
+- **O modelo "EBITDA" que o app oferece como MPDA provavelmente NÃO é
+  MPDA — confirmado em fonte.** A IFRS 18 exclui da definição o
+  "resultado operacional antes de depreciação, amortização e perdas por
+  redução ao valor recuperável" (OPDAI), que é exatamente como
+  `MODELOS[0]` está definido em `mpda.js`: base operacional, excluindo
+  `DEPRECIACAO`. Ou seja, o app hoje oferece como MPDA justamente a
+  medida que a norma tira da definição. Já "EBITDA ajustado" e
+  "resultado recorrente" seguem sendo MPDA sem dúvida.
+
+  A sutileza que fecha o raciocínio: a exclusão só vale se a medida
+  coincidir EXATAMENTE com o OPDAI. Um EBITDA calculado à moda brasileira
+  (Resolução CVM 156: resultado líquido + tributos + resultado financeiro
+  líquido + D&A) difere do OPDAI pelos itens financeiros que o CPC 51
+  reclassifica para operacional — juros de mora, tarifas bancárias. Com
+  esses itens, volta a ser MPDA.
+
+  Some-se que a **Resolução CVM 237/2025 revoga a Resolução CVM 156**, com
+  efeitos a partir de 1º/1/2027: o EBITDA perde regra própria e cai no
+  regime de MPDA. **Correção sugerida:** manter o modelo, mas exibir na
+  tela que, se a medida coincidir exatamente com o resultado operacional
+  antes de D&A, ela não é MPDA e não exige a nota — e que qualquer ajuste
+  além disso a torna MPDA.
 
 Ficou de fora, de propósito:
 
@@ -149,12 +161,13 @@ Ficou de fora, de propósito:
    `CLAUDE.md`, agora mais valioso): com o De-Para do CPC 51 pronto na
    tela, gerar o arquivo de perfil a partir das decisões tomadas fecha o
    ciclo e serve de especificação para a Fase 4 (parametrização do ERP).
-3. **Extrair um `useCPC51` de `App.jsx`.** O componente passou de 500
+3. **Aviso do EBITDA na tela de MPDA** (ver registro de 10/08, item
+   confirmado em fonte): distinguir o EBITDA que coincide com o resultado
+   operacional antes de D&A — que não é MPDA — de qualquer versão
+   ajustada, que é.
+4. **Extrair um `useCPC51` de `App.jsx`.** O componente passou de 500
    para 672 linhas e concentra oito estados novos. Não é urgente, mas é
    o arquivo que mais cresce a cada funcionalidade.
-4. **Resolver o enquadramento do EBITDA puro como MPDA** (ver registro de
-   10/08). É correção de conteúdo normativo, não de código: se confirmado,
-   vira um aviso na tela e um parágrafo a mais na minuta da nota.
 5. **Efeito tributário por item de MPDA**, com campo editável por ajuste
    — fecha a exigência da norma que hoje sai como lacuna.
 6. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
