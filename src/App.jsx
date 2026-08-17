@@ -10,6 +10,8 @@ import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalance
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
+import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
+import { baixarCSVDeParaCompleto, baixarExcelDePara } from "./lib/exportacaoDePara.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
@@ -33,40 +35,99 @@ import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
 import { EtapaCPC51 } from "./components/EtapaCPC51.jsx";
 import { Cronograma51 } from "./components/Cronograma51.jsx";
+import { DePara } from "./components/DePara.jsx";
+import { Inicio } from "./components/Inicio.jsx";
+import { Icone } from "./components/Icones.jsx";
 
-/** O fluxo é sequencial de verdade (1 → 4), então numeração aqui
- *  carrega informação. Balanço, Horizontal e Histórico são vistas
- *  paralelas sobre o mesmo estado — recebem outro marcador, não um
- *  número, pra não fingirem ser passos 5, 6 e 7. */
-const FLUXO = [
-  ["importar", "Importar"],
-  ["conferir", "Conferir"],
-  ["classificar", "Classificar"],
-  ["dre", "DRE"],
+/* A TRILHA É DADO, NÃO JSX.
+ *
+ * Antes eram três listas e três blocos de JSX quase idênticos, com a
+ * regra de "esta aba abre quando?" escrita à mão dentro de cada um — três
+ * expressões booleanas diferentes que ninguém conseguia comparar. Como
+ * dado, acrescentar uma seção nova (o caminho do app virar ERP: cadastros,
+ * fiscal, contas a pagar) é uma linha aqui e uma cláusula em
+ * `abaDisponivel`, e não mais um bloco copiado.
+ *
+ * Cada seção agrupa abas que respondem à MESMA pergunta:
+ *
+ *   Fluxo       → "como eu chego na DRE?"      (sequencial, numerado)
+ *   Análises    → "o que estes números dizem?"
+ *   Parâmetros  → "para onde vai cada conta?"  (o De-Para; é daqui que
+ *                  sai a parametrização do ERP)
+ *   Arquivo     → "o que já foi fechado?"
+ *   CPC 51      → "como isso fica em 2027?"
+ *
+ * Parâmetros ficou fora de Análises de propósito: De-Para não é leitura
+ * de resultado, é cadastro — e cadastro que se procura em "Análises" é
+ * cadastro que ninguém acha. */
+const SECOES = [
+  {
+    id: "fluxo",
+    rotulo: "Fluxo",
+    // Só o fluxo é numerado: ele É sequencial. As outras seções são
+    // vistas paralelas e recebem só o ícone, para não fingirem ser passos.
+    numerado: true,
+    abas: [
+      ["importar", "Importar", "importar"],
+      ["conferir", "Conferir", "conferir"],
+      ["classificar", "Classificar", "classificar"],
+      ["dre", "DRE", "dre"],
+    ],
+  },
+  {
+    id: "analises",
+    rotulo: "Análises",
+    abas: [
+      ["painel", "Painel", "painel"],
+      ["balanco", "Balanço", "balanco"],
+      ["horizontal", "Horizontal", "horizontal"],
+      ["comparativo", "Comparativa", "comparativo"],
+    ],
+  },
+  {
+    id: "parametros",
+    rotulo: "Parâmetros",
+    abas: [["depara", "De-Para", "depara"]],
+  },
+  {
+    id: "arquivo",
+    rotulo: "Arquivo",
+    abas: [
+      ["historico", "Histórico", "historico"],
+      ["arquivos", "Arquivos", "arquivos"],
+    ],
+  },
+  {
+    id: "cpc51",
+    rotulo: "CPC 51 · 2027",
+    abas: [
+      ["cpc51", "Demonstração", "cpc51"],
+      ["plano", "Plano de ação", "plano"],
+    ],
+  },
 ];
 
-const VISTAS = [
-  ["painel", "Painel"],
-  ["balanco", "Balanço"],
-  ["horizontal", "Horizontal"],
-  ["comparativo", "Comparativa"],
-  ["historico", "Histórico"],
-  ["arquivos", "Arquivos"],
-];
+/* Abas que não dependem de arquivo nenhum: abrem sempre. Histórico e
+   Arquivos leem o que já foi salvo; o plano de ação é do escritório, não
+   do razão aberto; Início mostra justamente o estado de "ainda vazio". */
+const SEMPRE_ABERTAS = ["inicio", "importar", "historico", "arquivos", "plano"];
 
-/* O CPC 51 ganha grupo próprio na trilha, e não uma linha a mais em
-   "Análises", porque não é outra leitura dos mesmos números: é a
-   estrutura que a demonstração vai ter a partir de 2027. Misturar com
-   Horizontal e Comparativa esconderia justamente o que precisa ficar
-   visível todo dia até a virada. O plano de ação não depende de arquivo
-   nenhum — abre mesmo sem razão importado. */
-const VISTAS_CPC51 = [
-  ["cpc51", "Demonstração CPC 51"],
-  ["plano", "Plano de ação"],
-];
+/* O menu recolhido é preferência de quem usa, não estado do arquivo:
+   sobrevive ao F5 e à troca de razão, e não entra na sessão em
+   IndexedDB, que é só para dado do cliente. */
+const CHAVE_MENU = "dre.menu.recolhido";
+/* O balancete completo desenha estas duas sozinho, sem razão. */
+const BASTA_BALANCETE = ["balanco", "painel"];
 
 export default function App() {
-  const [aba, setAba] = useState("importar");
+  const [aba, setAba] = useState("inicio");
+  // Gaveta no celular (fechada por padrão) e trilho recolhido no desktop
+  // (lembrado entre sessões). São dois estados porque são dois gestos
+  // diferentes: um é "abrir o menu", o outro é "ganhar largura de tela".
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [recolhido, setRecolhido] = useState(() => {
+    try { return localStorage.getItem(CHAVE_MENU) === "1"; } catch { return false; }
+  });
   const [linhas, setLinhas] = useState([]);
   const [cols, setCols] = useState([]);
   const [map, setMap] = useState({});
@@ -141,9 +202,9 @@ export default function App() {
         setPolitica51({ ...POLITICA_PADRAO, ...s.politica51 });
         setCategoriaConta(s.categoriaConta || {});
         setMedidas51(s.medidas51 || []);
-        // Sessão só de balancete não tem razão para conferir: leva direto
-        // ao Balanço, que é o que aquele arquivo entrega.
-        setAba((s.linhas || []).length ? "conferir" : "balanco");
+        // Volta sempre para o Início: é ele que diz, em uma linha, qual
+        // arquivo está aberto e o que ficou pendente da última vez.
+        setAba("inicio");
       }
       setSessaoCarregada(true);
     });
@@ -170,6 +231,17 @@ export default function App() {
      arquivo aberto: fica em localStorage, sobrevive à troca de razão e
      não é apagado por "Limpar tudo". */
   useEffect(() => { salvarPlanoAcao(planoAcao); }, [planoAcao]);
+
+  useEffect(() => {
+    try { localStorage.setItem(CHAVE_MENU, recolhido ? "1" : "0"); } catch { /* modo privado */ }
+  }, [recolhido]);
+
+  /* Trocar de aba fecha a gaveta do celular — senão o menu cobre a tela
+     que a pessoa acabou de escolher. */
+  function irPara(id) {
+    setAba(id);
+    setMenuAberto(false);
+  }
 
   useEffect(() => {
     if (lerConfigGitHub()) {
@@ -284,7 +356,7 @@ export default function App() {
     // junto com o resto. O plano de ação não — ele é do escritório.
     setPolitica51(POLITICA_PADRAO); setCategoriaConta({}); setMedidas51([]);
     setFiltroMes("todos"); setFiltroCC("todos"); setFiltroCompetencia("todas");
-    setErro(""); setAvisoPerfil(""); setAba("importar");
+    setErro(""); setAvisoPerfil(""); setAba("inicio");
   }
 
   function importarPlano(file) {
@@ -413,6 +485,20 @@ export default function App() {
     politica: politica51, empresa, cnpj, filtroMes, meses, filtroCompetencia, nomes: nomesEfetivos,
   };
 
+  /* ---------- De-Para ----------
+     A mesma decisão das etapas Classificar e CPC 51, vista conta a conta
+     e nos dois eixos ao mesmo tempo. Não é um terceiro estado: lê
+     `grupoDe`, `tocadas` e `categoriaConta`, e escreve de volta nos
+     mesmos setters — por isso reclassificar aqui refaz a DRE na hora. */
+  const deParaLinhas = useMemo(
+    () => montarDePara(contasResultado, {
+      grupoDe, tocadas, categoriaPorConta: categoriaConta, politica: politica51, nomes: nomesEfetivos,
+    }),
+    [contasResultado, classif, sugestao, tocadas, categoriaConta, politica51, nomesEfetivos]
+  );
+  const placarDePara = useMemo(() => resumoDePara(deParaLinhas), [deParaLinhas]);
+  const ctxDePara = { empresa, cnpj, filtroMes, meses, filtroCompetencia };
+
   function definirCategoria(conta, categoria) {
     setCategoriaConta((p) => {
       const novo = { ...p };
@@ -453,83 +539,167 @@ export default function App() {
   const temBalancete = !!abertura.balancete;
   const prova = useMemo(() => provaIntegridade(contasResultado, grupoDe), [contasResultado, grupoDe]);
 
+  /** Uma aba abre quando a fonte de que ela depende existe. Escrito uma
+   *  vez, em vez de três expressões booleanas espalhadas pela trilha —
+   *  era assim que "Balanço abre só com balancete" ficava impossível de
+   *  conferir sem ler os três blocos e comparar de cabeça. */
+  function abaDisponivel(id) {
+    if (SEMPRE_ABERTAS.includes(id)) return true;
+    if (BASTA_BALANCETE.includes(id)) return temDados || temBalancete;
+    return temDados;
+  }
+
+  /* O estado de cada aba, no próprio menu — agora como SELO, não frase.
+     A pergunta continua a mesma ("onde tem trabalho me esperando?"), mas
+     a resposta cabe num número: `3` contas a resolver diz o mesmo que
+     "3 a resolver" e sobrevive ao menu recolhido, onde não há largura
+     para texto nenhum. `alerta` pinta o selo de âmbar — nunca vermelho,
+     que neste projeto pertence ao dado.
+
+     `titulo` é o que o selo significa por extenso: vira `title` e
+     `aria-label` do item, porque "3" sozinho não é acessível. */
+  const estadoDaAba = useMemo(() => {
+    const e = {};
+    if (temDados && linhas.length && Math.abs(dif) >= 0.01) {
+      e.conferir = { selo: "!", alerta: true, titulo: "partidas não fecham" };
+    }
+    if (contasResultado.length) {
+      e.classificar = { selo: `${contasResultado.length}`, titulo: `${contasResultado.length} contas de resultado` };
+      e.depara = placarDePara.pendente
+        ? { selo: `${placarDePara.pendente}`, alerta: true, titulo: `${placarDePara.pendente} contas a resolver` }
+        : { selo: "✓", titulo: "mapeamento completo" };
+    }
+    if (temDados && !conciliacao51.fecha) e.cpc51 = { selo: "!", alerta: true, titulo: "não concilia" };
+    return e;
+  }, [temDados, linhas.length, dif, contasResultado.length, placarDePara, conciliacao51.fecha]);
+
+  /* O período, escrito uma vez: ele aparece na faixa de contexto do topo,
+     no Início e no cabeçalho do Painel. Eram três expressões iguais. */
+  const periodoLegivel = filtroCompetencia !== "todas"
+    ? competenciaLegivel(filtroCompetencia)
+    : (meses.length ? (meses.length > 1 ? `${meses[0]} a ${meses[meses.length - 1]}` : meses[0]) : "");
+
+  /* Um item do menu. Mesma marcação para o Início e para as abas das
+     seções, para não haver dois jeitos de desenhar a mesma coisa. */
+  function ItemMenu({ id, nome, ico, num }) {
+    const livre = abaDisponivel(id);
+    const est = livre ? estadoDaAba[id] : null;
+    return (
+      <button className="etapa" data-on={aba === id ? "1" : "0"}
+        data-feito={id === "importar" && temDados ? "1" : "0"}
+        aria-current={aba === id ? (num ? "step" : "page") : undefined}
+        disabled={!livre} onClick={() => irPara(id)}
+        aria-label={est?.titulo ? `${nome} — ${est.titulo}` : nome}
+        title={livre ? (est?.titulo ? `${nome} — ${est.titulo}` : nome) : `${nome} — abre com um razão ou balancete importado`}>
+        <span className="etapa-ico">
+          <Icone nome={ico} />
+          {num && <span className="etapa-num" aria-hidden="true">{num}</span>}
+        </span>
+        <span className="etapa-nome">{nome}</span>
+        {est && <span className="etapa-selo" data-alerta={est.alerta ? "1" : "0"} aria-hidden="true">{est.selo}</span>}
+      </button>
+    );
+  }
+
   return (
-    <div className="dre-app">
-      <div className="wrap">
-        <header className="masthead">
-          <div>
-            <h1>Gerador de DRE</h1>
-            <p>
-              Importe o razão contábil, confira as partidas e classifique as contas de resultado.
-              A demonstração sai pronta, com análise vertical e detalhe por conta.
-            </p>
-          </div>
-          <div className="row" style={{ gap: 10 }}>
-            <button className="btn ghost theme-btn" onClick={() => setTema(tema === "dark" ? "light" : "dark")}
-              aria-label="Alternar tema claro/escuro">
-              {tema === "dark" ? "Modo claro" : "Modo escuro"}
-            </button>
-            {temDados && (
-              <button className="btn ghost" onClick={limparTudo}
-                title="Apaga o razão, as classificações e os dados da empresa deste navegador">
-                Limpar tudo
+    <div className="dre-app" data-recolhido={recolhido ? "1" : "0"}>
+      {/* Faixa do topo: identidade à esquerda, CONTEXTO no meio, ações à
+          direita. O contexto é o que o parágrafo de apresentação antigo
+          tentava dizer e nunca conseguia — qual arquivo, qual período,
+          qual fonte —, agora em três selos clicáveis que levam à tela
+          que muda cada um. */}
+      <header className="topo">
+        <div className="topo-in">
+          <button className="topo-menu" aria-label="Abrir o menu" aria-expanded={menuAberto}
+            onClick={() => setMenuAberto((v) => !v)}>
+            <Icone nome={menuAberto ? "fechar" : "menu"} tamanho={20} />
+          </button>
+
+          <button className="marca-app" onClick={() => irPara("inicio")} title="Início">
+            <span className="marca-glifo" aria-hidden="true">DRE</span>
+            <span className="marca-nome">Gerador de DRE</span>
+          </button>
+
+          <div className="topo-ctx">
+            {(arquivo || abertura.arquivo) && (
+              <button className="ctx-chip" onClick={() => irPara("importar")} title="Trocar o arquivo">
+                <Icone nome="dre" tamanho={14} />
+                <span className="ctx-chip-txt">{arquivo || abertura.arquivo}</span>
               </button>
             )}
-            <div className="selo rotulo">Partidas dobradas · CPC 26</div>
+            {periodoLegivel && (
+              <button className="ctx-chip" onClick={() => irPara("conferir")} disabled={!temDados} title="Mudar o período">
+                <Icone nome="historico" tamanho={14} />
+                <span className="ctx-chip-txt">{periodoLegivel}</span>
+              </button>
+            )}
+            {temBalancete && (
+              <button className="ctx-chip" data-forte="1" onClick={() => irPara("conferir")} title="Trocar a fonte dos dados">
+                <Icone nome="balanco" tamanho={14} />
+                <span className="ctx-chip-txt">{fonteEfetiva === "balancete" ? "Balancete" : "Razão"}</span>
+              </button>
+            )}
           </div>
-        </header>
 
+          <div className="topo-acoes">
+            {(temDados || temBalancete) && (
+              <button className="ico-btn" onClick={limparTudo}
+                aria-label="Limpar tudo"
+                title="Apaga o razão, as classificações e os dados da empresa deste navegador">
+                <Icone nome="lixo" />
+              </button>
+            )}
+            <button className="ico-btn" onClick={() => setTema(tema === "dark" ? "light" : "dark")}
+              aria-label={tema === "dark" ? "Usar tema claro" : "Usar tema escuro"}
+              title={tema === "dark" ? "Tema claro" : "Tema escuro"}>
+              <Icone nome={tema === "dark" ? "sol" : "lua"} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="wrap">
         <div className="app-grid">
-          <nav className="trilha" aria-label="Etapas e vistas">
-            <div className="trilha-grupo">
-              <div className="rotulo">Fluxo</div>
-              {FLUXO.map(([id, nome], i) => (
-                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
-                  data-feito={id === "importar" && temDados ? "1" : "0"}
-                  aria-current={aba === id ? "step" : undefined}
-                  disabled={id !== "importar" && !temDados} onClick={() => setAba(id)}>
-                  <span className="etapa-num">{i + 1}</span>
-                  <span className="etapa-txt">
-                    <span className="etapa-nome">{nome}</span>
-                    {id === "importar" && arquivo && <span className="etapa-sub">{arquivo}</span>}
-                  </span>
-                </button>
+          {/* Véu do celular: fecha a gaveta ao tocar fora dela. */}
+          <div className="veu" data-on={menuAberto ? "1" : "0"} onClick={() => setMenuAberto(false)} aria-hidden="true" />
+
+          <nav className="lateral" data-aberto={menuAberto ? "1" : "0"} aria-label="Seções do aplicativo">
+            <div className="lateral-rolagem">
+              <div className="trilha-grupo">
+                <ItemMenu id="inicio" nome="Início" ico="inicio" />
+              </div>
+
+              {SECOES.map((secao) => (
+                <div className="trilha-grupo" key={secao.id} role="group" aria-label={secao.rotulo}>
+                  <div className="rotulo">{secao.rotulo}</div>
+                  {secao.abas.map(([id, nome, ico], i) => (
+                    <ItemMenu key={id} id={id} nome={nome} ico={ico} num={secao.numerado ? i + 1 : null} />
+                  ))}
+                </div>
               ))}
             </div>
 
-            <div className="trilha-grupo">
-              <div className="rotulo">Análises</div>
-              {VISTAS.map(([id, nome]) => (
-                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
-                  aria-current={aba === id ? "page" : undefined}
-                  disabled={!["historico", "arquivos"].includes(id) && !temDados && !(["balanco", "painel"].includes(id) && temBalancete)}
-                  onClick={() => setAba(id)}>
-                  <span className="etapa-marca" />
-                  <span className="etapa-txt">
-                    <span className="etapa-nome">{nome}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="trilha-grupo">
-              <div className="rotulo">CPC 51 · 2027</div>
-              {VISTAS_CPC51.map(([id, nome]) => (
-                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
-                  aria-current={aba === id ? "page" : undefined}
-                  disabled={id !== "plano" && !temDados}
-                  onClick={() => setAba(id)}>
-                  <span className="etapa-marca" />
-                  <span className="etapa-txt">
-                    <span className="etapa-nome">{nome}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
+            <button className="recolher" onClick={() => setRecolhido((v) => !v)}
+              aria-label={recolhido ? "Expandir o menu" : "Recolher o menu"}
+              title={recolhido ? "Expandir o menu" : "Recolher o menu"}>
+              <Icone nome={recolhido ? "expandir" : "recolher"} tamanho={16} />
+              <span className="etapa-nome">Recolher</span>
+            </button>
           </nav>
 
-          <main className="painel">
+          <main className="painel" key={aba}>
             {erro && <div className="err">{erro}</div>}
+
+            {aba === "inicio" && (
+              <Inicio
+                arquivo={arquivo} arquivoBalancete={abertura.arquivo} empresa={empresa}
+                periodo={periodoLegivel} temDados={temDados} temBalancete={temBalancete}
+                temRazao={linhas.length > 0} nLinhas={nLinhas} nContas={contas.length}
+                nContasResultado={contasResultado.length} dif={dif} placar={placarDePara}
+                concilia={conciliacao51.fecha} dre={dre}
+                onIr={irPara} disponivel={abaDisponivel}
+              />
+            )}
 
             {aba === "importar" && <EtapaImportar carregando={carregando} progresso={progresso} onImportar={importar}
                 onImportarBalancete={importarAbertura} abertura={abertura} />}
@@ -553,7 +723,7 @@ export default function App() {
                 semRazao={fonteEfetiva === "balancete" && linhas.length === 0}
                 onFiltroMes={setFiltroMes} onFiltroCC={setFiltroCC}
                 onEmpresa={setEmpresa} onCnpj={setCnpj} onMap={setMap}
-                onIrClassificar={() => setAba("classificar")}
+                onIrClassificar={() => irPara("classificar")}
               />
             )}
 
@@ -568,7 +738,7 @@ export default function App() {
                   setTocadas({ ...tocadas, [conta]: true });
                 }}
                 onImportarPlano={importarPlano}
-                onGerarDRE={() => setAba("dre")}
+                onGerarDRE={() => irPara("dre")}
                 onLimparManuais={() => { setClassif({}); setTocadas({}); }}
                 avisoPerfil={avisoPerfil} onAvisoPerfil={setAvisoPerfil}
                 onSalvarPerfil={salvarPerfil} onAplicarPerfil={aplicarPerfil}
@@ -597,8 +767,7 @@ export default function App() {
             {aba === "painel" && (temDados || temBalancete) && (
               <Painel dre={dre} temDados={temDados} balancete={abertura.balancete}
                 dresPorCompetencia={dresPorCompetencia} empresa={empresa}
-                periodo={filtroCompetencia !== "todas" ? competenciaLegivel(filtroCompetencia)
-                  : (meses.length ? `${meses[0]} a ${meses[meses.length - 1]}` : "")} />
+                periodo={periodoLegivel} />
             )}
 
             {aba === "balanco" && (temDados || temBalancete) && (
@@ -608,6 +777,20 @@ export default function App() {
                     onTrocar={() => setAbertura({ saldos: {}, arquivo: "", aviso: "", balancete: null })} />
                 : <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia}
                     abertura={abertura} onImportarAbertura={importarAbertura} />
+            )}
+
+            {aba === "depara" && temDados && (
+              <DePara
+                linhas={deParaLinhas} empresa={empresa} cnpj={cnpj}
+                onClassificar={(conta, grupo) => {
+                  setClassif({ ...classif, [conta]: grupo });
+                  setTocadas({ ...tocadas, [conta]: true });
+                }}
+                onCategoriaConta={definirCategoria}
+                onLimparCategorias={() => setCategoriaConta({})}
+                onBaixarCSV={() => baixarCSVDeParaCompleto(deParaLinhas, ctxDePara)}
+                onBaixarExcel={() => baixarExcelDePara(deParaLinhas, placarDePara, porGrupo(deParaLinhas), ctxDePara)}
+              />
             )}
 
             {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
@@ -635,7 +818,7 @@ export default function App() {
                 onBaixarExcel={() => baixarExcelCPC51(ctxExport51)}
                 onBaixarDePara={() => baixarCSVDePara(dePara51, ctxExport51)}
                 onBaixarNota={() => baixarNotaMPDA(medidas51, dre51, ctxExport51)}
-                onIrAoPlano={() => setAba("plano")}
+                onIrAoPlano={() => irPara("plano")}
               />
             )}
 
@@ -657,11 +840,12 @@ export default function App() {
               />
             )}
 
-            {!temDados && !(["balanco", "painel"].includes(aba) && temBalancete) && !["importar", "historico", "arquivos", "plano"].includes(aba) && (
+            {/* Mesma regra da trilha, e não uma cópia dela: sem isso, uma
+                aba nova aberta na trilha caía numa tela em branco aqui. */}
+            {!abaDisponivel(aba) && (
               <div className="empty">
-                <b>Nenhum razão carregado</b>
-                Comece pela etapa 1, Importar — as outras telas se abrem sozinhas assim que o
-                arquivo entrar.
+                <b>Nenhum arquivo carregado</b>
+                <button className="btn" onClick={() => irPara("importar")}>Importar razão</button>
               </div>
             )}
           </main>

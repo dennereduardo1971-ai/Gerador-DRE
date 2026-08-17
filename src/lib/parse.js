@@ -5,7 +5,11 @@ export const brl = (n) =>
   Math.abs(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
   (n < 0 ? ")" : "");
 
-export const pct = (n) => (isFinite(n) ? (n * 100).toFixed(1) + "%" : "—");
+/* Vírgula decimal, como todo o resto do app: "326,3%", não "326.3%".
+   Seguro trocar porque `pct` só alimenta tela e o PNG do painel — os
+   exportadores (CSV/Excel) formatam número por conta própria, e um
+   percentual com ponto no meio de uma planilha em pt-BR viraria texto. */
+export const pct = (n) => (isFinite(n) ? (n * 100).toFixed(1).replace(".", ",") + "%" : "—");
 
 /** Converte "1.234,56", "1234,56" ou "1234.56" para número. */
 export function numeroBR(v) {

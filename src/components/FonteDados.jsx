@@ -31,16 +31,18 @@ export function FonteDados({
           <span className="rotulo">Fonte dos dados</span>
         </div>
         <p className="fonte-txt">
-          O balancete <b>{arquivoBalancete}</b> traz apenas as contas{" "}
-          <b>{cobertura.digitos.join(" e ")}</b> — Ativo e Passivo. Ele monta o{" "}
-          <b>Balanço Patrimonial</b> sozinho, mas a DRE precisa das contas de resultado (3 a 7),
-          que não estão nesse arquivo. Por isso a DRE continua vindo do razão.
+          DRE pelo <b>razão</b> · Balanço pelo balancete. O arquivo só traz as contas{" "}
+          <b>{cobertura.digitos.join(" e ")}</b>.
         </p>
-        <p className="fonte-txt">
-          Se o seu sistema permitir exportar o <b>mesmo relatório sem filtrar por conta</b>, o
-          balancete passa a montar DRE e Balanço de uma vez — e o razão fica reservado ao que só
-          ele faz: análise mês a mês, centro de custo e detalhe de lançamento.
-        </p>
+        <details className="explica">
+          <summary>Como usar o balancete também na DRE</summary>
+          <p>
+            A DRE precisa das contas de resultado (3 a 7), que não estão em{" "}
+            <b>{arquivoBalancete}</b>. Exporte o <b>mesmo relatório sem filtrar por conta</b> e o
+            balancete passa a montar DRE e Balanço de uma vez — o razão fica reservado ao que só
+            ele faz: análise mês a mês, centro de custo e detalhe de lançamento.
+          </p>
+        </details>
       </div>
     );
   }
@@ -67,23 +69,29 @@ export function FonteDados({
 
       <p className="fonte-txt">
         {noBalancete ? (
-          <>
-            A DRE e o Balanço estão sendo montados a partir de <b>{arquivoBalancete}</b>, que já
-            vem somado e fechado pela contabilidade — e traz o plano de contas junto, então a
-            classificação por código funciona sem importar plano nenhum.
-            {temRazao
-              ? " O razão importado continua disponível: troque de fonte acima quando precisar de análise mês a mês, centro de custo ou detalhe de lançamento, que o balancete não tem."
-              : " Para análise mês a mês, centro de custo ou detalhe de lançamento, importe também o razão — o balancete é um retrato de um período agregado."}
-          </>
+          <>DRE e Balanço vindos de <b>{arquivoBalancete}</b>, já fechado pela contabilidade.</>
         ) : (
-          <>
-            A DRE está sendo montada a partir do <b>razão</b>, somando lançamento a lançamento —
-            é o que permite análise mês a mês, filtro por centro de custo e detalhe de cada
-            lançamento. O balancete <b>{arquivoBalancete}</b> continua carregado e monta o
-            Balanço Patrimonial.
-          </>
+          <>DRE somada do <b>razão</b>, lançamento a lançamento. Balanço por <b>{arquivoBalancete}</b>.</>
         )}
       </p>
+
+      {/* As duas fontes não são redundantes, e a diferença entre elas é o
+          que alguém precisa saber ANTES de trocar — mas não a cada vez
+          que abre a tela. Aberto por quem tem a dúvida. */}
+      <details className="explica">
+        <summary>O que muda ao trocar de fonte</summary>
+        <p>
+          O <b>balancete</b> é mais confiável (passou pelo fechamento) e traz o plano de contas
+          junto, então a classificação por código funciona sem importar plano nenhum. Mas é um
+          retrato de um período agregado: não tem competência mês a mês, centro de custo nem
+          lançamento individual.
+        </p>
+        <p>
+          O <b>razão</b> tem tudo isso — é ele que alimenta Comparativa, Horizontal e o filtro
+          por centro de custo. Em compensação, a soma é feita pelo app.
+          {!temRazao && " Nenhum razão foi importado ainda."}
+        </p>
+      </details>
     </div>
   );
 }

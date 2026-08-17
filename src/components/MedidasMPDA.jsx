@@ -20,12 +20,16 @@ export function MedidasMPDA({ medidas, dre51, onAdicionar, onRemover, onAjuste, 
     <div className="card">
       <h2>MPDA — medidas de desempenho definidas pela administração</h2>
       <p className="hint">
-        Se a empresa divulga EBITDA, EBITDA ajustado ou "resultado recorrente", o CPC 51 exige
-        nota explicativa única com a conciliação da medida com o subtotal mais diretamente
-        comparável, o efeito de tributos e o efeito sobre não controladores de cada item. Uma boa
-        notícia: como o resultado operacional da norma já exclui juros e tributos sobre o lucro, o
-        EBITDA vira uma conta de duas linhas.
+        Divulgou EBITDA ou "resultado recorrente"? A norma exige nota com a conciliação.
       </p>
+      <details className="explica">
+        <summary>O que a nota precisa ter</summary>
+        <p>
+          Conciliação da medida com o subtotal mais diretamente comparável, o efeito de tributos
+          e o efeito sobre não controladores de cada item. Como o resultado operacional da norma
+          já exclui juros e tributos sobre o lucro, o EBITDA vira uma conta de duas linhas.
+        </p>
+      </details>
 
       {disponiveis.length > 0 && (
         <div className="row" style={{ marginBottom: 14 }}>
@@ -102,9 +106,8 @@ export function MedidasMPDA({ medidas, dre51, onAdicionar, onRemover, onAjuste, 
         <div className="row" style={{ marginTop: 14 }}>
           <button className="btn ghost" onClick={onBaixarNota}>Baixar minuta da nota explicativa</button>
           <span className="hint" style={{ margin: 0 }}>
-            A minuta sai com a conciliação preenchida e os efeitos tributário e de não
-            controladores marcados como lacuna — são dados que o app não tem e que ninguém deve
-            publicar como zero.
+            Conciliação preenchida; efeito tributário e de não controladores saem como lacuna,
+            nunca como zero.
           </span>
         </div>
       )}
