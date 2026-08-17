@@ -1303,9 +1303,23 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
     border-right: 1px solid var(--regua);
     box-shadow: 0 0 40px rgba(0, 0, 0, .18);
     transform: translateX(-100%);
+    /* `transform` só esconde visualmente — o `<nav>` continua na ordem
+       de tabulação e na árvore de acessibilidade, então Tab (ou um
+       leitor de tela lendo linear) passava pelos ~18 botões do menu
+       AINDA FORA DA TELA antes de chegar ao conteúdo. `visibility`
+       resolve os dois problemas (some do foco e da árvore), com um
+       atraso na transição só do lado de FECHAR: a gaveta ainda desliza
+       visível durante os 0.2s, e só sai da árvore quando já está
+       inteiramente fora da tela. Abrir não tem atraso — fica alcançável
+       assim que a animação começa. */
+    visibility: hidden;
+    transition: transform .2s ease, visibility 0s linear .2s;
+  }
+  .lateral[data-aberto="1"] {
+    transform: none;
+    visibility: visible;
     transition: transform .2s ease;
   }
-  .lateral[data-aberto="1"] { transform: none; }
 
   .veu {
     display: block;

@@ -1,10 +1,10 @@
 import { Fragment } from "react";
-import { brl, competenciaLegivel } from "../lib/parse.js";
+import { brl } from "../lib/parse.js";
 import { Linha, Secao, Detalhe, Cabecalho } from "./LinhaDRE.jsx";
 import { montarLinhas } from "../lib/linhasDRE.js";
 
 export function EtapaDRE({
-  dre, empresa, cnpj, filtroMes, meses, filtroCC, filtroCompetencia, tDeb, tCre, dif,
+  dre, empresa, cnpj, periodo, filtroCC, tDeb, tCre, dif,
   nomes, detalhado, onToggleDetalhado, onBaixarCSV, onBaixarExcel, prova, onSalvarHistorico,
 }) {
   const base = dre.receitaLiq || 1;
@@ -31,10 +31,7 @@ export function EtapaDRE({
           <p>
             {empresa ? "Demonstração do Resultado Intermediária" : ""}
             {cnpj ? ` · CNPJ ${cnpj}` : ""}
-            {" · "}
-            {filtroCompetencia && filtroCompetencia !== "todas"
-              ? competenciaLegivel(filtroCompetencia)
-              : (filtroMes === "todos" ? meses.join(", ") || "período do arquivo" : filtroMes)}
+            {" · "}{periodo || "período do arquivo"}
             {filtroCC !== "todos" ? ` · centro de custo ${filtroCC}` : ""} · valores em R$
           </p>
         </div>

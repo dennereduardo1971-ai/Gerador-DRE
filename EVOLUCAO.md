@@ -44,11 +44,11 @@ _Atualizado em 17/08/2026._
 | | |
 |---|---|
 | Testes | 211 (Vitest, 14 arquivos) |
-| Lint | `npx oxlint src/` — 2 avisos pré-existentes em `historico.js` |
-| Bundle | app 415 kB (128 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
+| Lint | `npx oxlint src/` — **zero avisos** (os 2 de `historico.js` foram corrigidos) |
+| Bundle | app 416 kB (128 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
 | CSS | 41 kB (8,3 kB gzip) |
-| Código | ~8.930 linhas em `src/` (App.jsx + lib + components) |
-| Maiores arquivos | `App.jsx` (856), `cpc51.js` (455), `cronograma51.js` (370) |
+| Código | ~8.955 linhas em `src/` (App.jsx + lib + components) |
+| Maiores arquivos | `App.jsx` (875), `cpc51.js` (455), `cronograma51.js` (370) |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não roda nesta máquina** (os arquivos reais são gitignorados) |
 | Skills versionadas | 6 (`manter-evolucao`, `testar-com-arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`, `nova-funcionalidade`, `otimizar-app`) |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) |
@@ -66,6 +66,103 @@ dado em `SECOES` (`App.jsx`):
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 17/08/2026 (4ª sessão) — auditoria, revisão visual, limpeza de lint e um bug real de período
+
+Pedido: rodar as skills e agentes de revisão pra achar otimizações e
+melhorias. Disparei `auditor-contabil` e `revisor-visual` em paralelo
+(sobre as duas mudanças da sessão anterior — casco novo e Excel
+estilizado) e segui a skill `otimizar-app` eu mesmo enquanto os dois
+trabalhavam.
+
+**Auditoria contábil: passou, sem risco real.** `classify.js`, `cpc51.js`,
+`linhasDRE.js`, `linhasCPC51.js`, `grupos.js` e `balancete.js` continuam
+byte-idênticos aos dois commits anteriores. A troca `xlsx` → `exceljs`
+na escrita preserva os mesmos valores em toda célula — só a API de
+escrita mudou. A mudança de `pct()` (vírgula decimal) é comprovadamente
+cosmética: nenhum exportador depende do texto que ela formata. Não
+validado contra `fixtures/` (arquivos reais ausentes nesta máquina,
+como sempre).
+
+**Revisão visual: achou uma regressão de acessibilidade real, corrigida
+na hora.** No celular, com a gaveta do menu fechada, `transform:
+translateX(-100%)` esconde visualmente mas NÃO tira o `<nav>` da ordem
+de tabulação nem da árvore de acessibilidade — Tab (ou um leitor de
+tela) passava pelos ~18 botões do menu ainda fora da tela antes de
+chegar ao conteúdo. Corrigido com `visibility: hidden` + atraso de
+transição só do lado de fechar (padrão de disclosure acessível: a
+animação de deslizar continua visível, o elemento só sai da árvore
+quando já está inteiramente fora da tela). De quebra, adicionado Esc
+para fechar a gaveta com devolução de foco ao botão que a abriu — a
+gaveta não tinha nenhum dos dois antes. Confirmado com teste real de
+teclado (Playwright): antes do fix, os 18 botões apareciam nos primeiros
+Tabs; depois, zero.
+
+**Limpeza de lint: os dois únicos avisos do projeto, corrigidos.**
+`lerSha()` em `historico.js` nunca era chamado — `gravarSha` grava um
+cache local do SHA remoto, mas `sincronizarHistorico()` e
+`removerDoHistorico()` sempre buscam o SHA fresco via `buscarArquivo()`
+antes de gravar, nunca o cache local. Função morta removida; a
+ternário-como-statement de `gravarSha` virou `if`/`else`. `npx oxlint
+src/` agora sai limpo.
+
+**O achado mais importante veio do usuário, não das skills: período
+errado em cinco lugares.** Um razão de vários meses mostrava uma lista
+gigante e fora de ordem de dias soltos ("01/jan, 01/fev, 01/mar...") no
+cabeçalho da DRE, e "01/jan a 29/mar" (dois dias quase aleatórios) no
+selo de contexto do topo — para um arquivo de janeiro a junho. Causa:
+`meses`, apesar do nome, é a lista de **dias** (coluna Dia/Mês) num
+`Set` sem ordem cronológica nenhuma; cinco lugares usavam essa lista
+como se fosse "o período do arquivo" — `periodoLegivel()` em
+`exportacao.js` (cabeçalho de TODO CSV/Excel exportado), o `.dre-head`
+da DRE, o do CPC 51, o `periodoLegivel` local de `App.jsx` (selo do
+topo, Painel, Início) e `onSalvarHistorico`. Um conserto anterior (ver
+sessão de 10/08 no histórico de commits) já tinha cortado a lista para
+"primeiro e último" quando passava de dois itens — tratou o SINTOMA
+(linha enorme) sem tocar na CAUSA (fonte errada, sem ordenação).
+
+Corrigido pela raiz: `periodoLegivel()` agora recebe `competencias` — a
+lista de competências (mês/ano) que `listarCompetencias()` já devolve
+ordenada de verdade — em vez de `meses`. As cinco expressões duplicadas
+viraram uma função só, chamada dos cinco lugares (App.jsx importa e usa
+a mesma `periodoLegivel` de `exportacao.js`, com um `const periodo =`
+calculado uma vez). `EtapaDRE.jsx` e `EtapaCPC51.jsx` perderam os props
+`filtroMes`/`meses`/`filtroCompetencia` (não usados para mais nada além
+disso) e passaram a receber `periodo` já pronto.
+
+Medido / verificado:
+
+- Vitest: 211 testes passando (nenhum teste cobria este texto — é
+  território novo para cobertura futura, ver backlog).
+- `npx oxlint src/`: **zero avisos** (eram 2 antes desta sessão).
+- `npm run build`: bundle sem mudança de tamanho relevante (a correção
+  de período não adiciona código; App.jsx foi de 856 para 875 linhas
+  pela documentação do bug, não pela lógica).
+- Reproduzido o bug de propósito: gerei um razão sintético de 6 meses
+  (18 dias distintos, 3 por mês) e confirmei ANTES do fix que o
+  cabeçalho realmente mostrava a lista de dias — depois do fix, o
+  navegador real (build de produção) mostrou "Jan/2026 a Jun/2026" no
+  selo do topo, no cabeçalho da DRE, no do CPC 51 e no `Período` do CSV
+  baixado.
+- Acessibilidade: teste de teclado real confirmando que a gaveta fechada
+  saiu da ordem de tabulação, que `visibility` computa `hidden`/`visible`
+  corretamente nos dois estados, e que Esc fecha e devolve o foco.
+
+Achado de quebra, não corrigido (fora do escopo desta sessão, registrado
+para não esquecer): nenhum teste cobre o texto de período — nem o antigo
+bug, nem a correção. Um teste unitário para `periodoLegivel()` (os três
+ramos: competência filtrada, dia filtrado, intervalo de competências)
+seria barato e teria pego isso antes de chegar à tela.
+
+Ficou de fora, de propósito:
+
+- Os outros achados "não pude confirmar sem navegador" do
+  `revisor-visual` (contraste efetivo nos dois temas, comportamento
+  tátil real da gaveta) — precisam de olho humano, não é algo que dê
+  para validar por leitura de código nem por Playwright sozinho.
+- Extrair `useCPC51`/`useDePara`/o casco de `App.jsx` (875 linhas) —
+  backlog já registrado, invasivo demais para entrar numa sessão de
+  auditoria/revisão.
 
 ### 17/08/2026 (3ª sessão) — Excel exportado com estilo de verdade, PDF com rodapé e quebra de página
 
@@ -432,7 +529,7 @@ Ficou de fora, de propósito:
    colunas por competência na estrutura antiga; falta a mesma coisa
    lendo `montarLinhas51`. É o maior buraco funcional que sobrou.
 4. **Extrair `useCPC51`, `useDePara` e o casco de `App.jsx`.** O
-   componente passou de 766 para 856 linhas com o topo e o menu novos —
+   componente passou de 766 para 875 linhas com o topo e o menu novos —
    é o arquivo que mais cresce a cada funcionalidade, e cada módulo de
    ERP vai empurrar mais. O corte mais óbvio agora é um `<Casco>` levando
    topo + menu + `ItemMenu`, que é bloco fechado e não toca em estado
@@ -443,8 +540,12 @@ Ficou de fora, de propósito:
    falta UI).
 7. **Agregar durante a importação**, em vez de guardar `linhas` cru em
    memória — tira o teto de tamanho de arquivo.
-8. **Limpeza barata:** `historico.js` tem `lerSha` morto e uma expressão
-   sem uso; são os dois únicos avisos de lint do projeto.
+8. **Teste unitário para `periodoLegivel()`.** Corrigido na sessão de
+   17/08 (4ª) um bug real de período mostrando dias soltos fora de
+   ordem em vez de "Jan/2026 a Jun/2026" — e não havia teste nenhum
+   cobrindo esse texto, nem antes nem depois do fix. Cobrir os três
+   ramos (competência filtrada, dia filtrado, intervalo de competências)
+   é barato e fecha essa lacuna de cobertura.
 
 ## Rumo a ERP: como pensar os próximos módulos
 

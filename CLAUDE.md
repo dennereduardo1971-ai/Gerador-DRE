@@ -388,6 +388,31 @@ seguro que reescrever a hierarquia de subtotais.
   até a ordem ser corrigida. Regra de bolso: declare o `display: none`
   "de tela" ANTES do bloco `@media print` que o sobrescreve, nunca
   depois.
+- **`transform` esconde visualmente, mas NÃO tira da ordem de tabulação
+  nem da árvore de acessibilidade** — ao contrário de `display: none` e
+  `visibility: hidden`. A gaveta do menu no celular (`.lateral` fora da
+  tela via `translateX(-100%)`) deixava todos os ~18 botões do menu
+  alcançáveis por Tab e por leitor de tela mesmo fechada, antes do
+  conteúdo principal. Off-canvas acessível precisa de `visibility:
+  hidden` (ou `inert`) junto do `transform` — com um atraso na
+  transição só do lado de FECHAR (`transition: transform .2s ease,
+  visibility 0s linear .2s`), pra a animação de deslizar continuar
+  visível e o elemento só sair da árvore quando já estiver inteiramente
+  fora da tela. Ver `.lateral` em `App.css` dentro de
+  `@media (max-width: 920px)`.
+- **`meses` (o array de `agregarPorConta`) é a lista de DIAS do
+  arquivo** (coluna Dia/Mês, tipo "01/jan"), não de meses — nome
+  historicamente errado, um `Set` sem ordem cronológica nenhuma. Usar
+  `meses[0]`/`meses[last]` ou `meses.join()` como "o período do
+  arquivo" produz uma lista enorme fora de ordem ou um intervalo entre
+  dois dias quase aleatórios — aconteceu em CINCO lugares ao mesmo
+  tempo (`periodoLegivel()` em `exportacao.js`, o `.dre-head` da DRE e
+  do CPC 51, o selo de contexto do topo, `onSalvarHistorico`) antes de
+  ser corrigido. **Período do arquivo é COMPETÊNCIA** (mês/ano) — use
+  `listarCompetencias()` (devolve já ordenado por `compararCompetencia`)
+  e `competenciaLegivel()`, nunca `meses`. `meses`/`filtroMes` só
+  servem para o filtro "Dia específico" de verdade, em
+  `EtapaConferir.jsx`.
 - **Números de Excel com célula numérica nativa**: não formate como
   texto antes de somar (`raw: false` no SheetJS introduz ambiguidade
   de locale — "1,234.56" americano vira "1.23456" se tratado como

@@ -15,7 +15,7 @@
  */
 
 import { Fragment } from "react";
-import { brl, competenciaLegivel, pct } from "../lib/parse.js";
+import { brl, pct } from "../lib/parse.js";
 import { Cabecalho, Linha, Secao } from "./LinhaDRE.jsx";
 import { montarLinhas51 } from "../lib/linhasCPC51.js";
 import { CATEGORIAS } from "../lib/cpc51.js";
@@ -46,7 +46,7 @@ function DetalheCategoria({ grupo, nomes, base, mostrar }) {
 
 export function EtapaCPC51({
   dre, dre51, conciliacao, mistas, cobertura, politica, categoriaPorConta,
-  contasResultado, grupoDe, categoriaDe, nomes, empresa, cnpj, filtroMes, meses, filtroCompetencia,
+  contasResultado, grupoDe, categoriaDe, nomes, empresa, cnpj, periodo,
   detalhado, onToggleDetalhado, medidas, onPolitica, onCategoriaConta, onLimparCategorias,
   onAdicionarMedida, onRemoverMedida, onAjusteMedida, onRemoverAjuste,
   onBaixarExcel, onBaixarDePara, onBaixarNota, onIrAoPlano,
@@ -119,10 +119,7 @@ export function EtapaCPC51({
           <p>
             Demonstração do Resultado conforme CPC 51
             {cnpj ? ` · CNPJ ${cnpj}` : ""}
-            {" · "}
-            {filtroCompetencia && filtroCompetencia !== "todas"
-              ? competenciaLegivel(filtroCompetencia)
-              : (filtroMes === "todos" ? meses.join(", ") || "período do arquivo" : filtroMes)}
+            {" · "}{periodo || "período do arquivo"}
             {" · valores em R$"}
           </p>
         </div>

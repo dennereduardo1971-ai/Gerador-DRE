@@ -14,7 +14,7 @@ a centavo.
 
 ```bash
 npx vitest run                                   # ponto de partida verde
-npm run build                                    # bundle: app + CSS + chunk do xlsx
+npm run build                                    # bundle: app + CSS + chunks de xlsx e exceljs
 npx oxlint src/                                  # código morto e expressões inúteis
 wc -l src/App.jsx src/lib/*.js src/components/*.jsx | sort -n | tail -10
 ```
@@ -42,8 +42,11 @@ npm run build && npx vite preview --port 4173
 3. **Tabelas longas.** Centenas de linhas com `<select>` dentro travam a
    digitação. O De-Para usa teto de 400 linhas desenhadas + filtro; siga
    esse padrão em vez de renderizar tudo.
-4. **Bundle.** `xlsx` (424 kB) já é `import()` dinâmico. Qualquer
-   biblioteca nova entra pelo mesmo caminho ou não entra.
+4. **Bundle.** `xlsx` (424 kB, leitura de arquivo importado) e `exceljs`
+   (930 kB, escrita dos Excel exportados) já são `import()` dinâmico —
+   cada um vira UM chunk carregado só na ação que precisa dele (importar
+   / baixar Excel), nunca os dois juntos e nunca no carregamento inicial.
+   Qualquer biblioteca nova entra pelo mesmo caminho ou não entra.
 
 ## 3. O que NÃO otimizar
 
@@ -60,14 +63,24 @@ npm run build && npx vite preview --port 4173
 - **Não junte as duas fontes** (razão e balancete) "porque são
   redundantes". Não são: só o razão tem competência mensal, centro de
   custo e lançamento individual.
-- **Não troque a lib `xlsx`** sem avisar o usuário: `exceljs`, a
-  alternativa óbvia, não lê `.xls` legado.
+- **Não troque `xlsx` por `exceljs` na LEITURA** (`importarExcel.js`) sem
+  avisar o usuário: `exceljs` não lê `.xls` legado, `.xlsb` nem `.ods`.
+  As duas bibliotecas já convivem de propósito — `xlsx` lê o que o
+  cliente manda, `exceljs` escreve o que o app entrega (ver "Exportação"
+  em `CLAUDE.md`). Não é dívida técnica a resolver; é a divisão certa.
+- **Não troque `exceljs` por `xlsx` na ESCRITA** achando que economiza
+  bundle. `xlsx` (SheetJS Community) ignora `cell.s` ao gravar — cor de
+  fundo, fonte e negrito somem no arquivo final, mesmo que o objeto em
+  memória pareça aceitar. Já aconteceu neste projeto: código com
+  `s: {font:{bold:true}}` que nunca funcionou. Ver "Exportação" em
+  `CLAUDE.md` antes de reconsiderar essa escolha.
 
 ## 4. Limpeza barata que está pendente
 
-`historico.js` tem `lerSha` morto e uma expressão sem uso — são os dois
-únicos avisos de lint do projeto. Se o objetivo da sessão for limpeza,
-comece por aí: é ganho real e risco zero.
+Nenhuma no momento — os dois avisos de lint que existiam (`lerSha`
+morto e uma expressão sem uso em `historico.js`) foram corrigidos.
+`npx oxlint src/` deve continuar em zero; se aparecer aviso novo, ele é
+mais barato de corrigir na hora do que de deixar acumular.
 
 ## 5. Depois de otimizar
 

@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
-import { agregarPorConta, avisosDoMapeamento, competenciaLegivel, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
+import { agregarPorConta, avisosDoMapeamento, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
 import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { parsearAbertura } from "./lib/abertura.js";
 import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalancete } from "./lib/balancete.js";
-import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
+import { baixarCSV, baixarExcel, periodoLegivel } from "./lib/exportacao.js";
 import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
 import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
@@ -125,6 +125,7 @@ export default function App() {
   // (lembrado entre sessões). São dois estados porque são dois gestos
   // diferentes: um é "abrir o menu", o outro é "ganhar largura de tela".
   const [menuAberto, setMenuAberto] = useState(false);
+  const botaoMenuRef = useRef(null);
   const [recolhido, setRecolhido] = useState(() => {
     try { return localStorage.getItem(CHAVE_MENU) === "1"; } catch { return false; }
   });
@@ -242,6 +243,20 @@ export default function App() {
     setAba(id);
     setMenuAberto(false);
   }
+
+  /* Fecha a gaveta com Esc e devolve o foco pro botão que a abriu — sem
+     isso, quem navega por teclado fecha o menu e perde a posição do
+     cursor, tendo que recomeçar do topo da página a cada vez. */
+  function fecharMenu() {
+    setMenuAberto(false);
+    botaoMenuRef.current?.focus();
+  }
+  useEffect(() => {
+    if (!menuAberto) return;
+    function onEsc(e) { if (e.key === "Escape") fecharMenu(); }
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [menuAberto]);
 
   useEffect(() => {
     if (lerConfigGitHub()) {
@@ -482,7 +497,8 @@ export default function App() {
 
   const ctxExport51 = {
     dre, dre51, conciliacao: conciliacao51, dePara: dePara51, medidas: medidas51,
-    politica: politica51, empresa, cnpj, filtroMes, meses, filtroCompetencia, nomes: nomesEfetivos,
+    politica: politica51, empresa, cnpj, filtroMes, filtroCompetencia,
+    competencias: competenciasDisponiveis, nomes: nomesEfetivos,
   };
 
   /* ---------- De-Para ----------
@@ -497,7 +513,7 @@ export default function App() {
     [contasResultado, classif, sugestao, tocadas, categoriaConta, politica51, nomesEfetivos]
   );
   const placarDePara = useMemo(() => resumoDePara(deParaLinhas), [deParaLinhas]);
-  const ctxDePara = { empresa, cnpj, filtroMes, meses, filtroCompetencia };
+  const ctxDePara = { empresa, cnpj, filtroMes, filtroCompetencia, competencias: competenciasDisponiveis };
 
   function definirCategoria(conta, categoria) {
     setCategoriaConta((p) => {
@@ -574,10 +590,17 @@ export default function App() {
   }, [temDados, linhas.length, dif, contasResultado.length, placarDePara, conciliacao51.fecha]);
 
   /* O período, escrito uma vez: ele aparece na faixa de contexto do topo,
-     no Início e no cabeçalho do Painel. Eram três expressões iguais. */
-  const periodoLegivel = filtroCompetencia !== "todas"
-    ? competenciaLegivel(filtroCompetencia)
-    : (meses.length ? (meses.length > 1 ? `${meses[0]} a ${meses[meses.length - 1]}` : meses[0]) : "");
+     no Início, no cabeçalho do Painel, na DRE, no CPC 51 e em todo
+     arquivo exportado. Eram seis expressões — cinco delas com o mesmo
+     defeito: usavam `meses` (a lista de DIAS do arquivo, um Set sem
+     ordem cronológica — apesar do nome) como se fosse o período do
+     arquivo, e mostravam ou uma centena de dias soltos ("01/jan, 01/fev,
+     01/mar...") ou um intervalo de dois dias quase aleatórios
+     ("01/jan a 29/mar" para um arquivo de janeiro a junho). Período é
+     COMPETÊNCIA — `periodoLegivel()` (exportacao.js) usa
+     `competenciasDisponiveis`, que já vem ordenada por mês/ano de
+     verdade. */
+  const periodo = periodoLegivel({ filtroMes, filtroCompetencia, competencias: competenciasDisponiveis });
 
   /* Um item do menu. Mesma marcação para o Início e para as abas das
      seções, para não haver dois jeitos de desenhar a mesma coisa. */
@@ -610,8 +633,8 @@ export default function App() {
           que muda cada um. */}
       <header className="topo">
         <div className="topo-in">
-          <button className="topo-menu" aria-label="Abrir o menu" aria-expanded={menuAberto}
-            onClick={() => setMenuAberto((v) => !v)}>
+          <button ref={botaoMenuRef} className="topo-menu" aria-label="Abrir o menu" aria-expanded={menuAberto}
+            onClick={() => (menuAberto ? fecharMenu() : setMenuAberto(true))}>
             <Icone nome={menuAberto ? "fechar" : "menu"} tamanho={20} />
           </button>
 
@@ -627,10 +650,10 @@ export default function App() {
                 <span className="ctx-chip-txt">{arquivo || abertura.arquivo}</span>
               </button>
             )}
-            {periodoLegivel && (
+            {periodo && (
               <button className="ctx-chip" onClick={() => irPara("conferir")} disabled={!temDados} title="Mudar o período">
                 <Icone nome="historico" tamanho={14} />
-                <span className="ctx-chip-txt">{periodoLegivel}</span>
+                <span className="ctx-chip-txt">{periodo}</span>
               </button>
             )}
             {temBalancete && (
@@ -661,7 +684,7 @@ export default function App() {
       <div className="wrap">
         <div className="app-grid">
           {/* Véu do celular: fecha a gaveta ao tocar fora dela. */}
-          <div className="veu" data-on={menuAberto ? "1" : "0"} onClick={() => setMenuAberto(false)} aria-hidden="true" />
+          <div className="veu" data-on={menuAberto ? "1" : "0"} onClick={fecharMenu} aria-hidden="true" />
 
           <nav className="lateral" data-aberto={menuAberto ? "1" : "0"} aria-label="Seções do aplicativo">
             <div className="lateral-rolagem">
@@ -693,7 +716,7 @@ export default function App() {
             {aba === "inicio" && (
               <Inicio
                 arquivo={arquivo} arquivoBalancete={abertura.arquivo} empresa={empresa}
-                periodo={periodoLegivel} temDados={temDados} temBalancete={temBalancete}
+                periodo={periodo} temDados={temDados} temBalancete={temBalancete}
                 temRazao={linhas.length > 0} nLinhas={nLinhas} nContas={contas.length}
                 nContasResultado={contasResultado.length} dif={dif} placar={placarDePara}
                 concilia={conciliacao51.fecha} dre={dre}
@@ -748,16 +771,13 @@ export default function App() {
 
             {aba === "dre" && temDados && (
               <EtapaDRE
-                dre={dre} empresa={empresa} cnpj={cnpj} filtroMes={filtroMes} meses={meses}
-                filtroCC={filtroCC} filtroCompetencia={filtroCompetencia} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomesEfetivos}
+                dre={dre} empresa={empresa} cnpj={cnpj} periodo={periodo}
+                filtroCC={filtroCC} tDeb={tDeb} tCre={tCre} dif={dif} nomes={nomesEfetivos}
                 detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
-                onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, meses, nomes: nomesEfetivos, filtroCompetencia })}
-                onBaixarExcel={() => baixarExcel({ dre, empresa, cnpj, filtroMes, meses, nomes: nomesEfetivos, filtroCompetencia, dresPorCompetencia })}
+                onBaixarCSV={() => baixarCSV({ dre, empresa, cnpj, filtroMes, filtroCompetencia, competencias: competenciasDisponiveis, nomes: nomesEfetivos })}
+                onBaixarExcel={() => baixarExcel({ dre, empresa, cnpj, filtroMes, filtroCompetencia, competencias: competenciasDisponiveis, nomes: nomesEfetivos, dresPorCompetencia })}
                 prova={prova}
                 onSalvarHistorico={() => {
-                  const periodo = filtroCompetencia !== "todas"
-                    ? competenciaLegivel(filtroCompetencia)
-                    : (filtroMes === "todos" ? meses.join(", ") : filtroMes);
                   salvarNoHistorico({ empresa, cnpj, periodo, dre });
                   setHistorico(listarHistorico());
                 }}
@@ -767,7 +787,7 @@ export default function App() {
             {aba === "painel" && (temDados || temBalancete) && (
               <Painel dre={dre} temDados={temDados} balancete={abertura.balancete}
                 dresPorCompetencia={dresPorCompetencia} empresa={empresa}
-                periodo={periodoLegivel} />
+                periodo={periodo} />
             )}
 
             {aba === "balanco" && (temDados || temBalancete) && (
@@ -802,8 +822,7 @@ export default function App() {
                 dre={dre} dre51={dre51} conciliacao={conciliacao51} mistas={mistas51}
                 cobertura={cobertura51} politica={politica51} categoriaPorConta={categoriaConta}
                 contasResultado={contasResultado} grupoDe={grupoDe} categoriaDe={categoriaDe}
-                nomes={nomesEfetivos} empresa={empresa} cnpj={cnpj}
-                filtroMes={filtroMes} meses={meses} filtroCompetencia={filtroCompetencia}
+                nomes={nomesEfetivos} empresa={empresa} cnpj={cnpj} periodo={periodo}
                 detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
                 medidas={medidas51}
                 onPolitica={setPolitica51}

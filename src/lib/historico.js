@@ -17,11 +17,16 @@ function gravar(lista) {
   try { window.localStorage.setItem(CHAVE, JSON.stringify(lista)); } catch { /* localStorage indisponível */ }
 }
 
-function lerSha() {
-  try { return window.localStorage.getItem(CHAVE_SHA) || null; } catch { return null; }
-}
+/* `sincronizarHistorico()` e `removerDoHistorico()` sempre buscam o SHA
+   remoto fresco via `buscarArquivo()` antes de gravar — nenhuma delas lê
+   este cache de volta. `gravarSha` grava mesmo assim (histórico de
+   diagnóstico, se um dia precisar); por isso só a leitura (`lerSha`, que
+   ninguém chamava) foi removida. */
 function gravarSha(sha) {
-  try { sha ? window.localStorage.setItem(CHAVE_SHA, sha) : window.localStorage.removeItem(CHAVE_SHA); } catch { /* indisponível */ }
+  try {
+    if (sha) window.localStorage.setItem(CHAVE_SHA, sha);
+    else window.localStorage.removeItem(CHAVE_SHA);
+  } catch { /* indisponível */ }
 }
 
 /** Lista o histórico de DREs salvas, mais recente primeiro. */
