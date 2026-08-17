@@ -39,23 +39,114 @@ Duas regras que não se afrouxam:
 
 ## Estado atual
 
-_Atualizado em 10/08/2026._
+_Atualizado em 17/08/2026._
 
 | | |
 |---|---|
-| Testes | 198 (Vitest, 13 arquivos) |
+| Testes | 211 (Vitest, 14 arquivos) |
 | Lint | `npx oxlint src/` — 2 avisos pré-existentes em `historico.js` |
-| Bundle | app 391 kB (121 kB gzip) + `xlsx` 424 kB em chunk sob demanda |
-| CSS | 30 kB (6,6 kB gzip) |
-| Código | ~7.800 linhas em `src/` |
-| Maiores arquivos | `App.jsx` (672), `cpc51.js` (455), `cronograma51.js` (370) |
+| Bundle | app 405 kB (125 kB gzip) + `xlsx` 424 kB em chunk sob demanda |
+| CSS | 31 kB (6,8 kB gzip) |
+| Código | ~8.430 linhas em `src/` (App.jsx + lib + components) |
+| Maiores arquivos | `App.jsx` (766), `cpc51.js` (455), `cronograma51.js` (370) |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não roda nesta máquina** (os arquivos reais são gitignorados) |
+| Skills versionadas | 6 (`manter-evolucao`, `testar-com-arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`, `nova-funcionalidade`, `otimizar-app`) |
+| Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) |
 
-Fluxo do app: Importar → Conferir → Classificar → DRE. Vistas paralelas:
-Painel, Balanço, Horizontal, Comparativa, Histórico, Arquivos. Grupo
-CPC 51: Demonstração CPC 51 e Plano de ação.
+A trilha tem cinco seções, definidas como dado em `SECOES` (`App.jsx`):
+
+| Seção | Abas |
+|---|---|
+| Fluxo | Importar → Conferir → Classificar → DRE |
+| Análises | Painel, Balanço, Horizontal, Comparativa |
+| Parâmetros | De-Para |
+| Arquivo | Histórico, Arquivos |
+| CPC 51 · 2027 | Demonstração CPC 51, Plano de ação |
 
 ## Registro
+
+### 17/08/2026 — trilha em cinco seções, área De-Para, skills e agentes
+
+Sessão de dois objetivos: deixar a navegação legível agora que são 13
+abas, e abrir a área De-Para — que é o primeiro passo concreto do
+caminho para ERP, porque parametrização é o que um ERP pede antes de
+qualquer coisa.
+
+Entrou:
+
+- `lib/depara.js` — a tabela de parametrização: uma linha por conta de
+  resultado, com grupo da DRE, categoria do CPC 51, **origem de cada
+  decisão**, motivo de revisão, resumo e filtros. Ele não decide nada:
+  compõe `grupoDe` (classify) com `resolverCategoria` (cpc51).
+- `lib/exportacaoDePara.js` — CSV e Excel (com filtro automático e aba de
+  resumo por grupo), o entregável da Fase 2 e a entrada da Fase 4.
+- `components/DePara.jsx` — placar, filtros por situação/grupo/categoria,
+  os **dois eixos editáveis na mesma linha** e leitura por destino.
+- `SECOES` em `App.jsx`: a trilha virou dado, com `abaDisponivel()` e
+  `estadoDaAba` (sub-rótulo com o número da tela, ponto âmbar quando há
+  pendência).
+- Cinco skills novas em `.claude/skills/` — três delas (`testar-com-
+  arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`) eram
+  prometidas pelo `CLAUDE.md` desde sempre e nunca tinham sido escritas.
+- Três agentes em `.claude/agents/`.
+
+Decisão estrutural mais importante: **o De-Para junta os dois eixos numa
+tela só, mas não vira uma terceira fonte de verdade.** Ele lê e escreve
+exatamente o mesmo estado de Classificar e da aba CPC 51 — por isso
+reclassificar ali refaz a DRE na hora. `deParaCPC51` (que alimenta o
+Excel de seis abas) continua existindo separado, e há teste novo provando
+que as duas tabelas concordam conta a conta sobre grupo e categoria. Era
+a alternativa a um refactor que criaria import circular entre
+`cpc51.js` e `depara.js`.
+
+Segunda decisão: **a trilha como dado.** Eram três blocos de JSX quase
+idênticos com três expressões booleanas diferentes de "quando esta aba
+abre", impossíveis de comparar sem lê-las lado a lado. Agora a regra está
+escrita uma vez em `abaDisponivel()`, e a mesma função guarda o estado
+vazio do `<main>` — antes eram duas cópias da regra, e uma aba nova caía
+em tela branca se você esquecesse da segunda.
+
+Medido / verificado:
+
+- Vitest: **211 testes passando** (13 novos).
+- `npx oxlint src/`: sem avisos novos (seguem os 2 de `historico.js`).
+- `npm run build`: ok. Bundle 391 → 405 kB (121 → 125 kB gzip); CSS
+  30 → 31 kB.
+- Navegador (Chromium, **build de produção**, razão sintético): as cinco
+  seções aparecem; o De-Para lista as contas com placar coerente; o
+  filtro "pendentes" isola as três contas certas; escolher uma categoria
+  sobe a completude na hora (72,7% → 81,8%) e o sub-rótulo da trilha
+  acompanha; a conciliação do CPC 51 continua em **0,00** depois da
+  mudança; CSV e XLSX baixam de verdade e o XLSX abre com as duas abas
+  e o filtro automático. Sem erro de página.
+- 390px e tema escuro conferidos na mesma passada: sem rolagem
+  horizontal do corpo, tabela vira cartão empilhado, e o sub-rótulo de
+  **pendência** continua visível na faixa (os informativos somem).
+- **Não verificado:** `fixtures/validar.mjs` — os arquivos reais não
+  estão nesta máquina. Risco baixo por construção: `classify.js`,
+  `parse.js` e `grupos.js` não foram tocados.
+
+Achado de quebra, corrigido só no exportador novo: o CSV rodava **os
+números gerados pelo próprio app** por `neutralizarFormula`, que prefixa
+com aspa simples tudo que começa com `-`. Resultado: toda despesa saía
+como TEXTO, que o Excel não soma — num arquivo cujo destino é carga em
+ERP e conferência por totais. `exportacaoDePara.js` separa célula de
+texto (neutralizada) de célula de número (formatada por `dec`), com teste
+cobrindo as duas metades. **O mesmo defeito continua em
+`baixarCSVDePara` e nos outros CSVs de `exportacao.js`** — não foi
+corrigido nesta sessão para não mexer em exportador validado sem pedido;
+está no backlog abaixo.
+
+Ficou de fora, de propósito:
+
+- Editar a política contábil do CPC 51 pelo De-Para. Ela muda a
+  demonstração inteira e continua morando na aba CPC 51, junto do texto
+  que explica a consequência.
+- Salvar perfil pelo De-Para. O botão continua na etapa Classificar; a
+  tela nova aponta para lá em vez de duplicar o controle.
+- Filtro por centro de custo e por competência dentro do De-Para. O
+  mapeamento não depende de período — quem quer conferir um mês usa os
+  filtros da etapa Conferir, que já valem para a tela toda.
 
 ### 10/08/2026 — CPC 51: motor, telas, exportação e plano de ação
 
@@ -123,25 +214,47 @@ Ficou de fora, de propósito:
 
 ## Próximos passos, na ordem que eu priorizaria
 
-1. **Comparativa na estrutura do CPC 51** (Fase 8, passo 36). A norma
+1. **Editor de perfil de plano a partir do De-Para.** Agora que a tela
+   mostra origem → destino → origem da decisão conta a conta, gerar o
+   arquivo de perfil de plano a partir dessas decisões é um botão e uma
+   função de serialização. Fecha o ciclo "atender cliente novo sem
+   commit e sem build", que é a restrição de projeto mais importante do
+   caminho para ERP, e serve de especificação para a Fase 4.
+2. **Número gerado pelo app não deve passar por `neutralizarFormula`.**
+   Corrigido em `exportacaoDePara.js`; falta em `baixarCSVDePara`
+   (`exportacaoCPC51.js`) e no CSV da DRE (`exportacao.js`), onde toda
+   despesa continua saindo como texto que o Excel não soma. Defeito real
+   e barato de corrigir — separar célula de texto de célula de número,
+   como o exportador novo faz, e cobrir com teste.
+3. **Comparativa na estrutura do CPC 51** (Fase 8, passo 36). A norma
    exige 2027 contra 2026 reapresentado. Hoje `EtapaComparativo` monta
    colunas por competência na estrutura antiga; falta a mesma coisa
    lendo `montarLinhas51`. É o maior buraco funcional que sobrou.
-2. **Editor de perfil de plano na interface** (backlog antigo do
-   `CLAUDE.md`, agora mais valioso): com o De-Para do CPC 51 pronto na
-   tela, gerar o arquivo de perfil a partir das decisões tomadas fecha o
-   ciclo e serve de especificação para a Fase 4 (parametrização do ERP).
-3. **Extrair um `useCPC51` de `App.jsx`.** O componente passou de 500
-   para 672 linhas e concentra oito estados novos. Não é urgente, mas é
-   o arquivo que mais cresce a cada funcionalidade.
-4. **Efeito tributário por item de MPDA**, com campo editável por ajuste
+4. **Extrair `useCPC51` e `useDePara` de `App.jsx`.** O componente passou
+   de 672 para 766 linhas — é o arquivo que mais cresce a cada
+   funcionalidade, e cada módulo de ERP vai empurrar mais. Não é urgente,
+   mas é o próximo lugar onde a leitura começa a doer.
+5. **Efeito tributário por item de MPDA**, com campo editável por ajuste
    — fecha a exigência da norma que hoje sai como lacuna.
-5. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
+6. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
    falta UI).
-6. **Agregar durante a importação**, em vez de guardar `linhas` cru em
+7. **Agregar durante a importação**, em vez de guardar `linhas` cru em
    memória — tira o teto de tamanho de arquivo.
-7. **Limpeza barata:** `historico.js` tem `lerSha` morto e uma expressão
+8. **Limpeza barata:** `historico.js` tem `lerSha` morto e uma expressão
    sem uso; são os dois únicos avisos de lint do projeto.
+
+## Rumo a ERP: como pensar os próximos módulos
+
+O agente `arquiteto-erp` existe para desenhar isso caso a caso, mas a
+regra geral cabe aqui: **módulo novo entra ao LADO do núcleo contábil,
+nunca por dentro dele.** O núcleo (parse → agregação → classificação →
+demonstrações) está validado centavo a centavo e é o ativo do projeto.
+
+Cadastro vai para a seção *Parâmetros* da trilha, junto do De-Para;
+leitura vai para *Análises*. E qualquer parametrização nova copia o
+formato de `depara.js`: origem, destino, **origem da decisão** e um
+placar de quanto falta — porque foi a coluna de origem que transformou
+uma planilha de mapeamento em documento de auditoria.
 
 ## Hipóteses ainda não confirmadas
 

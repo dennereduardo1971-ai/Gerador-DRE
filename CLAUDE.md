@@ -70,6 +70,10 @@ src/
     mpda.js                       # medidas de desempenho da administração
     cronograma51.js               # o cronograma de implementação, como dado
     planoAcao.js                  # andamento do plano (localStorage)
+    depara.js                     # a tabela de parametrização: conta →
+                                   #  grupo da DRE + categoria do CPC 51,
+                                   #  com a ORIGEM de cada decisão
+    exportacaoDePara.js           # o De-Para completo em CSV e Excel
     exportacaoCPC51.js            # Excel de seis abas + De-Para + nota
     exportacao.js                 # CSV e Excel, ambos a partir de linhasDRE
     sessao.js                     # persistência da sessão em IndexedDB
@@ -83,11 +87,14 @@ src/
     MedidasMPDA.jsx                # MPDA com a conciliação sempre aberta
     Cronograma51.jsx                # o plano de ação, fase a fase
     LinhaDRE.jsx                 # Linha/Secao/Cabecalho/Detalhe da DRE
+    DePara.jsx                       # a área de parametrização: os dois
+                                      #  eixos editáveis na mesma linha
     Eixo.jsx                      # Canal e Balanca — o eixo visual
                                    # compartilhado (ver "Sistema visual")
     SincronizacaoGitHub.jsx         # painel de config da sincronização
   App.jsx                        # dono de todo o estado; as Etapas são
-                                  # "burras" (recebem props, chamam callbacks)
+                                  # "burras" (recebem props, chamam callbacks);
+                                  # a trilha de navegação é DADO (`SECOES`)
   App.css                        # design system em variáveis CSS (--papel,
                                   # --tinta, --marca, --barra-* etc.) — tema
                                   # escuro é um seletor
@@ -95,12 +102,39 @@ src/
                                   # as mesmas variáveis
 ```
 
-Fluxo do app: Importar → Conferir → Classificar → DRE, com Balanço,
-Horizontal e Histórico como abas paralelas que dependem do mesmo
-estado agregado (`contas`, calculado uma vez em `App.jsx` via
-`agregarPorConta`). A trilha tem um terceiro grupo, "CPC 51 · 2027":
-a Demonstração CPC 51 lê as mesmas contas por outro eixo, e o Plano de
-ação não depende de arquivo nenhum.
+Fluxo do app: Importar → Conferir → Classificar → DRE. As demais abas
+são vistas paralelas sobre o mesmo estado agregado (`contas`, calculado
+uma vez em `App.jsx` via `agregarPorConta`).
+
+**A trilha é dado, não JSX.** `SECOES` em `App.jsx` descreve cinco
+seções, cada uma agrupando abas que respondem à mesma pergunta:
+
+| Seção | Pergunta | Abas |
+|---|---|---|
+| Fluxo | como eu chego na DRE? | Importar → Conferir → Classificar → DRE |
+| Análises | o que estes números dizem? | Painel, Balanço, Horizontal, Comparativa |
+| Parâmetros | para onde vai cada conta? | De-Para |
+| Arquivo | o que já foi fechado? | Histórico, Arquivos |
+| CPC 51 · 2027 | como isso fica em 2027? | Demonstração CPC 51, Plano de ação |
+
+Três coisas a não desfazer aqui:
+
+- **Só "Fluxo" é numerado**, porque só ele é sequencial de verdade. As
+  outras seções recebem losango, para não fingirem ser passos 5, 6 e 7.
+- **A regra de "quando esta aba abre" se escreve uma vez**, em
+  `abaDisponivel()`. Ela governa a trilha E o estado vazio do `<main>`;
+  eram duas cópias antes, e aba nova aberta na trilha caía em tela
+  branca quando alguém esquecia da segunda.
+- **Parâmetros não é uma linha em Análises.** De-Para é cadastro, não
+  leitura de resultado — e cadastro que se procura em "Análises" é
+  cadastro que ninguém acha. É também a seção onde entram os módulos de
+  parametrização do caminho para ERP.
+
+O sub-rótulo de cada aba (`estadoDaAba`) traz o número que importa
+daquela tela, e um ponto **âmbar** — nunca vermelho, que aqui pertence ao
+dado — marca pendência. Em 390px os sub-rótulos informativos somem, mas
+os de pendência ficam: `display: none` tira o texto também da árvore de
+acessibilidade, e o ponto é `aria-hidden`.
 
 ## Sistema visual ("Razão")
 
@@ -304,6 +338,17 @@ seguro que reescrever a hierarquia de subtotais.
 - **Nunca commite os arquivos reais de razão/plano de contas do
   Denner** (números financeiros de instituição real) — ficam em
   `fixtures/`, que está no `.gitignore`.
+- **Número gerado pelo app não pode passar por `neutralizarFormula`.**
+  Ela prefixa com aspa simples tudo que começa com `- = + @` — defesa
+  certa para TEXTO vindo do plano de contas e do histórico do razão, que
+  o app não controla. Mas `dec(-40000)` produz `"-40000.00"`, que também
+  começa com `-`: aplicada ali, ela transforma **toda despesa numa
+  célula de texto que o Excel não soma**. Num arquivo cujo destino é
+  carga em ERP e conferência por totais, isso é pior que inútil.
+  `exportacaoDePara.js` separa `celulaTexto` de `celulaNumero`, com
+  teste cobrindo as duas metades. **O defeito ainda existe em
+  `baixarCSVDePara` e no CSV da DRE** — está no backlog de
+  `EVOLUCAO.md`, não é comportamento desejado.
 
 ## Como testar
 
@@ -314,9 +359,10 @@ Duas camadas, e as duas importam:
    de propósito as decisões que já custaram caro: o cabeçalho real do
    razão do IESB, a separação custo/fopag, Prouni fora de Bolsas,
    provisões em duas linhas, a soma líquida (reversão reduz despesa), a
-   hierarquia de subtotais e — desde o CPC 51 — a igualdade entre o lucro
-   líquido das duas estruturas. Se um deles ficar vermelho depois de uma
-   mudança sua, presuma regressão até provar o contrário.
+   hierarquia de subtotais, a igualdade entre o lucro líquido das duas
+   estruturas (CPC 51) e o acordo entre as duas tabelas De-Para. Se um
+   deles ficar vermelho depois de uma mudança sua, presuma regressão até
+   provar o contrário.
 2. **`node fixtures/validar.mjs`** — a validação contra a DRE real, mês
    a mês, centavo a centavo. Insubstituível: o Vitest prova que a lógica
    não mudou, mas só o arquivo real prova que ela está certa. Rode
@@ -332,7 +378,7 @@ valendo para quem quer conferir o build localmente antes:
 
 ```bash
 npm install
-npm test             # 198 testes (conferir em EVOLUCAO.md)
+npm test             # 211 testes (conferir em EVOLUCAO.md)
 npm run build        # gera dist/
 rm -rf docs && cp -r dist docs   # normalmente desnecessário: o CI faz
 ```
@@ -341,17 +387,33 @@ O `vite.config.js` usa `base: './'` (caminho relativo) de propósito —
 funciona tanto em GitHub Pages num subcaminho (`/Gerador-DRE/`) quanto
 aberto localmente, sem precisar reconfigurar nada.
 
-## Skills deste projeto
+## Skills e agentes deste projeto
 
-- `.claude/skills/manter-evolucao/` — como fechar uma sessão de trabalho:
-  medir, registrar em `EVOLUCAO.md` e corrigir este arquivo no mesmo
-  commit quando alguma frase daqui deixar de ser verdade.
+Skills (`.claude/skills/`) — instruções que uma sessão carrega para fazer
+uma tarefa do jeito deste projeto:
 
-Três outras skills já foram descritas aqui (`testar-com-arquivo-real`,
-`ajustar-classificacao-dre`, `build-e-publicar`) mas **nunca foram
-versionadas** — o conteúdo delas vive nas seções "Como testar",
-"O coração do projeto" e "Build e publicação" deste arquivo. Se um dia
-forem escritas de verdade, é aqui que a lista se atualiza.
+| Skill | Quando |
+|---|---|
+| `manter-evolucao` | fechar a sessão: medir, registrar em `EVOLUCAO.md`, corrigir este arquivo no mesmo commit |
+| `nova-funcionalidade` | tela, módulo ou capacidade nova — inclusive os módulos do caminho para ERP |
+| `ajustar-classificacao-dre` | mudar para onde uma conta vai (padrões, mapa por código, perfis, categorias) |
+| `testar-com-arquivo-real` | validar contra o razão e a DRE reais de `fixtures/`, e ser honesto quando eles não estão na máquina |
+| `otimizar-app` | desempenho, bundle e código morto — medindo antes e depois |
+| `build-e-publicar` | levar a mudança ao site, com e sem terminal do lado do usuário |
+
+Agentes (`.claude/agents/`) — sessões especializadas para revisar ou
+planejar:
+
+| Agente | Para quê |
+|---|---|
+| `auditor-contabil` | "esta mudança alterou algum número que não devia mudar?" — invariantes, testes congelados, validação real |
+| `revisor-visual` | sistema visual "Razão" e o piso de acessibilidade: paleta, 390px, foco, temas, impressão |
+| `arquiteto-erp` | desenhar o próximo módulo rumo a ERP, reusando o núcleo em vez de reescrevê-lo |
+
+A doutrina continua morando **aqui**: as skills apontam para as seções
+deste arquivo em vez de duplicá-las. Quando uma decisão mudar, mude
+aqui — se a frase correspondente numa skill deixar de bater, corrija a
+skill no mesmo commit.
 
 ## Memória de trabalho: `EVOLUCAO.md`
 
@@ -413,6 +475,42 @@ mapa não resolveu.
 
 Ao mexer aqui, os testes de `planoPerfil.test.js` cobrem a mecânica, mas
 **só `fixtures/validar.mjs` prova que o perfil do IESB continua certo.**
+
+## De-Para — a tabela de parametrização
+
+`depara.js` responde, para cada conta de resultado, "para onde isso
+vai?" — nos DOIS eixos ao mesmo tempo: o grupo da DRE atual e a
+categoria do CPC 51. É a aba **Parâmetros → De-Para**, o entregável da
+Fase 2 do cronograma e a especificação de entrada da Fase 4
+(parametrização no ERP).
+
+Quatro decisões que não devem ser desfeitas:
+
+1. **Ele não decide nada.** A resolução continua em `classify.js` (via
+   `grupoDe`) e em `cpc51.js` (via `resolverCategoria`). `depara.js` só
+   junta, rotula a origem e conta o que falta. Reimplementar qualquer uma
+   das duas decisões ali criaria uma segunda verdade sobre o destino de
+   uma conta.
+2. **A tela escreve no MESMO estado** de Classificar e da aba CPC 51
+   (`classif`/`tocadas` e `categoriaConta`). Por isso reclassificar no
+   De-Para refaz a DRE na hora — é literalmente a mesma decisão, feita de
+   outro lugar. Não crie um terceiro estado paralelo.
+3. **`deParaCPC51` (em `cpc51.js`) continua existindo separado**, porque
+   é o recorte que alimenta o Excel de seis abas da auditoria. Fazer um
+   delegar ao outro criaria import circular entre `cpc51.js` e
+   `depara.js` — a mesma classe de problema que fez `grupos.js` nascer.
+   Em vez disso, `depara.test.js` prova que as duas tabelas concordam
+   conta a conta sobre grupo e categoria.
+4. **A coluna "origem da decisão" é o que torna a planilha um documento
+   de auditoria.** Sem ela, mapeamento herdado do padrão e mapeamento
+   conferido conta a conta parecem a mesma coisa — e é justamente essa
+   diferença que a auditoria pergunta. `completude` conta só a conta que
+   TEM destino na DRE e não depende mais de julgamento: um De-Para 100%
+   "preenchido" com metade das contas em "Não entra na DRE" está
+   escondendo trabalho, não pronto.
+
+Qualquer parametrização nova do caminho para ERP copia esse formato:
+origem, destino, origem da decisão, e um placar de quanto falta.
 
 ## Exportação
 
@@ -696,13 +794,15 @@ arquivo aberto.
 Na ordem que eu (Claude) priorizaria, já sem o que foi feito. A lista
 viva, com o que foi medido em cada sessão, está em `EVOLUCAO.md`:
 
-1. **Comparativa na estrutura do CPC 51** — a norma exige 2027 contra
+1. **Editor de perfil de plano a partir do De-Para** — hoje dá para
+   CARREGAR um perfil de plano, mas criar um do zero ainda exige
+   escrever o JSON à mão. Com a aba De-Para mostrando origem → destino →
+   origem da decisão, gerar o arquivo a partir dessas decisões é um botão
+   e uma serialização, e fecha o ciclo "atender cliente novo sem commit
+   e sem build".
+2. **Comparativa na estrutura do CPC 51** — a norma exige 2027 contra
    2026 reapresentado (Fase 8, passo 36). Hoje `EtapaComparativo` só
    monta colunas na estrutura antiga.
-2. **Editor de perfil de plano na própria interface** — hoje dá para
-   CARREGAR um perfil de plano, mas para criar um do zero ainda é
-   preciso escrever o JSON à mão. Uma tela que gere o perfil a partir
-   das classificações feitas por código fecharia o ciclo.
 3. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
    aba com dados; já devolve `abas`, falta UI.
 4. **Circulante × Não Circulante no Balanço** — agora que existe saldo de

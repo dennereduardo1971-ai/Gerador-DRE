@@ -164,11 +164,14 @@
 
 .painel { min-width: 0; }
 
-/* ---------- trilha de etapas ----------
+/* ---------- trilha de seções ----------
    Vertical no desktop porque o fluxo É sequencial: isso é
-   navegação com estado, não migalha de pão. Numeração só em
-   1–4 (o fluxo de verdade); Balanço, Horizontal e Histórico
-   são vistas paralelas e recebem outro marcador. */
+   navegação com estado, não migalha de pão. Numeração só no
+   grupo "Fluxo" (o fluxo de verdade); Análises, Parâmetros,
+   Arquivo e CPC 51 são vistas paralelas e recebem losango.
+
+   As seções vêm de `SECOES` em App.jsx — a trilha é dado, e o
+   CSS não sabe (nem precisa saber) quantos grupos existem. */
 
 .trilha {
   position: sticky;
@@ -250,6 +253,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Pendência na própria trilha: âmbar, nunca vermelho. Vermelho neste
+   projeto pertence ao DADO (saldo negativo, diferença que não fecha na
+   demonstração); gastá-lo em rótulo de navegação faria a tela gritar
+   duas coisas diferentes com a mesma cor. O ponto é redundante com o
+   texto do sub-rótulo de propósito — quem lê rápido vê o ponto, quem
+   usa leitor de tela lê a frase, e o ponto fica `aria-hidden`. */
+.etapa-sub[data-alerta="1"] { color: var(--atencao); }
+.etapa-alerta {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--atencao);
+  vertical-align: middle;
 }
 
 /* ---------- cartões ---------- */
@@ -832,7 +852,13 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
     white-space: nowrap;
   }
   .etapa { flex: 0 0 auto; width: auto; white-space: nowrap; padding: 7px 11px; }
+  /* Na faixa, o sub-rótulo informativo (nome do arquivo, contagem de
+     contas) some — não cabe e não é urgente. O de PENDÊNCIA fica: é a
+     única forma de a informação chegar a quem usa leitor de tela, já que
+     o ponto âmber é `aria-hidden` e `display: none` tira o texto também
+     da árvore de acessibilidade. */
   .etapa-sub { display: none; }
+  .etapa-sub[data-alerta="1"] { display: block; }
 }
 
 @media (max-width: 760px) {
@@ -1653,3 +1679,51 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
   .cron-item { flex-direction: column; gap: 6px; }
   .cron-item select { width: 100%; }
 }
+
+/* ---------- De-Para ----------
+   A tabela de parametrização: uma linha por conta, dois destinos e a
+   origem de cada decisão. Só três regras próprias — o resto reusa
+   `.card`, `.checks`, `.filters` e `.tabela-cartao`, porque uma tela de
+   cadastro que inventa seu próprio visual é uma tela que parece de outro
+   app. */
+
+/* A linha pendente se marca pela borda, não pelo fundo: fundo colorido
+   brigaria com a listra de linha alternada do papel de razão, que é o
+   que faz uma tabela longa continuar legível. */
+tr[data-pendente="1"] td:first-child { box-shadow: inset 2px 0 0 var(--atencao); }
+
+/* Os dois <select> precisam caber o rótulo inteiro. Truncado, "Operacional"
+   e "Operações descontinuadas" viram a mesma coisa na tela — e escolher
+   categoria errada por causa de reticências é o tipo de defeito que o
+   projeto inteiro tenta evitar. A tabela rola na horizontal quando não
+   couber; o rótulo, não. */
+.dp-tabela select { width: 100%; min-width: 208px; }
+.dp-tabela .desc { min-width: 160px; }
+
+.dp-motivo {
+  display: block;
+  margin-top: 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--atencao);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+}
+
+/* O nome do grupo na leitura por destino é um filtro, não um link para
+   outro lugar — por isso herda a tinta do texto em vez da cor de marca,
+   que aqui prometeria navegação. */
+.dp-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--regua-forte);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.dp-link:hover { color: var(--marca); text-decoration-color: var(--marca); }
+.dp-link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }

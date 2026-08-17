@@ -10,6 +10,8 @@ import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalance
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
+import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
+import { baixarCSVDeParaCompleto, baixarExcelDePara } from "./lib/exportacaoDePara.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
@@ -33,37 +35,82 @@ import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
 import { EtapaCPC51 } from "./components/EtapaCPC51.jsx";
 import { Cronograma51 } from "./components/Cronograma51.jsx";
+import { DePara } from "./components/DePara.jsx";
 
-/** O fluxo é sequencial de verdade (1 → 4), então numeração aqui
- *  carrega informação. Balanço, Horizontal e Histórico são vistas
- *  paralelas sobre o mesmo estado — recebem outro marcador, não um
- *  número, pra não fingirem ser passos 5, 6 e 7. */
-const FLUXO = [
-  ["importar", "Importar"],
-  ["conferir", "Conferir"],
-  ["classificar", "Classificar"],
-  ["dre", "DRE"],
+/* A TRILHA É DADO, NÃO JSX.
+ *
+ * Antes eram três listas e três blocos de JSX quase idênticos, com a
+ * regra de "esta aba abre quando?" escrita à mão dentro de cada um — três
+ * expressões booleanas diferentes que ninguém conseguia comparar. Como
+ * dado, acrescentar uma seção nova (o caminho do app virar ERP: cadastros,
+ * fiscal, contas a pagar) é uma linha aqui e uma cláusula em
+ * `abaDisponivel`, e não mais um bloco copiado.
+ *
+ * Cada seção agrupa abas que respondem à MESMA pergunta:
+ *
+ *   Fluxo       → "como eu chego na DRE?"      (sequencial, numerado)
+ *   Análises    → "o que estes números dizem?"
+ *   Parâmetros  → "para onde vai cada conta?"  (o De-Para; é daqui que
+ *                  sai a parametrização do ERP)
+ *   Arquivo     → "o que já foi fechado?"
+ *   CPC 51      → "como isso fica em 2027?"
+ *
+ * Parâmetros ficou fora de Análises de propósito: De-Para não é leitura
+ * de resultado, é cadastro — e cadastro que se procura em "Análises" é
+ * cadastro que ninguém acha. */
+const SECOES = [
+  {
+    id: "fluxo",
+    rotulo: "Fluxo",
+    // Só o fluxo é numerado: ele É sequencial. As outras seções são
+    // vistas paralelas e recebem losango, para não fingirem ser passos.
+    numerado: true,
+    abas: [
+      ["importar", "Importar"],
+      ["conferir", "Conferir"],
+      ["classificar", "Classificar"],
+      ["dre", "DRE"],
+    ],
+  },
+  {
+    id: "analises",
+    rotulo: "Análises",
+    abas: [
+      ["painel", "Painel"],
+      ["balanco", "Balanço"],
+      ["horizontal", "Horizontal"],
+      ["comparativo", "Comparativa"],
+    ],
+  },
+  {
+    id: "parametros",
+    rotulo: "Parâmetros",
+    abas: [["depara", "De-Para"]],
+  },
+  {
+    id: "arquivo",
+    rotulo: "Arquivo",
+    abas: [
+      ["historico", "Histórico"],
+      ["arquivos", "Arquivos"],
+    ],
+  },
+  {
+    id: "cpc51",
+    rotulo: "CPC 51 · 2027",
+    abas: [
+      ["cpc51", "Demonstração CPC 51"],
+      ["plano", "Plano de ação"],
+    ],
+  },
 ];
 
-const VISTAS = [
-  ["painel", "Painel"],
-  ["balanco", "Balanço"],
-  ["horizontal", "Horizontal"],
-  ["comparativo", "Comparativa"],
-  ["historico", "Histórico"],
-  ["arquivos", "Arquivos"],
-];
-
-/* O CPC 51 ganha grupo próprio na trilha, e não uma linha a mais em
-   "Análises", porque não é outra leitura dos mesmos números: é a
-   estrutura que a demonstração vai ter a partir de 2027. Misturar com
-   Horizontal e Comparativa esconderia justamente o que precisa ficar
-   visível todo dia até a virada. O plano de ação não depende de arquivo
-   nenhum — abre mesmo sem razão importado. */
-const VISTAS_CPC51 = [
-  ["cpc51", "Demonstração CPC 51"],
-  ["plano", "Plano de ação"],
-];
+/* Abas que não dependem de arquivo nenhum: abrem sempre. Histórico e
+   Arquivos leem o que já foi salvo; o plano de ação é do escritório, não
+   do razão aberto. */
+const SEMPRE_ABERTAS = ["importar", "historico", "arquivos", "plano"];
+/* O balancete completo desenha estas duas sozinho, sem razão. */
+const BASTA_BALANCETE = ["balanco", "painel"];
 
 export default function App() {
   const [aba, setAba] = useState("importar");
@@ -413,6 +460,20 @@ export default function App() {
     politica: politica51, empresa, cnpj, filtroMes, meses, filtroCompetencia, nomes: nomesEfetivos,
   };
 
+  /* ---------- De-Para ----------
+     A mesma decisão das etapas Classificar e CPC 51, vista conta a conta
+     e nos dois eixos ao mesmo tempo. Não é um terceiro estado: lê
+     `grupoDe`, `tocadas` e `categoriaConta`, e escreve de volta nos
+     mesmos setters — por isso reclassificar aqui refaz a DRE na hora. */
+  const deParaLinhas = useMemo(
+    () => montarDePara(contasResultado, {
+      grupoDe, tocadas, categoriaPorConta: categoriaConta, politica: politica51, nomes: nomesEfetivos,
+    }),
+    [contasResultado, classif, sugestao, tocadas, categoriaConta, politica51, nomesEfetivos]
+  );
+  const placarDePara = useMemo(() => resumoDePara(deParaLinhas), [deParaLinhas]);
+  const ctxDePara = { empresa, cnpj, filtroMes, meses, filtroCompetencia };
+
   function definirCategoria(conta, categoria) {
     setCategoriaConta((p) => {
       const novo = { ...p };
@@ -453,6 +514,41 @@ export default function App() {
   const temBalancete = !!abertura.balancete;
   const prova = useMemo(() => provaIntegridade(contasResultado, grupoDe), [contasResultado, grupoDe]);
 
+  /** Uma aba abre quando a fonte de que ela depende existe. Escrito uma
+   *  vez, em vez de três expressões booleanas espalhadas pela trilha —
+   *  era assim que "Balanço abre só com balancete" ficava impossível de
+   *  conferir sem ler os três blocos e comparar de cabeça. */
+  function abaDisponivel(id) {
+    if (SEMPRE_ABERTAS.includes(id)) return true;
+    if (BASTA_BALANCETE.includes(id)) return temDados || temBalancete;
+    return temDados;
+  }
+
+  /* O estado de cada aba, na própria trilha.
+     A pergunta que a reorganização precisa responder não é só "onde fica
+     a aba X", é "onde tem trabalho me esperando". Por isso o sub-rótulo
+     traz o número que importa daquela tela, e `alerta` marca — em âmbar,
+     nunca em vermelho, que aqui pertence ao dado — o que não fecha.
+     Só há entrada para aba que TEM o que dizer: sub-rótulo vazio em toda
+     linha transformaria a trilha num paredão de texto cinza. */
+  const estadoDaAba = useMemo(() => {
+    const e = {};
+    if (arquivo) e.importar = { sub: arquivo };
+    if (temDados && linhas.length && Math.abs(dif) >= 0.01) {
+      e.conferir = { sub: "partidas não fecham", alerta: true };
+    }
+    if (contasResultado.length) {
+      e.classificar = { sub: `${contasResultado.length} contas de resultado` };
+      e.depara = placarDePara.pendente
+        ? { sub: `${placarDePara.pendente} a resolver`, alerta: true }
+        : { sub: "mapeamento completo" };
+    }
+    if (abertura.arquivo) e.balanco = { sub: abertura.arquivo };
+    if (temDados && !conciliacao51.fecha) e.cpc51 = { sub: "não concilia", alerta: true };
+    return e;
+  }, [arquivo, temDados, linhas.length, dif, contasResultado.length, placarDePara,
+      abertura.arquivo, conciliacao51.fecha]);
+
   return (
     <div className="dre-app">
       <div className="wrap">
@@ -480,52 +576,34 @@ export default function App() {
         </header>
 
         <div className="app-grid">
-          <nav className="trilha" aria-label="Etapas e vistas">
-            <div className="trilha-grupo">
-              <div className="rotulo">Fluxo</div>
-              {FLUXO.map(([id, nome], i) => (
-                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
-                  data-feito={id === "importar" && temDados ? "1" : "0"}
-                  aria-current={aba === id ? "step" : undefined}
-                  disabled={id !== "importar" && !temDados} onClick={() => setAba(id)}>
-                  <span className="etapa-num">{i + 1}</span>
-                  <span className="etapa-txt">
-                    <span className="etapa-nome">{nome}</span>
-                    {id === "importar" && arquivo && <span className="etapa-sub">{arquivo}</span>}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="trilha-grupo">
-              <div className="rotulo">Análises</div>
-              {VISTAS.map(([id, nome]) => (
-                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
-                  aria-current={aba === id ? "page" : undefined}
-                  disabled={!["historico", "arquivos"].includes(id) && !temDados && !(["balanco", "painel"].includes(id) && temBalancete)}
-                  onClick={() => setAba(id)}>
-                  <span className="etapa-marca" />
-                  <span className="etapa-txt">
-                    <span className="etapa-nome">{nome}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="trilha-grupo">
-              <div className="rotulo">CPC 51 · 2027</div>
-              {VISTAS_CPC51.map(([id, nome]) => (
-                <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
-                  aria-current={aba === id ? "page" : undefined}
-                  disabled={id !== "plano" && !temDados}
-                  onClick={() => setAba(id)}>
-                  <span className="etapa-marca" />
-                  <span className="etapa-txt">
-                    <span className="etapa-nome">{nome}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
+          <nav className="trilha" aria-label="Seções do aplicativo">
+            {SECOES.map((secao) => (
+              <div className="trilha-grupo" key={secao.id} role="group" aria-label={secao.rotulo}>
+                <div className="rotulo">{secao.rotulo}</div>
+                {secao.abas.map(([id, nome], i) => {
+                  const livre = abaDisponivel(id);
+                  const est = livre ? estadoDaAba[id] : null;
+                  return (
+                    <button key={id} className="etapa" data-on={aba === id ? "1" : "0"}
+                      data-feito={id === "importar" && temDados ? "1" : "0"}
+                      aria-current={aba === id ? (secao.numerado ? "step" : "page") : undefined}
+                      disabled={!livre} onClick={() => setAba(id)}
+                      title={livre ? undefined : "Abre assim que um razão ou balancete for importado"}>
+                      {secao.numerado
+                        ? <span className="etapa-num">{i + 1}</span>
+                        : <span className="etapa-marca" />}
+                      <span className="etapa-txt">
+                        <span className="etapa-nome">
+                          {nome}
+                          {est?.alerta && <span className="etapa-alerta" aria-hidden="true" />}
+                        </span>
+                        {est && <span className="etapa-sub" data-alerta={est.alerta ? "1" : "0"}>{est.sub}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
 
           <main className="painel">
@@ -610,6 +688,20 @@ export default function App() {
                     abertura={abertura} onImportarAbertura={importarAbertura} />
             )}
 
+            {aba === "depara" && temDados && (
+              <DePara
+                linhas={deParaLinhas} empresa={empresa} cnpj={cnpj}
+                onClassificar={(conta, grupo) => {
+                  setClassif({ ...classif, [conta]: grupo });
+                  setTocadas({ ...tocadas, [conta]: true });
+                }}
+                onCategoriaConta={definirCategoria}
+                onLimparCategorias={() => setCategoriaConta({})}
+                onBaixarCSV={() => baixarCSVDeParaCompleto(deParaLinhas, ctxDePara)}
+                onBaixarExcel={() => baixarExcelDePara(deParaLinhas, placarDePara, porGrupo(deParaLinhas), ctxDePara)}
+              />
+            )}
+
             {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
 
             {aba === "comparativo" && temDados && <EtapaComparativo dresPorCompetencia={dresPorCompetencia} />}
@@ -657,7 +749,9 @@ export default function App() {
               />
             )}
 
-            {!temDados && !(["balanco", "painel"].includes(aba) && temBalancete) && !["importar", "historico", "arquivos", "plano"].includes(aba) && (
+            {/* Mesma regra da trilha, e não uma cópia dela: sem isso, uma
+                aba nova aberta na trilha caía numa tela em branco aqui. */}
+            {!abaDisponivel(aba) && (
               <div className="empty">
                 <b>Nenhum razão carregado</b>
                 Comece pela etapa 1, Importar — as outras telas se abrem sozinhas assim que o
