@@ -43,21 +43,30 @@ export const dec = (n) => (n == null ? "" : n.toFixed(2));
 /* "jan a fev a mar a abr" era o que saía no cabeçalho de todo arquivo
    exportado quando o razão cobria mais de dois meses — o `join(" a ")`
    entre TODOS os meses. Com um razão diário, virava uma linha de
-   quinhentos caracteres. Período é intervalo: com mais de dois pontos,
-   o que interessa é o primeiro e o último. */
-export function periodoLegivel({ filtroMes, meses, filtroCompetencia }) {
+   quinhentos caracteres. A correção de então cortou pro primeiro e o
+   último — mas usando `meses`, que apesar do nome é a lista de DIAS
+   (coluna Dia/Mês, "01/jan", "15/mar"...), um Set sem ordem cronológica
+   nenhuma: "primeiro e último" ali virava dois dias quase aleatórios
+   ("01/jan a 29/mar" para um arquivo de janeiro a junho). O sintoma
+   (linha enorme) sumiu; a causa (fonte errada) ficou. Período é
+   COMPETÊNCIA (mês/ano), não dia — por isso agora vem de
+   `competencias`, a lista que `listarCompetencias()` já devolve
+   ordenada de verdade. */
+export function periodoLegivel({ filtroMes, filtroCompetencia, competencias = [] }) {
   if (filtroCompetencia && filtroCompetencia !== "todas") return competenciaLegivel(filtroCompetencia);
-  if (filtroMes !== "todos") return filtroMes;
-  const lista = meses || [];
-  return lista.length > 2 ? `${lista[0]} a ${lista[lista.length - 1]}` : lista.join(" a ");
+  if (filtroMes && filtroMes !== "todos") return filtroMes;
+  if (!competencias.length) return "";
+  return competencias.length > 1
+    ? `${competenciaLegivel(competencias[0])} a ${competenciaLegivel(competencias[competencias.length - 1])}`
+    : competenciaLegivel(competencias[0]);
 }
 
-export function cabecalho({ empresa, cnpj, filtroMes, meses, filtroCompetencia, titulo }) {
+export function cabecalho({ empresa, cnpj, filtroMes, filtroCompetencia, competencias, titulo }) {
   return [
     [titulo || "DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO"],
     [empresa || "Empresa"],
     [cnpj ? `CNPJ ${cnpj}` : ""],
-    ["Período", periodoLegivel({ filtroMes, meses, filtroCompetencia })],
+    ["Período", periodoLegivel({ filtroMes, filtroCompetencia, competencias })],
     [],
   ];
 }
