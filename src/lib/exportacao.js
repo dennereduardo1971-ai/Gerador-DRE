@@ -11,6 +11,11 @@
 import { GRUPOS, SINAL_GRUPO } from "./classify.js";
 import { montarLinhas } from "./linhasDRE.js";
 import { competenciaLegivel } from "./parse.js";
+import {
+  aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
+  escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook,
+  FORMATO_MOEDA, FORMATO_PCT,
+} from "./excelEstilo.js";
 
 /** Neutraliza injeção de fórmula em CSV.
  *
@@ -120,54 +125,49 @@ export function baixarCSV(ctx) {
   baixar("\uFEFF" + csv, nomeArquivo(empresa, "csv"), "text/csv;charset=utf-8");
 }
 
-/** Excel formatado: DRE, contas por grupo e, quando o razão cobre mais de
- *  um mês, a comparativa — cada uma em sua aba, com números como NÚMERO
- *  (não texto), para o contador poder somar e filtrar em cima. */
+/** Excel estilizado: DRE, contas por grupo e, quando o razão cobre mais
+ *  de um mês, a comparativa — cada uma em sua aba, com números como
+ *  NÚMERO (não texto), para o contador poder somar e filtrar em cima, e
+ *  com o mesmo visual "Razão" da tela: cabeçalho de marca, rajado
+ *  alternado, subtotal em negrito. Ver `excelEstilo.js` para o porquê de
+ *  `exceljs` em vez de `xlsx` aqui. */
 export async function baixarExcel(ctx) {
-  const XLSX = await import("xlsx");
+  const ExcelJS = (await import("exceljs")).default;
   const { dre, empresa, nomes, dresPorCompetencia = [] } = ctx;
-  const wb = XLSX.utils.book_new();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Gerador de DRE";
+  wb.created = new Date();
 
   // --- Aba DRE ---
-  const linhas = matrizDRE(dre);
-  const aoa = [
-    ...cabecalho(ctx),
-    ["Linha", "Valor", "AV %"],
-    ...linhas.map((l) => [l.lbl, l.val ?? null, l.av ?? null]),
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = [{ wch: 48 }, { wch: 16 }, { wch: 9 }];
+  const ws = wb.addWorksheet("DRE");
+  definirLarguras(ws, [48, 16, 9]);
+  escreverTitulo(ws, cabecalho(ctx)[0]?.[0] || "DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO", 3);
+  cabecalho(ctx).slice(1).forEach((l) => { if (l.length) escreverMeta(ws, l); else linhaEmBranco(ws); });
+  const cabTabela = escreverCabecalhoTabela(ws, ["Linha", "Valor", "AV %"]);
 
-  const primeiraLinha = cabecalho(ctx).length + 1; // 0-based: linha do "Linha|Valor|AV %"
-  linhas.forEach((l, i) => {
-    const r = primeiraLinha + 1 + i;
-    const cv = XLSX.utils.encode_cell({ r, c: 1 });
-    const ca = XLSX.utils.encode_cell({ r, c: 2 });
-    // Negativo entre parênteses e em vermelho, como manda a convenção
-    // contábil — e como a tela já mostra.
-    if (ws[cv]) ws[cv].z = '#,##0.00;[Red](#,##0.00)';
-    if (ws[ca]) ws[ca].z = "0.0%";
-    if (l.t === "secao" || l.t === "sub" || l.t === "final") {
-      [XLSX.utils.encode_cell({ r, c: 0 }), cv, ca].forEach((ref) => {
-        if (ws[ref]) ws[ref].s = { font: { bold: true } };
-      });
-    }
+  const linhas = matrizDRE(dre);
+  linhas.forEach((l) => {
+    const row = ws.addRow([l.lbl, l.val ?? null, l.av ?? null]);
+    row.getCell(2).numFmt = FORMATO_MOEDA;
+    row.getCell(3).numFmt = FORMATO_PCT;
+    if (l.t === "secao" || l.t === "sub" || l.t === "final") marcarSubtotal(ws, row.number, 3);
   });
-  XLSX.utils.book_append_sheet(wb, ws, "DRE");
+  aplicarZebra(ws, cabTabela.number + 1, ws.rowCount, 3);
 
   // --- Aba de contas por grupo ---
-  const det = [["Grupo", "Conta", "Descrição", "Valor"]];
+  const wsDet = wb.addWorksheet("Contas por grupo");
+  definirLarguras(wsDet, [32, 14, 42, 16]);
+  const cabDet = escreverCabecalhoTabela(wsDet, ["Grupo", "Conta", "Descrição", "Valor"]);
   GRUPOS.forEach((g) => {
     if (g.id === "IGNORAR") return;
     const sinal = SINAL_GRUPO[g.id] ?? 1;
-    dre.bal[g.id].contas.forEach((c) =>
-      det.push([g.nome, c.conta, nomes[c.conta] || "", c.saldo * sinal])
-    );
+    dre.bal[g.id].contas.forEach((c) => {
+      const row = wsDet.addRow([g.nome, c.conta, nomes[c.conta] || "", c.saldo * sinal]);
+      row.getCell(4).numFmt = FORMATO_MOEDA;
+    });
   });
-  const wsDet = XLSX.utils.aoa_to_sheet(det);
-  wsDet["!cols"] = [{ wch: 32 }, { wch: 14 }, { wch: 42 }, { wch: 16 }];
-  wsDet["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: det.length - 1, c: 3 } }) };
-  XLSX.utils.book_append_sheet(wb, wsDet, "Contas por grupo");
+  aplicarZebra(wsDet, cabDet.number + 1, wsDet.rowCount, 4);
+  wsDet.autoFilter = { from: { row: cabDet.number, column: 1 }, to: { row: wsDet.rowCount, column: 4 } };
 
   // --- Aba comparativa (só se houver mais de uma competência) ---
   if (dresPorCompetencia.length > 1) {
@@ -179,16 +179,16 @@ export async function baixarExcel(ctx) {
     // conforme o mês tiver movimento, e o mês mais recente representa
     // melhor a estrutura corrente.
     const esqueleto = matrizDRE(dresPorCompetencia[dresPorCompetencia.length - 1].dre);
-    const comp = [["Linha", ...colunas.map((c) => c.titulo)]];
+    const wsComp = wb.addWorksheet("Comparativa");
+    definirLarguras(wsComp, [48, ...colunas.map(() => 16)]);
+    const cabComp = escreverCabecalhoTabela(wsComp, ["Linha", ...colunas.map((c) => c.titulo)]);
     esqueleto.forEach((l) => {
-      comp.push([l.lbl, ...colunas.map((c) => c.valores.get(l.lbl) ?? null)]);
+      const row = wsComp.addRow([l.lbl, ...colunas.map((c) => c.valores.get(l.lbl) ?? null)]);
+      for (let c = 2; c <= colunas.length + 1; c++) row.getCell(c).numFmt = FORMATO_MOEDA;
+      if (l.t === "secao" || l.t === "sub" || l.t === "final") marcarSubtotal(wsComp, row.number, colunas.length + 1);
     });
-    const wsComp = XLSX.utils.aoa_to_sheet(comp);
-    wsComp["!cols"] = [{ wch: 48 }, ...colunas.map(() => ({ wch: 16 }))];
-    XLSX.utils.book_append_sheet(wb, wsComp, "Comparativa");
+    aplicarZebra(wsComp, cabComp.number + 1, wsComp.rowCount, colunas.length + 1);
   }
 
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  baixar(buf, nomeArquivo(empresa, "xlsx"),
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  await baixarWorkbook(wb, nomeArquivo(empresa, "xlsx"));
 }

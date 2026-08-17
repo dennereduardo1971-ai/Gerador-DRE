@@ -45,9 +45,9 @@ _Atualizado em 17/08/2026._
 |---|---|
 | Testes | 211 (Vitest, 14 arquivos) |
 | Lint | `npx oxlint src/` — 2 avisos pré-existentes em `historico.js` |
-| Bundle | app 413 kB (127 kB gzip) + `xlsx` 424 kB em chunk sob demanda |
-| CSS | 40 kB (8,2 kB gzip) |
-| Código | ~8.760 linhas em `src/` (App.jsx + lib + components) |
+| Bundle | app 415 kB (128 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
+| CSS | 41 kB (8,3 kB gzip) |
+| Código | ~8.930 linhas em `src/` (App.jsx + lib + components) |
 | Maiores arquivos | `App.jsx` (856), `cpc51.js` (455), `cronograma51.js` (370) |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não roda nesta máquina** (os arquivos reais são gitignorados) |
 | Skills versionadas | 6 (`manter-evolucao`, `testar-com-arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`, `nova-funcionalidade`, `otimizar-app`) |
@@ -66,6 +66,113 @@ dado em `SECOES` (`App.jsx`):
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 17/08/2026 (3ª sessão) — Excel exportado com estilo de verdade, PDF com rodapé e quebra de página
+
+Pedido: downloads "organizados e estilizados", e PDF "se possível".
+Antes de mexer, investiguei por que o estilo já escrito no código
+(`s: { font: { bold: true } }` em três exportadores) não aparecia nos
+arquivos — descoberta que mudou o plano inteiro.
+
+**A descoberta:** `xlsx` (SheetJS Community, a biblioteca gratuita já
+usada) aceita `cell.s` no objeto em memória, mas **ignora esse campo ao
+gravar** — só formato numérico (`cell.z`) chega no `.xlsx` de verdade.
+Confirmado lendo o código-fonte da lib (`get_cell_style` em
+`node_modules/xlsx/xlsx.js` só olha `cell.z`) e testando: um cabeçalho
+com `s: {font:{bold:true}}` abre no Excel sem nenhum estilo. Cor de
+fundo, fonte e negrito são recurso pago (SheetJS Pro) nessa
+distribuição — as três exportações do projeto tinham código morto.
+
+Perguntei ao Denner até onde valia ir. Resposta: quer cor e negrito de
+verdade. Medi o custo antes de decidir: `exceljs` (que escreve estilo de
+verdade, grátis) pesa **~271 kB gzip** minificado — quase o dobro do
+`xlsx` (141 kB gzip). Ele topou o peso.
+
+Entrou:
+
+- **`exceljs` como dependência nova**, só para ESCRITA — `import()`
+  dinâmico, carregado só quando alguém clica em "Baixar Excel", no mesmo
+  padrão que `xlsx` já usava. A LEITURA de arquivo importado continua em
+  `xlsx`/SheetJS (é a única das duas que lê `.xls` legado, `.xlsb` e
+  `.ods`) — as duas bibliotecas convivem, cada uma fazendo a metade que
+  sabe fazer.
+- `lib/excelEstilo.js` — o visual definido uma vez: cabeçalho de marca
+  (índigo, texto branco), cabeçalho de tabela com fundo sutil e borda
+  inferior de marca, rajado alternado (zebra) ecoando o papel de razão
+  que dá nome ao projeto, subtotal em negrito com fundo e borda superior,
+  formato de moeda nativo do Excel (parênteses + vermelho automático em
+  negativo, sem precisar de cor manual), congelamento da linha de
+  cabeçalho, larguras de coluna.
+- Os três exportadores (`exportacao.js`, `exportacaoDePara.js`,
+  `exportacaoCPC51.js`) reescritos para montar o workbook com `exceljs`
+  em vez de `xlsx`. Os dados que cada aba mostra não mudaram — só quem
+  escreve o arquivo.
+- CSS de impressão (`@media print`) revisado: cabeçalho da demonstração
+  com mais peso, `break-after`/`break-inside` para não deixar um título
+  de seção sozinho no fim de uma página nem cortar uma linha ao meio, e
+  um rodapé só de papel (`.print-rodape`, `display:none` na tela) com
+  "Gerado em [data] às [hora]" ao final da DRE e da demonstração CPC 51.
+
+**Dois defeitos de impressão achados só gerando o PDF de verdade** (nunca
+apareceriam num teste unitário nem olhando a tela):
+
+1. **O Lucro Líquido negativo sumia no PDF.** `.line[data-k="final"]
+   .val.neg` tem `color: var(--marca-tinta)` (branco) para contrastar com
+   o fundo índigo da linha na TELA; o `@media print` já zerava o fundo e
+   pintava a linha de preto, mas não pintava esse `.val.neg` — mais
+   específico, ele continuava branco. Texto branco em papel branco: a
+   linha mais importante da demonstração ficava ilegível justamente
+   quando o resultado era negativo. Corrigido com uma regra que sobrepõe
+   `.val` e `.val.neg` para preto dentro do bloco de impressão.
+2. **Legenda do canal ("0" / "receita bruta") órfã no cabeçalho.** O
+   texto que rotula a barra visual (`.canal-legenda`) não estava sendo
+   escondido junto com a própria barra (`.canal`, que já era `display:
+   none`) — sobrava um texto solto brigando de posição com "Valor (R$)" e
+   "% RL" no cabeçalho da tabela impressa. Adicionado `.canal-legenda` à
+   mesma regra de ocultação.
+3. **O próprio rodapé de impressão não aparecia**, nem no papel — bug
+   introduzido e corrigido na mesma sessão: a regra `.print-rodape {
+   display: none; }` (para nunca aparecer na tela) tinha ficado
+   posicionada DEPOIS do bloco `@media print` no arquivo; com
+   especificidade igual, quem vem depois no CSS vence, então ela apagava
+   de volta o `display: block` de dentro do próprio bloco de impressão.
+   Corrigido movendo a regra `display: none` para ANTES do `@media
+   print`.
+
+Medido / verificado:
+
+- Vitest: 211 testes passando (nenhum mudou — os únicos testes que
+  tocam exportação cobrem só o lado CSV/segurança, que não mudou).
+- `npx oxlint src/`: sem avisos novos.
+- `npm run build`: `exceljs` vira chunk próprio de 930 kB (256 kB gzip),
+  carregado só sob demanda; bundle principal quase não mudou (415 kB).
+- **Os três Excel gerados e lidos de volta por DUAS bibliotecas
+  independentes** (o próprio `exceljs`, e depois `openpyxl` em Python —
+  para provar que o arquivo é um `.xlsx` de verdade e não só algo que a
+  mesma lib que o escreveu consegue reler): valores batendo com a tela,
+  formato de moeda aplicado (`#,##0.00;[Red](#,##0.00)`), cabeçalho
+  colorido (`FF2B3A8C`), negrito e fundo nos subtotais, painel congelado
+  na linha de cabeçalho (`A7`, `A5`, `A2` conforme a aba), filtro
+  automático.
+- **PDF conferido de verdade**: `page.emulateMedia({media:"print"})` +
+  `page.pdf()` no Chromium headless (o mesmo motor por trás do "Imprimir
+  / PDF" do app) — 3 páginas A4, rodapé com data/hora visível ao final,
+  Lucro Líquido negativo legível em preto, sem legenda órfã no
+  cabeçalho.
+- **Não tentei renderizar visualmente via LibreOffice** — `soffice
+  --headless` está quebrado nesta máquina (falha até num `.xlsx`
+  trivial, sem relação com os arquivos gerados). A prova por
+  `openpyxl` supre isso.
+
+Ficou de fora, de propósito:
+
+- Biblioteca de geração de PDF (jsPDF, pdf-lib etc.). O Denner topou
+  manter o PDF como impressão do navegador — CSS melhor, sem dependência
+  nova. Continua valendo o motivo já documentado: menos configurável,
+  mas sem 300 kB a mais nem um segundo motor de layout para manter em
+  sincronia com a tela.
+- Estender o estilo do Excel além do que já existia em conteúdo (não
+  mudei nenhuma coluna, aba ou dado — só quem escreve e como fica).
 
 ### 17/08/2026 (2ª sessão) — casco novo e textos enxutos
 

@@ -156,6 +156,12 @@ export function EtapaCPC51({
           Análise vertical calculada sobre a receita operacional líquida da estrutura atual, para
           as duas demonstrações serem comparáveis linha a linha.
         </div>
+
+        {/* Só existe no papel — ver `.print-rodape` em App.css. */}
+        <p className="print-rodape">
+          Gerado pelo Gerador de DRE em {new Date().toLocaleDateString("pt-BR")} às{" "}
+          {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.
+        </p>
       </div>
 
       {/* 3. A ponte. */}
