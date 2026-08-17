@@ -86,6 +86,14 @@ export function EtapaDRE({
           Débitos {brl(tDeb)} · créditos {brl(tCre)} ·{" "}
           {Math.abs(dif) < 0.01 ? "razão fechado" : `diferença de ${brl(Math.abs(dif))}`}.
         </div>
+
+        {/* Só existe no papel: `display: none` na tela, visível dentro de
+            `@media print` (App.css). A data é a do momento em que a
+            página foi impressa/exportada — o gesto que gera o PDF. */}
+        <p className="print-rodape">
+          Gerado pelo Gerador de DRE em {new Date().toLocaleDateString("pt-BR")} às{" "}
+          {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.
+        </p>
       </div>
     </>
   );

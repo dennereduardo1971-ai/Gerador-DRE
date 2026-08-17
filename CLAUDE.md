@@ -76,6 +76,8 @@ src/
     exportacaoDePara.js           # o De-Para completo em CSV e Excel
     exportacaoCPC51.js            # Excel de seis abas + De-Para + nota
     exportacao.js                 # CSV e Excel, ambos a partir de linhasDRE
+    excelEstilo.js                # o visual dos Excel exportados, uma vez
+                                   #  só (exceljs — xlsx não escreve estilo)
     sessao.js                     # persistência da sessão em IndexedDB
     perfil.js                     # perfil de classificação (conta → grupo)
                                    # salvável em arquivo
@@ -372,7 +374,20 @@ seguro que reescrever a hierarquia de subtotais.
   reverta isso sem testar contra um build real publicado.
 - **`xlsx` (SheetJS) tem que ser `import()` dinâmico**, não import
   estático — senão o bundle principal engorda ~350KB pra quem só usa
-  CSV. Ver `importarExcel.js`.
+  CSV. Ver `importarExcel.js`. **`exceljs` também**, pelo mesmo motivo —
+  ver `excelEstilo.js` e a seção "Exportação" abaixo.
+- **`xlsx` (SheetJS Community) não escreve estilo de célula** — `cell.s`
+  (negrito, cor de fundo) é aceito no objeto e ignorado ao gravar; só
+  `cell.z` (formato numérico) chega no arquivo. Ver a seção "Exportação".
+- **Ordem de regras CSS com a mesma especificidade decide por SOURCE
+  ORDER, não por "estar dentro de `@media`".** Uma regra `.x { display:
+  none; }` fora de qualquer media query, posicionada DEPOIS de
+  `@media print { .x { display: block; } }` no arquivo, GANHA na
+  impressão — o media query não dá prioridade sozinho. Foi assim que
+  `.print-rodape` ficou invisível mesmo dentro do próprio `@media print`
+  até a ordem ser corrigida. Regra de bolso: declare o `display: none`
+  "de tela" ANTES do bloco `@media print` que o sobrescreve, nunca
+  depois.
 - **Números de Excel com célula numérica nativa**: não formate como
   texto antes de somar (`raw: false` no SheetJS introduz ambiguidade
   de locale — "1,234.56" americano vira "1.23456" se tratado como
@@ -587,9 +602,42 @@ esquecesse do segundo lugar, o arquivo entregue ao cliente divergiria
 silenciosamente da tela conferida. **Não volte a escrever a estrutura da
 DRE em nenhum outro lugar.**
 
-O PDF é a impressão do navegador (o CSS de impressão já existia), não uma
-biblioteca. É menos configurável, mas não adiciona 300 kB ao bundle nem
-um segundo motor de layout para manter em sincronia com a tela.
+O PDF é a impressão do navegador (o CSS de impressão já existia, revisado
+na sessão do Excel estilizado — ver abaixo), não uma biblioteca. É menos
+configurável, mas não adiciona 300 kB ao bundle nem um segundo motor de
+layout para manter em sincronia com a tela.
+
+### Duas bibliotecas de planilha, cada uma fazendo a metade que sabe fazer
+
+`xlsx` (SheetJS Community) **lê** o arquivo importado — CSV, `.xls`
+legado, `.xlsb`, `.ods`. `exceljs` **escreve** os três Excel exportados
+(`exportacao.js`, `exportacaoDePara.js`, `exportacaoCPC51.js`). As duas
+convivem de propósito, e a razão é um limite real da `xlsx`:
+
+**`xlsx` (SheetJS Community) ignora `cell.s` ao gravar.** O objeto em
+memória aceita `s: { font: { bold: true }, fill: {...} }` sem reclamar,
+mas `get_cell_style` (em `node_modules/xlsx/xlsx.js`) só olha `cell.z`
+(formato numérico) na hora de escrever o `.xlsx` — cor de fundo, fonte e
+negrito são recurso pago (SheetJS Pro) nessa distribuição. Um cabeçalho
+com `s: {font:{bold:true}}` abre no Excel sem nenhum estilo; isso já
+esteve no código deste projeto como código morto até ser descoberto e
+corrigido. **Não tente estilizar célula com `xlsx` de novo** — se um dia
+precisar de estilo em algo que só `xlsx` grava, é limite da biblioteca,
+não bug de uso.
+
+`exceljs` escreve estilo de verdade, mas pesa **~271 kB gzip**
+minificado — quase o dobro do `xlsx` (141 kB gzip). Só entra via
+`import()` dinâmico, no clique de "Baixar Excel", nunca no bundle
+principal. `excelEstilo.js` define o visual uma vez (cabeçalho de marca,
+cabeçalho de tabela, rajado alternado ecoando o papel de razão, subtotal
+em negrito, formato de moeda nativo) para as três exportações saírem com
+a mesma cara em vez de cada uma inventar a própria.
+
+**Ao verificar um Excel gerado, não confie só na biblioteca que o
+escreveu para relê-lo** — um bug de escrita pode ser autoconsistente e
+passar despercebido se a mesma lib relê o que ela mesma gravou errado.
+Leia de volta com uma biblioteca INDEPENDENTE (`openpyxl` em Python
+serviu bem) antes de considerar validado.
 
 ## Balancete de abertura
 

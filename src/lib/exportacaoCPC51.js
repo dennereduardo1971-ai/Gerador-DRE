@@ -19,11 +19,16 @@ import { montarLinhas51 } from "./linhasCPC51.js";
 import { CATEGORIAS, NOME_CATEGORIA, gruposParaRevisar } from "./cpc51.js";
 import { calcularMPDA, notaMPDA } from "./mpda.js";
 import { matrizDRE, matrizLinhas, cabecalho, baixar, dec, neutralizarFormula, periodoLegivel } from "./exportacao.js";
+import {
+  aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
+  escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook,
+  FORMATO_MOEDA, FORMATO_PCT,
+} from "./excelEstilo.js";
 
 const nomeArquivo = (empresa, sufixo, ext) =>
   `${sufixo}_${(empresa || "empresa").replace(/\W+/g, "_")}_${new Date().toISOString().slice(0, 10)}.${ext}`;
 
-const FORMATO_VALOR = '#,##0.00;[Red](#,##0.00)';
+const FORMATO_VALOR = FORMATO_MOEDA;
 
 /** A minuta da nota de MPDA como arquivo de texto.
  *
@@ -55,38 +60,28 @@ export function baixarCSVDePara(dePara, ctx = {}) {
   baixar("﻿" + csv, nomeArquivo(ctx.empresa, "DePara_CPC51", "csv"), "text/csv;charset=utf-8");
 }
 
-function formatarValores(XLSX, ws, linhas, primeiraLinha, colValor) {
-  linhas.forEach((l, i) => {
-    const r = primeiraLinha + i;
-    const cv = XLSX.utils.encode_cell({ r, c: colValor });
-    if (ws[cv]) ws[cv].z = FORMATO_VALOR;
-    if (l.t === "secao" || l.t === "sub" || l.t === "final") {
-      for (let c = 0; c <= colValor; c++) {
-        const ref = XLSX.utils.encode_cell({ r, c });
-        if (ws[ref]) ws[ref].s = { font: { bold: true } };
-      }
-    }
-  });
-}
-
 export async function baixarExcelCPC51(ctx) {
-  const XLSX = await import("xlsx");
+  const ExcelJS = (await import("exceljs")).default;
   const { dre, dre51, conciliacao, dePara, medidas = [], politica, empresa, nomes = {} } = ctx;
-  const wb = XLSX.utils.book_new();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Gerador de DRE";
+  wb.created = new Date();
   const base = dre?.receitaLiq || 1;
 
   // --- Aba 1: a demonstração na estrutura do CPC 51 ---
   const linhas51 = matrizLinhas(montarLinhas51(dre51).itens, base);
-  const cab = cabecalho({ ...ctx, titulo: "DEMONSTRAÇÃO DO RESULTADO — CPC 51" });
-  const aoa = [...cab, ["Linha", "Valor", "AV %"], ...linhas51.map((l) => [l.lbl, l.val ?? null, l.av ?? null])];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = [{ wch: 62 }, { wch: 18 }, { wch: 9 }];
-  formatarValores(XLSX, ws, linhas51, cab.length + 1, 1);
-  linhas51.forEach((_, i) => {
-    const ref = XLSX.utils.encode_cell({ r: cab.length + 1 + i, c: 2 });
-    if (ws[ref]) ws[ref].z = "0.0%";
+  const ws = wb.addWorksheet("DRE CPC 51");
+  definirLarguras(ws, [62, 18, 9]);
+  escreverTitulo(ws, "DEMONSTRAÇÃO DO RESULTADO — CPC 51", 3);
+  cabecalho(ctx).slice(1).forEach((l) => { if (l.length) escreverMeta(ws, l); else linhaEmBranco(ws); });
+  const cab1 = escreverCabecalhoTabela(ws, ["Linha", "Valor", "AV %"]);
+  linhas51.forEach((l) => {
+    const row = ws.addRow([l.lbl, l.val ?? null, l.av ?? null]);
+    row.getCell(2).numFmt = FORMATO_VALOR;
+    row.getCell(3).numFmt = FORMATO_PCT;
+    if (l.t === "secao" || l.t === "sub" || l.t === "final") marcarSubtotal(ws, row.number, 3);
   });
-  XLSX.utils.book_append_sheet(wb, ws, "DRE CPC 51");
+  aplicarZebra(ws, cab1.number + 1, ws.rowCount, 3);
 
   // --- Aba 2: as duas estruturas lado a lado ---
   /* Não é uma tabela de-para linha a linha, e não deveria ser: as duas
@@ -94,100 +89,103 @@ export async function baixarExcelCPC51(ctx) {
      conjunto, e o que precisa bater é o último número de cada coluna. */
   const linhasAtual = matrizDRE(dre);
   const altura = Math.max(linhasAtual.length, linhas51.length);
-  const par = [
-    ["DEMONSTRAÇÕES PARALELAS — ESTRUTURA ATUAL x CPC 51"],
-    [empresa || "Empresa", "", "", periodoLegivel(ctx)],
-    [],
-    ["Estrutura atual", "Valor", "", "Estrutura CPC 51", "Valor"],
-  ];
+  const wsPar = wb.addWorksheet("DFs paralelas");
+  definirLarguras(wsPar, [52, 18, 3, 62, 18]);
+  escreverTitulo(wsPar, "DEMONSTRAÇÕES PARALELAS — ESTRUTURA ATUAL x CPC 51", 5);
+  escreverMeta(wsPar, [empresa || "Empresa", "", "", periodoLegivel(ctx)]);
+  linhaEmBranco(wsPar);
+  const cab2 = escreverCabecalhoTabela(wsPar, ["Estrutura atual", "Valor", "", "Estrutura CPC 51", "Valor"]);
   for (let i = 0; i < altura; i++) {
     const a = linhasAtual[i];
     const b = linhas51[i];
-    par.push([a?.lbl ?? "", a?.val ?? null, "", b?.lbl ?? "", b?.val ?? null]);
+    const row = wsPar.addRow([a?.lbl ?? "", a?.val ?? null, "", b?.lbl ?? "", b?.val ?? null]);
+    row.getCell(2).numFmt = FORMATO_VALOR;
+    row.getCell(5).numFmt = FORMATO_VALOR;
   }
-  par.push([]);
-  par.push([
+  aplicarZebra(wsPar, cab2.number + 1, wsPar.rowCount, 5);
+  linhaEmBranco(wsPar);
+  const rowLL = wsPar.addRow([
     "Lucro líquido (estrutura atual)", dre.liquido, "",
     "Resultado líquido (CPC 51)", dre51.liquido,
   ]);
-  par.push([
+  rowLL.getCell(2).numFmt = FORMATO_VALOR;
+  rowLL.getCell(5).numFmt = FORMATO_VALOR;
+  marcarSubtotal(wsPar, rowLL.number, 5);
+  const rowProva = wsPar.addRow([
     conciliacao.fecha
       ? "As duas estruturas fecham no mesmo resultado — o CPC 51 reclassifica, não altera o lucro."
       : "ATENÇÃO: as duas estruturas NÃO fecham no mesmo resultado. Revise o mapeamento antes de apresentar.",
     conciliacao.diferenca,
   ]);
-  const wsPar = XLSX.utils.aoa_to_sheet(par);
-  wsPar["!cols"] = [{ wch: 52 }, { wch: 18 }, { wch: 3 }, { wch: 62 }, { wch: 18 }];
-  for (let i = 0; i < altura; i++) {
-    [1, 4].forEach((c) => {
-      const ref = XLSX.utils.encode_cell({ r: 4 + i, c });
-      if (wsPar[ref]) wsPar[ref].z = FORMATO_VALOR;
-    });
-  }
-  XLSX.utils.book_append_sheet(wb, wsPar, "DFs paralelas");
+  rowProva.getCell(2).numFmt = FORMATO_VALOR;
+  if (!conciliacao.fecha) rowProva.getCell(1).font = { color: { argb: "FFB0302F" }, bold: true };
 
   // --- Aba 3: a ponte entre um operacional e outro ---
-  const pontes = conciliacao.pontes;
-  const conc = [
-    ["CONCILIAÇÃO ENTRE AS DUAS ESTRUTURAS"],
-    [empresa || "Empresa", periodoLegivel(ctx)],
-    [],
-    ["Do Resultado Operacional atual ao Resultado Operacional do CPC 51", "Valor"],
-    ...pontes.map((p) => [p.lbl, p.val]),
-    [],
-    ["Prova do resultado", "Valor"],
+  const wsConc = wb.addWorksheet("Conciliação");
+  definirLarguras(wsConc, [66, 18]);
+  escreverTitulo(wsConc, "CONCILIAÇÃO ENTRE AS DUAS ESTRUTURAS", 2);
+  escreverMeta(wsConc, [empresa || "Empresa", periodoLegivel(ctx)]);
+  linhaEmBranco(wsConc);
+  const cab3 = escreverCabecalhoTabela(wsConc, ["Do Resultado Operacional atual ao Resultado Operacional do CPC 51", "Valor"]);
+  conciliacao.pontes.forEach((p) => { wsConc.addRow([p.lbl, p.val]).getCell(2).numFmt = FORMATO_VALOR; });
+  aplicarZebra(wsConc, cab3.number + 1, wsConc.rowCount, 2);
+  linhaEmBranco(wsConc);
+  escreverCabecalhoTabela(wsConc, ["Prova do resultado", "Valor"], { congelar: false });
+  [
     ["Lucro líquido — estrutura atual", dre.liquido],
     ["Resultado líquido — CPC 51", dre51.liquido],
     ["Diferença", conciliacao.diferenca],
-  ];
-  const wsConc = XLSX.utils.aoa_to_sheet(conc);
-  wsConc["!cols"] = [{ wch: 66 }, { wch: 18 }];
-  conc.forEach((_, i) => {
-    const ref = XLSX.utils.encode_cell({ r: i, c: 1 });
-    if (wsConc[ref] && typeof wsConc[ref].v === "number") wsConc[ref].z = FORMATO_VALOR;
+  ].forEach((l, i) => {
+    const row = wsConc.addRow(l);
+    row.getCell(2).numFmt = FORMATO_VALOR;
+    if (i === 2) marcarSubtotal(wsConc, row.number, 2);
   });
-  XLSX.utils.book_append_sheet(wb, wsConc, "Conciliação");
 
   // --- Aba 4: o De-Para conta a conta ---
-  const dp = [["Conta", "Descrição", "Grupo na DRE", "Categoria CPC 51", "Origem da decisão", "Saldo"]];
-  dePara.forEach((l) =>
-    dp.push([l.conta, l.descricao || nomes[l.conta] || "", l.grupoNome, l.categoriaNome, l.origem, l.saldo])
-  );
-  const wsDp = XLSX.utils.aoa_to_sheet(dp);
-  wsDp["!cols"] = [{ wch: 16 }, { wch: 46 }, { wch: 32 }, { wch: 26 }, { wch: 18 }, { wch: 16 }];
-  wsDp["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: dp.length - 1, c: 5 } }) };
-  XLSX.utils.book_append_sheet(wb, wsDp, "De-Para");
+  const wsDp = wb.addWorksheet("De-Para");
+  definirLarguras(wsDp, [16, 46, 32, 26, 18, 16]);
+  const cab4 = escreverCabecalhoTabela(wsDp, ["Conta", "Descrição", "Grupo na DRE", "Categoria CPC 51", "Origem da decisão", "Saldo"]);
+  dePara.forEach((l) => {
+    const row = wsDp.addRow([l.conta, l.descricao || nomes[l.conta] || "", l.grupoNome, l.categoriaNome, l.origem, l.saldo]);
+    row.getCell(6).numFmt = FORMATO_VALOR;
+  });
+  aplicarZebra(wsDp, cab4.number + 1, wsDp.rowCount, 6);
+  wsDp.autoFilter = { from: { row: cab4.number, column: 1 }, to: { row: wsDp.rowCount, column: 6 } };
 
   // --- Aba 5: MPDA com a conciliação de cada medida ---
-  const mp = [["MEDIDAS DE DESEMPENHO DEFINIDAS PELA ADMINISTRAÇÃO (MPDA)"], []];
+  const wsMp = wb.addWorksheet("MPDA");
+  definirLarguras(wsMp, [58, 18, 20, 26]);
+  escreverTitulo(wsMp, "MEDIDAS DE DESEMPENHO DEFINIDAS PELA ADMINISTRAÇÃO (MPDA)", 4);
+  linhaEmBranco(wsMp);
   if (!medidas.length) {
-    mp.push(["Nenhuma medida cadastrada."]);
-    mp.push([
+    escreverMeta(wsMp, ["Nenhuma medida cadastrada."]);
+    escreverMeta(wsMp, [
       "Se a empresa divulga EBITDA, EBITDA ajustado ou resultado recorrente, o CPC 51 exige " +
       "nota explicativa com conciliação — cadastre a medida na aba CPC 51.",
     ]);
   }
   medidas.forEach((m) => {
     const c = calcularMPDA(m, dre51);
-    mp.push([m.nome, "Valor", "Efeito de tributos", "Efeito de não controladores"]);
-    c.linhas.forEach((l) => mp.push([l.lbl, l.val, l.t === "l" ? "[preencher]" : "", l.t === "l" ? "[preencher]" : ""]));
-    if (m.porQueUtil) mp.push(["Por que a administração usa esta medida:", m.porQueUtil]);
-    mp.push([]);
+    escreverCabecalhoTabela(wsMp, [m.nome, "Valor", "Efeito de tributos", "Efeito de não controladores"], { congelar: false });
+    const primeira = wsMp.rowCount + 1;
+    c.linhas.forEach((l) => {
+      const row = wsMp.addRow([l.lbl, l.val, l.t === "l" ? "[preencher]" : "", l.t === "l" ? "[preencher]" : ""]);
+      row.getCell(2).numFmt = FORMATO_VALOR;
+      if (l.t === "sub" || l.t === "final") marcarSubtotal(wsMp, row.number, 4);
+    });
+    aplicarZebra(wsMp, primeira, wsMp.rowCount, 4);
+    if (m.porQueUtil) escreverMeta(wsMp, ["Por que a administração usa esta medida:", m.porQueUtil]);
+    linhaEmBranco(wsMp);
   });
-  const wsMp = XLSX.utils.aoa_to_sheet(mp);
-  wsMp["!cols"] = [{ wch: 58 }, { wch: 18 }, { wch: 20 }, { wch: 26 }];
-  mp.forEach((_, i) => {
-    const ref = XLSX.utils.encode_cell({ r: i, c: 1 });
-    if (wsMp[ref] && typeof wsMp[ref].v === "number") wsMp[ref].z = FORMATO_VALOR;
-  });
-  XLSX.utils.book_append_sheet(wb, wsMp, "MPDA");
 
   // --- Aba 6: a política contábil que gerou tudo acima ---
-  const pol = [
-    ["POLÍTICA CONTÁBIL DE CLASSIFICAÇÃO — CPC 51"],
-    [empresa || "Empresa", periodoLegivel(ctx)],
-    [],
-    ["Julgamento", "Definição adotada"],
+  const wsPol = wb.addWorksheet("Política");
+  definirLarguras(wsPol, [52, 34, 90]);
+  escreverTitulo(wsPol, "POLÍTICA CONTÁBIL DE CLASSIFICAÇÃO — CPC 51", 3);
+  escreverMeta(wsPol, [empresa || "Empresa", periodoLegivel(ctx)]);
+  linhaEmBranco(wsPol);
+  const cabJ = escreverCabecalhoTabela(wsPol, ["Julgamento", "Definição adotada"], { congelar: false });
+  [
     [
       "Investir em ativos é atividade de negócio principal?",
       politica?.investirEhAtividadePrincipal ? "Sim — o resultado de investimento é apresentado em operacional" : "Não",
@@ -196,18 +194,16 @@ export async function baixarExcelCPC51(ctx) {
       "Conceder financiamento a clientes é atividade de negócio principal?",
       politica?.financiarClientesEhAtividadePrincipal ? "Sim — o resultado de financiamento é apresentado em operacional" : "Não",
     ],
-    [],
-    ["Categoria", "Definição"],
-    ...CATEGORIAS.map((c) => [c.nome, c.descricao]),
-    [],
-    ["Grupo que exige julgamento", "Categoria adotada", "Motivo"],
-    ...gruposParaRevisar(politica).map((g) => [g.nome, NOME_CATEGORIA[g.categoria] || "", g.motivo]),
-  ];
-  const wsPol = XLSX.utils.aoa_to_sheet(pol);
-  wsPol["!cols"] = [{ wch: 52 }, { wch: 34 }, { wch: 90 }];
-  XLSX.utils.book_append_sheet(wb, wsPol, "Política");
+  ].forEach((l) => wsPol.addRow(l));
+  aplicarZebra(wsPol, cabJ.number + 1, wsPol.rowCount, 2);
+  linhaEmBranco(wsPol);
+  const cabCat = escreverCabecalhoTabela(wsPol, ["Categoria", "Definição"], { congelar: false });
+  CATEGORIAS.forEach((c) => wsPol.addRow([c.nome, c.descricao]));
+  aplicarZebra(wsPol, cabCat.number + 1, wsPol.rowCount, 2);
+  linhaEmBranco(wsPol);
+  const cabRev = escreverCabecalhoTabela(wsPol, ["Grupo que exige julgamento", "Categoria adotada", "Motivo"], { congelar: false });
+  gruposParaRevisar(politica).forEach((g) => wsPol.addRow([g.nome, NOME_CATEGORIA[g.categoria] || "", g.motivo]));
+  aplicarZebra(wsPol, cabRev.number + 1, wsPol.rowCount, 3);
 
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  baixar(buf, nomeArquivo(empresa, "CPC51", "xlsx"),
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  await baixarWorkbook(wb, nomeArquivo(empresa, "CPC51", "xlsx"));
 }

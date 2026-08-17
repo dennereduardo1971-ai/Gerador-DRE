@@ -1420,14 +1420,59 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
    IMPRESSÃO — a DRE é o documento; o resto é interface
    ============================================================ */
 
+/* Fora do `@media print`: nunca aparece na tela. Tem que vir ANTES do
+   bloco `@media print` abaixo — mesma especificidade (uma classe), então
+   quem vem depois no arquivo vence; se ficasse depois, este `display:
+   none` incondicional apagava de volta o `display: block` de dentro do
+   próprio bloco de impressão, e o rodapé nunca aparecia nem no papel. */
+.print-rodape { display: none; }
+
 @media print {
-  .lateral, .topo, .veu, .card, .btn, .canal { display: none !important; }
+  .lateral, .topo, .veu, .card, .btn, .canal, .canal-legenda { display: none !important; }
   .app-grid { display: block; }
   .dre-app { background: #fff; color: #000; }
   .dre { border: none; box-shadow: none; }
   .line { grid-template-columns: minmax(0, 1fr) 150px 72px; }
   .line[data-k="final"] { background: none; color: #000; border-top: 2px solid #000; }
   .line[data-k="final"] .av { color: #000; opacity: 1; }
+  /* BUG achado só ao imprimir de verdade, não em tela: o valor final
+     negativo tem `color: var(--marca-tinta)` (branco) definido direto em
+     `.val.neg`, mais específico que o `color: #000` do `data-k="final"`
+     acima — sem isso, o Lucro Líquido some quando é negativo, exatamente
+     o resultado que mais precisa aparecer numa demonstração impressa. */
+  .line[data-k="final"] .val,
+  .line[data-k="final"] .val.neg { color: #000; }
+
+  /* Papel impresso não é tela: sem sticky, sem sombra, com margem de
+     verdade — e SEM o `.papel-rodape`, que só existe para a tela; o
+     rodapé de página é o próximo bloco. */
+  @page { margin: 14mm 12mm; }
+  .wrap { padding: 0; max-width: none; }
+
+  /* Quebra de página no lugar certo. O documento não tem um `<section>`
+     por grupo — cada linha da DRE é irmã das outras dentro de `.dre` —
+     então a única quebra que dá para prevenir com CSS puro é a pior: um
+     título de seção sozinho no fim de uma página, separado das linhas
+     que ele resume. `avoid-page` no título gruda a próxima linha nele;
+     `avoid` em cada linha evita cortar uma linha alta (conta com nome
+     comprido) ao meio. */
+  .dre-head, .line[data-k="secao"] { break-after: avoid-page; }
+  .line { break-inside: avoid; }
+  .prova, .foot, .print-rodape { break-inside: avoid; }
+
+  /* Cabeçalho da demonstração: o nome da empresa é o que identifica a
+     página impressa fora de contexto, então ganha o peso que na tela já
+     tinha antes do resto virar preto e branco. */
+  .dre-head { border-bottom-color: #000; }
+  .dre-head h3 { color: #000; }
+
+  /* Rodapé com a data de geração — só existe aqui, nunca na tela (ver
+     `.print-rodape` em App.css fora deste bloco: `display: none` por
+     padrão). Não é um rodapé de página de verdade (CSS não repete
+     conteúdo HTML em toda página impressa de forma confiável entre
+     navegadores) — é o fechamento do documento, o bastante para quem
+     lê "quando isto foi gerado" sem abrir o app de novo. */
+  .print-rodape { display: block; margin-top: 10px; padding-top: 10px; border-top: 1px solid #000; color: #000; font-size: 10.5px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

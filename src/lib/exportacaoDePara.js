@@ -13,6 +13,10 @@
  */
 
 import { baixar, cabecalho, dec, neutralizarFormula } from "./exportacao.js";
+import {
+  aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
+  escreverTitulo, linhaEmBranco, baixarWorkbook, FORMATO_MOEDA,
+} from "./excelEstilo.js";
 
 const COLUNAS = [
   "Conta", "Descrição", "Grupo na DRE", "Origem do grupo",
@@ -73,42 +77,44 @@ export function baixarCSVDeParaCompleto(linhas, ctx = {}) {
 /** O mesmo De-Para em Excel, com filtro automático ligado e uma aba de
  *  resumo por grupo. O filtro não é enfeite: é como se confere um
  *  mapeamento de 400 contas — filtra por grupo e lê as 14 linhas que
- *  caíram em Custos. */
+ *  caíram em Custos. Estilo em `excelEstilo.js`: mesmo cabeçalho de
+ *  marca e rajado alternado das outras planilhas exportadas. */
 export async function baixarExcelDePara(linhas, resumo, grupos, ctx = {}) {
-  const XLSX = await import("xlsx");
-  const wb = XLSX.utils.book_new();
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Gerador de DRE";
+  wb.created = new Date();
 
-  const aoa = [COLUNAS, ...linhas.map(linhaMatriz)];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = [{ wch: 16 }, { wch: 48 }, { wch: 32 }, { wch: 15 }, { wch: 26 }, { wch: 18 }, { wch: 14 }, { wch: 16 }];
-  ws["!autofilter"] = {
-    ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: COLUNAS.length - 1 } }),
-  };
-  linhas.forEach((_, i) => {
-    const ref = XLSX.utils.encode_cell({ r: i + 1, c: 7 });
-    if (ws[ref]) ws[ref].z = "#,##0.00;[Red](#,##0.00)";
+  const ws = wb.addWorksheet("De-Para");
+  definirLarguras(ws, [16, 48, 32, 15, 26, 18, 14, 16]);
+  const cabTabela = escreverCabecalhoTabela(ws, COLUNAS);
+  linhas.forEach((l) => {
+    const row = ws.addRow(linhaMatriz(l));
+    row.getCell(8).numFmt = FORMATO_MOEDA;
   });
-  XLSX.utils.book_append_sheet(wb, ws, "De-Para");
+  aplicarZebra(ws, cabTabela.number + 1, ws.rowCount, COLUNAS.length);
+  ws.autoFilter = { from: { row: cabTabela.number, column: 1 }, to: { row: ws.rowCount, column: COLUNAS.length } };
 
-  const res = [
-    ["DE-PARA — RESUMO DA PARAMETRIZAÇÃO"],
-    [ctx.empresa || "Empresa"],
-    [],
+  const wsRes = wb.addWorksheet("Resumo");
+  definirLarguras(wsRes, [36, 12, 18, 12]);
+  escreverTitulo(wsRes, "DE-PARA — RESUMO DA PARAMETRIZAÇÃO", 4);
+  escreverMeta(wsRes, [ctx.empresa || "Empresa"]);
+  linhaEmBranco(wsRes);
+  [
     ["Contas de resultado", resumo.total],
     ["Com destino na DRE", resumo.comGrupo],
     ["Fora da DRE", resumo.semGrupo],
     ["Categoria ainda a revisar", resumo.aRevisar],
     ["Decisões manuais de grupo", resumo.manuaisGrupo],
     ["Decisões manuais de categoria", resumo.manuaisCategoria],
-    [],
-    ["Grupo na DRE", "Contas", "Saldo", "A revisar"],
-    ...grupos.map((g) => [g.nome, g.n, g.total, g.aRevisar]),
-  ];
-  const wsRes = XLSX.utils.aoa_to_sheet(res);
-  wsRes["!cols"] = [{ wch: 36 }, { wch: 12 }, { wch: 18 }, { wch: 12 }];
-  XLSX.utils.book_append_sheet(wb, wsRes, "Resumo");
+  ].forEach((l) => escreverMeta(wsRes, l));
+  linhaEmBranco(wsRes);
+  const cabGrupos = escreverCabecalhoTabela(wsRes, ["Grupo na DRE", "Contas", "Saldo", "A revisar"], { congelar: false });
+  grupos.forEach((g) => {
+    const row = wsRes.addRow([g.nome, g.n, g.total, g.aRevisar]);
+    row.getCell(3).numFmt = FORMATO_MOEDA;
+  });
+  aplicarZebra(wsRes, cabGrupos.number + 1, wsRes.rowCount, 4);
 
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  baixar(buf, nomeArquivo(ctx.empresa, "xlsx"),
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  await baixarWorkbook(wb, nomeArquivo(ctx.empresa, "xlsx"));
 }
