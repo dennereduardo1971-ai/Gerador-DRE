@@ -183,9 +183,21 @@ export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
   const passivo = gruposDe(bal, "2");
   const base = r.totalAtivo || 1;
 
-  // A prova cruzada só existe se houver DRE do mesmo período na mão.
+  /* A prova cruzada só existe se houver DRE na mão — e ela se faz contra
+     o resultado do PERÍODO, não contra o desequilíbrio do saldo.
+     São dois números diferentes: o saldo das contas de resultado é
+     acumulado no exercício, o movimento é só o período pedido no
+     relatório. A DRE (montada de débito e crédito do período) reproduz o
+     segundo. Comparar com o primeiro acusava divergência de período
+     dentro de um arquivo só. */
   const temDRE = typeof lucroLiquido === "number" && !eZero(lucroLiquido);
-  const bateComDRE = temDRE && Math.abs(lucroLiquido - r.resultadoExercicio) < 0.01;
+  const periodo = typeof r.resultadoPeriodo === "number" ? r.resultadoPeriodo : null;
+  const bateComPeriodo = temDRE && periodo != null && Math.abs(lucroLiquido - periodo) < 0.01;
+  // Um razão que cobre o exercício inteiro bate com o acumulado; dizer
+  // isso é mais útil que apontar uma diferença sem explicação.
+  const bateComAcumulado = temDRE && !bateComPeriodo
+    && Math.abs(lucroLiquido - r.resultadoExercicio) < 0.01;
+  const alvo = bateComAcumulado ? r.resultadoExercicio : periodo;
 
   return (
     <>
@@ -208,20 +220,31 @@ export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
         </div>
         <p className="equacao-nota">
           Um balancete só das contas 1 e 2 não fecha — e não deve fechar. A diferença entre os
-          dois lados é o resultado do período, que vive nas contas 3 a 7 e só vai para o
-          Patrimônio Líquido no encerramento do exercício.
+          dois lados é o resultado <b>acumulado</b> do exercício, que vive nas contas 3 a 7 e só
+          vai para o Patrimônio Líquido no encerramento.
+          {periodo != null && Math.abs(periodo - r.resultadoExercicio) > 0.01 && (
+            <> No período deste relatório o resultado foi <b>{brl(periodo)}</b> — o restante vem
+              dos meses anteriores do mesmo exercício.</>
+          )}
           {temDRE ? (
-            bateComDRE ? (
-              <> A DRE deste razão apurou <b>{brl(lucroLiquido)}</b> de lucro líquido: <b>bate</b> com
-                a diferença do balancete.</>
+            bateComPeriodo ? (
+              <> A DRE apurou <b>{brl(lucroLiquido)}</b> de lucro líquido: <b>bate</b> com o
+                resultado do período.</>
+            ) : bateComAcumulado ? (
+              <> A DRE apurou <b>{brl(lucroLiquido)}</b>: <b>bate</b> com o resultado acumulado do
+                exercício — o razão cobre o exercício inteiro, não só o período do balancete.</>
             ) : (
-              <> A DRE deste razão apurou <b>{brl(lucroLiquido)}</b>, uma diferença de{" "}
-                <b>{brl(Math.abs(lucroLiquido - r.resultadoExercicio))}</b> em relação ao balancete —
-                os dois arquivos podem não cobrir o mesmo período.</>
+              <> A DRE apurou <b>{brl(lucroLiquido)}</b>, uma diferença de{" "}
+                <b>{brl(Math.abs(lucroLiquido - (alvo ?? r.resultadoExercicio)))}</b> — os dois
+                arquivos podem não cobrir o mesmo período.</>
             )
           ) : (
             <> Importe o razão do mesmo período para o app conferir esse valor contra o Lucro
               Líquido da DRE.</>
+          )}
+          {r.resultadoConfere === true && (
+            <> Conferência interna: as contas patrimoniais e as de resultado apuram o mesmo
+              resultado de período por caminhos independentes.</>
           )}
         </p>
       </div>

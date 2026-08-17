@@ -119,9 +119,12 @@ describe("resumo — o desequilíbrio é o resultado do exercício", () => {
     // Não é coincidência: é a identidade que prova que o balancete das
     // contas 1 e 2 só não fecha pelo resultado que está nas contas 3 a 7.
     // Vale quando o saldo ANTERIOR já estava equilibrado, isto é, quando
-    // o exercício anterior foi encerrado — que é o caso normal e o do
-    // arquivo real (débitos 478.342.682,57 − créditos 477.412.123,48 =
-    // 930.559,09 = Ativo − Passivo).
+    // o exercício anterior foi encerrado.
+    //
+    // E vale só neste recorte: ESTE balancete traz só as contas 1 e 2.
+    // Num balancete COMPLETO os dois lados se anulam por partida dobrada
+    // — no arquivo real de jun/2026, débito = crédito = 104.386.603,85,
+    // diferença zero. Ver "resultado — período não é acumulado" abaixo.
     expect(r.debitoPeriodo - r.creditoPeriodo).toBeCloseTo(r.resultadoExercicio, 2);
   });
 
@@ -208,5 +211,170 @@ describe("balancete como fonte da DRE", () => {
     expect(nomes["1"]).toBe("ATIVO");
     expect(nomes["11110"]).toBe("CAIXA");
     expect(nomes["1111001"]).toBe("FUNDO FIXO");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Nível de passagem: a máscara do código sozinha não monta a árvore.
+ * ------------------------------------------------------------------ */
+
+/* Recorte fiel do ramo de docentes do balancete real de jun/2026, onde a
+ * máscara do relatório é ambígua: "4.1.10.1" e "4.1.10.10" saem com
+ * valores IDÊNTICOS em todas as colunas, e as folhas do grupo numeram a
+ * partir do código de cinco dígitos ("4.1.10.11.4"), não do de seis. Pelo
+ * prefixo puro a folha pendura no avô e NENHUM dos dois fecha. */
+const DOCENTES = [
+  CABECALHO,
+  ["4", "DESPESAS ADMINISTRATIVAS", "        140,00 D", 25, 0, "         25,00 D", "        165,00 D"],
+  ["4.1", "DESPESAS DAS ATIV. CONTINUADAS", "        140,00 D", 25, 0, "         25,00 D", "        165,00 D"],
+  ["4.1.10", "CUSTO TOTAL - DOCENTES", "        140,00 D", 25, 0, "         25,00 D", "        165,00 D"],
+  ["4.1.10.1", "CUSTO TOTAL - DOCENTES", "        140,00 D", 25, 0, "         25,00 D", "        165,00 D"],
+  ["4.1.10.10", "CUSTO COM PESSOAL - DOCENTES", "        140,00 D", 25, 0, "         25,00 D", "        165,00 D"],
+  ["4.1.10.10.1", "SALARIOS", "        100,00 D", 20, 0, "         20,00 D", "        120,00 D"],
+  ["4.1.10.11.4", "DOCENTES PJ", "         40,00 D", 5, 0, "          5,00 D", "         45,00 D"],
+];
+
+describe("hierarquia — o nível de passagem", () => {
+  const bal = parsearBalancete(DOCENTES);
+
+  it("remonta o ramo quando a sintética repete os números do pai", () => {
+    // "4.1.10.11.4" numera a partir de 41101, então pelo prefixo cairia
+    // em 41101 — e aí sobrariam 45,00 numa ponta e faltariam na outra.
+    expect(bal.porCodigo.get("4110114").pai).toBe("411010");
+    expect(bal.porCodigo.get("4110101").pai).toBe("411010");
+    expect(bal.porCodigo.get("411010").pai).toBe("41101");
+  });
+
+  it("o reparo é registrado, não silencioso", () => {
+    expect(bal.reconciliadas).toEqual([{ de: "4.1.10.1", para: "4.1.10.10", quantas: 1 }]);
+  });
+
+  it("depois do reparo toda sintética fecha com suas filhas", () => {
+    expect(bal.resumo.sinteticasErradas).toBe(0);
+    expect(bal.resumo.integro).toBe(true);
+  });
+
+  it("não muda quem é analítica — o total do período fica de pé", () => {
+    expect(bal.folhas.map((c) => c.codigo).sort()).toEqual(["4110101", "4110114"]);
+    expect(bal.resumo.debitoPeriodo).toBeCloseTo(25, 2);
+  });
+
+  it("não repara arquivo genuinamente errado — deixa o erro aparecer", () => {
+    // A garantia que importa: o reparo não pode virar um remendo que faz
+    // um arquivo furado parecer íntegro.
+    const errado = parsearBalancete([
+      CABECALHO,
+      ["1", "ATIVO", "0,00", 0, 0, "0,00", "500,00 D"],
+      ["1.1", "CIRCULANTE", "0,00", 0, 0, "0,00", "100,00 D"],
+      ["1.1.1", "CAIXA", "0,00", 0, 0, "0,00", "100,00 D"],
+    ]);
+    expect(errado.reconciliadas).toEqual([]);
+    expect(errado.resumo.sinteticasErradas).toBe(1);
+    expect(errado.resumo.integro).toBe(false);
+  });
+
+  it("desfaz o movimento quando ele não resolve o desencontro", () => {
+    const naoResolve = parsearBalancete([
+      CABECALHO,
+      ["4", "DESPESAS", "140,00 D", 0, 0, "0,00", "165,00 D"],
+      ["4.1.10.1", "CUSTO TOTAL - DOCENTES", "140,00 D", 0, 0, "0,00", "165,00 D"],
+      ["4.1.10.10", "CUSTO COM PESSOAL - DOCENTES", "140,00 D", 0, 0, "0,00", "165,00 D"],
+      ["4.1.10.10.1", "SALARIOS", "100,00 D", 0, 0, "0,00", "120,00 D"],
+      ["4.1.10.11.4", "DOCENTES PJ", "40,00 D", 0, 0, "0,00", "99,00 D"],
+    ]);
+    expect(naoResolve.reconciliadas).toEqual([]);
+    expect(naoResolve.porCodigo.get("4110114").pai).toBe("41101"); // hierarquia intacta
+    expect(naoResolve.resumo.integro).toBe(false);
+  });
+
+  it("uma cadeia de filha única que já fecha não é remontada", () => {
+    const cadeia = parsearBalancete([
+      CABECALHO,
+      ["1", "ATIVO", "100,00 D", 0, 0, "0,00", "100,00 D"],
+      ["1.1", "CIRCULANTE", "100,00 D", 0, 0, "0,00", "100,00 D"],
+      ["1.1.1", "CAIXA", "100,00 D", 0, 0, "0,00", "100,00 D"],
+    ]);
+    expect(cadeia.reconciliadas).toEqual([]);
+    expect(cadeia.folhas.map((c) => c.codigo)).toEqual(["111"]);
+  });
+
+  it("não toca em balancete cuja hierarquia por prefixo já fecha", () => {
+    // A garantia de que o reparo não pode disparar à toa: ele só
+    // permanece se, depois de mover, os dois lados passarem a fechar.
+    expect(parsearBalancete(BALANCETE).reconciliadas).toEqual([]);
+    expect(parsearBalancete(BALANCETE).porCodigo.get("13400").pai).toBe("13");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Resultado do período x resultado acumulado do exercício.
+ * ------------------------------------------------------------------ */
+
+/* Balancete completo (contas 1 a 4), como o relatório sem filtro. O saldo
+ * das contas de resultado é ACUMULADO no exercício; o movimento é só o
+ * período pedido. Aqui: acumulado 350,00, período 100,00. */
+const COMPLETO = [
+  CABECALHO,
+  ["1", "ATIVO", "      1.000,00 D", 350, 0, "        350,00 D", "      1.350,00 D"],
+  ["1.1", "CIRCULANTE", "      1.000,00 D", 350, 0, "        350,00 D", "      1.350,00 D"],
+  ["1.1.1", "CAIXA", "      1.000,00 D", 350, 0, "        350,00 D", "      1.350,00 D"],
+  ["2", "PASSIVO", "        750,00 C", 0, 250, "        250,00 C", "      1.000,00 C"],
+  ["2.1", "PASSIVO CIRCULANTE", "        750,00 C", 0, 250, "        250,00 C", "      1.000,00 C"],
+  ["2.1.1", "FORNECEDORES", "        750,00 C", 0, 250, "        250,00 C", "      1.000,00 C"],
+  ["3", "RECEITAS LIQUIDAS", "        500,00 C", 0, 200, "        200,00 C", "        700,00 C"],
+  ["3.1", "MENSALIDADES", "        500,00 C", 0, 200, "        200,00 C", "        700,00 C"],
+  ["3.1.1", "GRADUACAO", "        500,00 C", 0, 200, "        200,00 C", "        700,00 C"],
+  ["4", "DESPESAS", "        250,00 D", 100, 0, "        100,00 D", "        350,00 D"],
+  ["4.1", "DESPESAS DAS ATIV. CONTINUADAS", "        250,00 D", 100, 0, "        100,00 D", "        350,00 D"],
+  ["4.1.1", "ALUGUEL", "        250,00 D", 100, 0, "        100,00 D", "        350,00 D"],
+];
+
+describe("resultado — período não é acumulado", () => {
+  const r = parsearBalancete(COMPLETO).resumo;
+
+  it("separa o acumulado do exercício do resultado do período", () => {
+    // Confundir os dois acusava divergência de período dentro de UM
+    // arquivo só: a DRE sai do movimento, a equação do Balanço sai do
+    // saldo. No arquivo real de jun/2026: 930.559,09 x 512.069,00.
+    expect(r.resultadoAcumulado).toBeCloseTo(350, 2);
+    expect(r.resultadoPeriodo).toBeCloseTo(100, 2);
+  });
+
+  it("o acumulado é o desequilíbrio do saldo patrimonial", () => {
+    expect(r.totalAtivo - r.totalPassivo).toBeCloseTo(r.resultadoAcumulado, 2);
+  });
+
+  it("os dois lados apuram o mesmo período por caminhos independentes", () => {
+    // Δ(Ativo + Passivo) do período = −Δ(contas de resultado). Quando o
+    // arquivo traz os dois lados, isso é conferência de graça.
+    expect(r.resultadoConfere).toBe(true);
+  });
+
+  it("a DRE montada deste balancete reproduz o resultado do PERÍODO", () => {
+    const contas = contasDeMovimento(parsearBalancete(COMPLETO));
+    const resultado = contas.filter((c) => c.conta[0] >= "3" && c.conta[0] <= "7");
+    expect(resultado.reduce((s, c) => s + c.saldo, 0)).toBeCloseTo(r.resultadoPeriodo, 2);
+  });
+});
+
+describe("balancete filtrado — menos contas, mesma leitura", () => {
+  const soPatrimonial = COMPLETO.filter((l, i) => i === 0 || String(l[0])[0] <= "2");
+  const soResultado = COMPLETO.filter((l, i) => i === 0 || String(l[0])[0] >= "3");
+
+  it("só as contas 1 e 2: monta o Balanço, não a DRE", () => {
+    const bal = parsearBalancete(soPatrimonial);
+    expect(coberturaBalancete(bal)).toMatchObject({ patrimonial: true, resultado: false });
+    // Sem as contas de resultado o período ainda sai — pelo movimento
+    // das próprias contas patrimoniais.
+    expect(bal.resumo.resultadoPeriodo).toBeCloseTo(100, 2);
+    expect(bal.resumo.resultadoAcumulado).toBeCloseTo(350, 2);
+    expect(bal.resumo.resultadoConfere).toBe(null); // não há o que cruzar
+  });
+
+  it("só as contas de resultado: monta a DRE, não o Balanço", () => {
+    const bal = parsearBalancete(soResultado);
+    expect(coberturaBalancete(bal)).toMatchObject({ patrimonial: false, resultado: true });
+    expect(bal.resumo.resultadoPeriodo).toBeCloseTo(100, 2);
+    expect(bal.resumo.resultadoAcumulado).toBeCloseTo(350, 2);
   });
 });

@@ -92,6 +92,62 @@ function acharPai(codigo, existentes) {
   return null;
 }
 
+const COLUNAS_VALOR = ["anterior", "debito", "credito", "movimento", "atual"];
+const mesmosValores = (a, b) => COLUNAS_VALOR.every((k) => Math.abs(a[k] - b[k]) < 0.005);
+
+/** Uma sintética fecha quando suas filhas somam o que ela declara. Folha
+ *  não tem o que fechar. */
+function fecha(c, porCodigo) {
+  if (!c.filhos.length) return true;
+  const soma = c.filhos.reduce((s, f) => s + porCodigo.get(f).atual, 0);
+  return Math.abs(soma - c.atual) <= 0.01;
+}
+
+/** Conserta o NÍVEL DE PASSAGEM: a sintética que repete, coluna por
+ *  coluna, os números do próprio pai.
+ *
+ *  A máscara de código do relatório tem largura variável, e em plano de
+ *  contas real ela chega a ser ambígua. No plano do IESB, "4.1.10.1"
+ *  (CUSTO TOTAL - DOCENTES) e "4.1.10.10" (CUSTO COM PESSOAL - DOCENTES)
+ *  saem com valores IDÊNTICOS em todas as colunas, e as folhas do grupo
+ *  ("4.1.10.11.4" DOCENTES PJ, "4.1.10.12.0" SEGURO VIDA...) numeram a
+ *  partir do código de cinco dígitos, não do de seis. Pelo prefixo puro
+ *  elas penduram no avô, e aí NENHUM dos dois fecha: sobram 400.387,33
+ *  em um e faltam exatamente os mesmos 400.387,33 no outro.
+ *
+ *  O reparo é guardado pela conferência que o próprio arquivo permite: só
+ *  tenta quando pai ou filha não fecham, e só PERMANECE se, depois de
+ *  mover, os dois passarem a fechar. Um balancete cuja hierarquia por
+ *  prefixo já bate nunca é tocado — e um arquivo que não fecha de
+ *  verdade continua sendo relatado como não fechando, em vez de ser
+ *  remendado até parecer certo. */
+function reconciliarHierarquia(contas, porCodigo) {
+  const movidas = [];
+  for (const c of contas) {
+    if (!c.pai || !c.filhos.length) continue;
+    const p = porCodigo.get(c.pai);
+    if (!mesmosValores(c, p)) continue;
+    if (fecha(p, porCodigo) && fecha(c, porCodigo)) continue;
+
+    const outros = p.filhos.filter((f) => f !== c.codigo);
+    if (!outros.length) continue;
+
+    const antesPai = [...p.filhos], antesFilha = [...c.filhos];
+    p.filhos = [c.codigo];
+    c.filhos = [...antesFilha, ...outros];
+    outros.forEach((f) => { porCodigo.get(f).pai = c.codigo; });
+
+    if (fecha(p, porCodigo) && fecha(c, porCodigo)) {
+      movidas.push({ de: p.exibicao, para: c.exibicao, quantas: outros.length });
+    } else {
+      p.filhos = antesPai;
+      c.filhos = antesFilha;
+      outros.forEach((f) => { porCodigo.get(f).pai = p.codigo; });
+    }
+  }
+  return movidas;
+}
+
 export function parsearBalancete(linhas) {
   const det = detectarColunas(linhas);
   if (!det) return null;
@@ -143,6 +199,10 @@ export function parsearBalancete(linhas) {
       porCodigo.get(p).filhos.push(c.codigo);
     }
   }
+  // O prefixo resolve a árvore quase inteira; o que ele não resolve, a
+  // própria conferência do arquivo resolve — e só o que ela confirma.
+  const reconciliadas = reconciliarHierarquia(contas, porCodigo);
+
   for (const c of contas) {
     let n = 0, atual = c;
     while (atual.pai) { n++; atual = porCodigo.get(atual.pai); }
@@ -156,6 +216,7 @@ export function parsearBalancete(linhas) {
     contas, porCodigo, raizes, folhas,
     lidas: contas.length,
     ignoradas,
+    reconciliadas,
     resumo: resumir(contas, porCodigo),
     // Saldo de abertura por conta analítica — é o que liga este arquivo
     // ao caminho que o Balanço já tinha antes deste formato existir.
@@ -163,12 +224,48 @@ export function parsearBalancete(linhas) {
   };
 }
 
+const DIGITOS_RESULTADO = ["3", "4", "5", "6", "7"];
+
+/** Soma um campo nos dígitos raiz pedidos, usando a conta-raiz quando ela
+ *  existe (já vem somada pela contabilidade) e as folhas quando não —
+ *  nunca as duas, que é o que dobraria o valor. Devolve null quando o
+ *  arquivo não traz nenhuma conta desses dígitos, para o chamador poder
+ *  distinguir "zero" de "não sei". */
+function somarRaizes(contas, folhas, digitos, campo) {
+  let total = 0, achou = false;
+  for (const d of digitos) {
+    const raiz = contas.find((c) => c.codigo === d);
+    if (raiz) { total += raiz[campo]; achou = true; continue; }
+    const soltas = folhas.filter((c) => c.codigo[0] === d);
+    if (soltas.length) { total += soltas.reduce((s, c) => s + c[campo], 0); achou = true; }
+  }
+  return achou ? total : null;
+}
+
 /** Confere a integridade interna e mede o desequilíbrio patrimonial.
  *
  *  O desequilíbrio NÃO é erro: um balancete só das contas 1 e 2 fecha
  *  por Ativo − (Passivo + PL) = resultado do exercício, que vive nas
- *  contas 3 a 7 e ainda não foi transportado ao Patrimônio Líquido. É
- *  exatamente esse valor que a DRE do mesmo período deve reproduzir. */
+ *  contas 3 a 7 e ainda não foi transportado ao Patrimônio Líquido.
+ *
+ *  Mas "o resultado" são DOIS números diferentes, e confundi-los produz
+ *  um alarme falso no arquivo real. O saldo ATUAL das contas de resultado
+ *  é acumulado no exercício (o relatório pergunta a data do saldo
+ *  anterior de receitas/despesas); o MOVIMENTO é só o período pedido.
+ *  No balancete de jun/2026 do IESB:
+ *
+ *    Ativo − (Passivo + PL) = 930.559,09  → resultado ACUMULADO jan–jun
+ *    movimento de 1 e 2     = 512.069,00  → resultado do PERÍODO (junho)
+ *
+ *  e a DRE montada a partir deste mesmo arquivo apura 512.069,00, porque
+ *  `contasDeMovimento` usa débito e crédito do período. Confrontá-la com
+ *  os 930.559,09 acusava "os dois arquivos podem não cobrir o mesmo
+ *  período" sobre UM arquivo só. Por isso os dois saem daqui separados.
+ *
+ *  As contas patrimoniais e as de resultado dão o mesmo número por
+ *  caminhos independentes — Δ(Ativo + Passivo) do período é o resultado
+ *  do período —, então quando o arquivo traz os dois lados isso vira uma
+ *  conferência cruzada de graça (`resultadoConfere`). */
 export function resumir(contas, porCodigo) {
   const raiz = (d) => contas.find((c) => c.codigo === d) || null;
   const ativo = raiz("1");
@@ -177,6 +274,25 @@ export function resumir(contas, porCodigo) {
   const folhas = contas.filter((c) => !c.filhos.length);
   const totalAtivo = ativo ? ativo.atual : folhas.filter((c) => c.codigo[0] === "1").reduce((s, c) => s + c.atual, 0);
   const totalPassivo = passivo ? passivo.atual : folhas.filter((c) => c.codigo[0] === "2").reduce((s, c) => s + c.atual, 0);
+
+  // Resultado pelo lado patrimonial: acumulado é o desequilíbrio do saldo
+  // atual; o do período é a variação desse desequilíbrio, ou seja o
+  // movimento das contas 1 e 2.
+  const temPatrimonial = contas.some((c) => c.codigo[0] === "1" || c.codigo[0] === "2");
+  const movPatrimonial = somarRaizes(contas, folhas, ["1", "2"], "movimento");
+  // E pelo lado das contas de resultado, com o sinal invertido (receita é
+  // credora, e lucro é positivo).
+  const acumResultado = somarRaizes(contas, folhas, DIGITOS_RESULTADO, "atual");
+  const movResultado = somarRaizes(contas, folhas, DIGITOS_RESULTADO, "movimento");
+
+  const resultadoAcumulado = temPatrimonial ? totalAtivo + totalPassivo
+    : acumResultado != null ? -acumResultado : null;
+  const resultadoPeriodo = movResultado != null ? -movResultado : movPatrimonial;
+
+  // Conferência cruzada: só existe quando o arquivo traz os dois lados.
+  const resultadoConfere = (temPatrimonial && movResultado != null && movPatrimonial != null)
+    ? Math.abs(movPatrimonial - -movResultado) < 0.01
+    : null;
 
   // Consistência: anterior + movimento = atual, em toda linha.
   const inconsistentes = contas.filter((c) => Math.abs(c.anterior + c.movimento - c.atual) > 0.01).length;
@@ -190,7 +306,12 @@ export function resumir(contas, porCodigo) {
   return {
     totalAtivo,
     totalPassivo: Math.abs(totalPassivo),
+    // Mantido com o nome antigo porque é o que a equação do Balanço
+    // mostra: o desequilíbrio do SALDO, que é o acumulado do exercício.
     resultadoExercicio: totalAtivo + totalPassivo,
+    resultadoAcumulado,
+    resultadoPeriodo,
+    resultadoConfere,
     debitoPeriodo: folhas.reduce((s, c) => s + c.debito, 0),
     creditoPeriodo: folhas.reduce((s, c) => s + c.credito, 0),
     nContas: contas.length,

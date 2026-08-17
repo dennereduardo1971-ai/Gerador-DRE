@@ -43,7 +43,7 @@ _Atualizado em 17/08/2026._
 
 | | |
 |---|---|
-| Testes | 211 (Vitest, 14 arquivos) |
+| Testes | 230 (Vitest, 15 arquivos) |
 | Lint | `npx oxlint src/` — **zero avisos** (os 2 de `historico.js` foram corrigidos) |
 | Bundle | app 416 kB (128 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
 | CSS | 41 kB (8,3 kB gzip) |
@@ -66,6 +66,41 @@ dado em `SECOES` (`App.jsx`):
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 17/08/2026 — balancete `ctbr041`: aba certa, nível de passagem e período × acumulado
+
+Trabalho de outra sessão, que ficou pronto no disco e sem commit; este
+commit só o preserva. Registro o que **eu mesmo verifiquei** aqui, e
+marco o resto como não verificado.
+
+O que entrou:
+
+- `pontuarAbaDeContas` em `importarExcel.js`: entre várias abas vence a
+  que tem mais linhas com código de conta na primeira coluna, não a
+  primeira com dados. O relatório real vem com uma aba `Parametros` antes
+  do balancete, e pegá-la matava o arquivo inteiro em "não achei nenhuma
+  conta".
+- `reconciliarHierarquia` em `balancete.js`: trata o **nível de
+  passagem** (duas sintéticas com valores idênticos, filhas numeradas a
+  partir do código mais curto). Só mantém o reparo se os dois lados
+  passarem a fechar, e o que foi movido sai em `bal.reconciliadas` — não
+  é silencioso.
+- `resumir` passa a devolver `resultadoAcumulado` e `resultadoPeriodo`
+  separados. Confundir os dois acusava "os dois arquivos podem não cobrir
+  o mesmo período" sobre UM arquivo só.
+- As armadilhas do formato passaram de quatro para sete em `CLAUDE.md`.
+
+Verificado por mim: **230 testes passando** (15 arquivos), `npx oxlint
+src/` em **zero avisos**, árvore de trabalho limpa depois do commit.
+
+**Não verificado por mim:** `fixtures/validar.mjs` (os arquivos reais não
+estão nesta máquina) e o comportamento na tela com o balancete real —
+os números citados acima vieram da sessão que fez o trabalho, não de
+medição minha.
+
+Fica de fora do commit: `scratch/`, com os scripts de depuração daquela
+sessão. Eles apontam para o balancete real do cliente em
+`/root/.claude/uploads`, então entraram no `.gitignore` em vez do Git.
 
 ### 17/08/2026 (4ª sessão) — auditoria, revisão visual, limpeza de lint e um bug real de período
 

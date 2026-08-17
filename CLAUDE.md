@@ -687,12 +687,30 @@ crédito, movimento e saldo atual, com a natureza indicada por "D"/"C" no
 fim do número. Quando esse formato é reconhecido, ele vira a FONTE do
 Balanço e o razão passa a ser a contraprova — não o contrário.
 
-Quatro armadilhas deste formato, todas cobertas por teste:
+O relatório sai do sistema com **duas abas**: `Parametros` (as perguntas
+do relatório — datas, faixa de contas) e só a segunda com o balancete.
+`importarExcelComoLinhas` escolhe a aba **com mais linhas com código de
+conta na primeira coluna**, não a primeira com dados — senão importa a
+aba de parâmetros e o arquivo inteiro morre em "não achei nenhuma conta".
+
+Sete armadilhas deste formato, todas cobertas por teste:
 
 - **Os níveis não têm largura fixa** (1, 2, 3, 5 e 7 dígitos no plano do
   IESB) e **um nível pode ser pulado**: `1.3.40.0` pendura direto em
   `1.3`, porque `1.3.4` não existe. Por isso o pai é o *prefixo mais
   longo que existe*, nunca "um nível acima".
+- **O prefixo sozinho não basta: existe NÍVEL DE PASSAGEM.** A máscara do
+  código é ambígua em plano real. No IESB, `4.1.10.1` (CUSTO TOTAL -
+  DOCENTES) e `4.1.10.10` (CUSTO COM PESSOAL - DOCENTES) saem com valores
+  **idênticos nas cinco colunas**, e as folhas do ramo numeram a partir do
+  código de cinco dígitos (`4.1.10.11.4` = `4110114`), não do de seis.
+  Pelo prefixo puro sobram 400.387,33 numa sintética e faltam os mesmos
+  400.387,33 na outra. `reconciliarHierarquia` move as filhas para a
+  sintética de passagem — e **só mantém o movimento se os dois lados
+  passarem a fechar**, então um arquivo cuja hierarquia por prefixo já
+  bate nunca é tocado, e um que não fecha de verdade continua sendo
+  relatado como não fechando. O reparo sai em `bal.reconciliadas` e é
+  dito na tela; não é silencioso.
 - **As sintéticas já vêm somadas.** Totalizar tudo dá o dobro; só as
   folhas entram em qualquer soma calculada aqui.
 - **O ponto é ambíguo dentro do mesmo arquivo**: colunas formatadas vêm
@@ -702,10 +720,27 @@ Quatro armadilhas deste formato, todas cobertas por teste:
   movimento do período por cem.
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença entre Ativo e Passivo + PL é o resultado do exercício, que
-  está nas contas 3 a 7. No arquivo real: 253.582.263,93 − 252.651.704,84
-  = 930.559,09, idêntico a débitos − créditos do período. **Nunca trate
-  isso como erro de importação.** A tela escreve a identidade e, havendo
-  razão do mesmo período, confronta o valor com o Lucro Líquido da DRE.
+  está nas contas 3 a 7. No arquivo real de jun/2026: 253.582.263,93 −
+  252.651.704,84 = 930.559,09. **Nunca trate isso como erro de
+  importação.**
+- **Resultado do PERÍODO não é resultado ACUMULADO — e confundir os dois
+  gera alarme falso.** O saldo atual das contas de resultado é acumulado
+  no exercício (o relatório pergunta a data do saldo anterior de
+  receitas/despesas); o movimento é só o período pedido. No mesmo arquivo:
+  acumulado jan–jun = 930.559,09, período (junho) = 512.069,00 — e a DRE,
+  que `contasDeMovimento` monta de débito e crédito **do período**, apura
+  512.069,00. Confrontá-la com os 930.559,09 acusava "os dois arquivos
+  podem não cobrir o mesmo período" sobre UM arquivo só. `resumir` devolve
+  `resultadoAcumulado` e `resultadoPeriodo` separados, e a tela confronta
+  a DRE com o do período (dizendo quando ela bate com o acumulado, que é o
+  caso do razão do exercício inteiro).
+- **"Débitos − créditos = resultado" só vale no balancete FILTRADO em 1 e
+  2.** Num balancete completo os dois lados se anulam por partida dobrada:
+  no arquivo real, débito = crédito = 104.386.603,85, ou seja a diferença
+  é **zero**, não 930.559,09. A identidade que vale sempre é
+  Δ(Ativo + Passivo) do período = resultado do período — e quando o
+  arquivo traz os dois lados, as contas patrimoniais e as de resultado
+  apuram esse mesmo número por caminhos independentes (`resultadoConfere`).
 
 ## Painel
 

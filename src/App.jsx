@@ -340,7 +340,14 @@ export default function App() {
               `(${completo.resumo.nFolhas} analíticas).` +
               (completo.resumo.integro
                 ? " Conferência interna do arquivo: anterior + movimento = atual em todas as linhas, e cada conta sintética bate com suas filhas."
-                : ` Atenção: ${completo.resumo.inconsistentes} linha(s) e ${completo.resumo.sinteticasErradas} sintética(s) não fecham dentro do próprio arquivo.`),
+                : ` Atenção: ${completo.resumo.inconsistentes} linha(s) e ${completo.resumo.sinteticasErradas} sintética(s) não fecham dentro do próprio arquivo.`) +
+              // A hierarquia não é dedutível só do código quando a máscara
+              // do relatório é ambígua; quando o app precisa remontar um
+              // ramo para a sintética fechar, ele diz que remontou.
+              (completo.reconciliadas.length
+                ? ` A hierarquia de ${completo.reconciliadas.length} ramo(s) foi remontada pelos próprios totais do arquivo ` +
+                  `(${completo.reconciliadas.map((m) => `${m.de} → ${m.para}`).join(", ")}), porque a numeração das contas sozinha não fechava.`
+                : ""),
           });
           return;
         }

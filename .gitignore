@@ -39,3 +39,7 @@ DRE_*.pdf
 painel_*.png
 perfil-dre_*.json
 plano-dre_*.json
+
+# scratch/ guarda scripts de depuração de sessão, que apontam para
+# arquivos reais em /root/.claude/uploads. Nunca entram no Git.
+scratch/
