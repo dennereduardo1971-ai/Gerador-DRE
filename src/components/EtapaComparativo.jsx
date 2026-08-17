@@ -55,10 +55,8 @@ export function EtapaComparativo({ dresPorCompetencia }) {
     <div className="card">
       <h2>DRE comparativa</h2>
       <p className="hint">
-        A demonstração inteira, uma coluna por competência. Role para o lado se o arquivo
-        cobrir muitos meses. O percentual embaixo de cada valor é a análise vertical daquele
-        mês, sobre a receita líquida do próprio mês — então dá para comparar estrutura, e não
-        só tamanho.
+        Uma coluna por competência. O percentual é a análise vertical do próprio mês — dá para
+        comparar estrutura, não só tamanho.
       </p>
       <div className="scroll">
         <table className="tabela-larga dre-comparativa">

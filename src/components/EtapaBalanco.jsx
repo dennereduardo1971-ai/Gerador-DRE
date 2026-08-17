@@ -41,11 +41,7 @@ export function EtapaBalanco({ balanco, filtroCompetencia, abertura = {}, onImpo
       <div className="card">
         <h2>Balancete de abertura</h2>
         <p className="hint">
-          Os saldos de cada conta no início do período — o dado que o razão sozinho não carrega.
-          Com ele, o Balanço deixa de ser a variação do período e passa a ser o saldo
-          patrimonial de verdade. Formato: código da conta na primeira coluna e saldo na
-          segunda (devedor positivo, credor negativo), ou débito e crédito em duas colunas.
-          CSV, TXT ou Excel.
+          Sem ele, o Balanço é a variação do período — não o saldo patrimonial.
         </p>
         <div className="row">
           <button className="btn ghost" onClick={() => aberturaRef.current?.click()}>
@@ -55,6 +51,14 @@ export function EtapaBalanco({ balanco, filtroCompetencia, abertura = {}, onImpo
             onChange={(e) => { onImportarAbertura(e.target.files[0]); e.target.value = ""; }} />
         </div>
         {abertura.aviso && <p className="hint" style={{ marginTop: 10 }}>{abertura.aviso}</p>}
+
+        <details className="explica">
+          <summary>Como deve ser o arquivo</summary>
+          <p>
+            Código da conta na primeira coluna e saldo na segunda (devedor positivo, credor
+            negativo), ou débito e crédito em duas colunas. CSV, TXT ou Excel.
+          </p>
+        </details>
       </div>
 
       <div className="checks">
@@ -68,10 +72,7 @@ export function EtapaBalanco({ balanco, filtroCompetencia, abertura = {}, onImpo
 
       <div className="card">
         <h2>Ativo e Passivo no mesmo eixo</h2>
-        <p className="hint">
-          O mesmo eixo da tela Conferir, agora com Ativo de um lado e Passivo + Patrimônio
-          Líquido do outro. Se um braço passar do outro, o excesso aparece em vermelho.
-        </p>
+        <p className="hint">Ativo de um lado, Passivo + PL do outro. O excesso sai em vermelho.</p>
         <Balanca
           esquerda={balanco.somaAtivo} direita={balanco.somaPassivo}
           rotuloEsq={`Ativo ${brl(balanco.somaAtivo)}`}

@@ -64,12 +64,9 @@ export function EtapaCPC51({
       <div className="card cpc-topo">
         <h2>CPC 51 — a DRE em cinco categorias</h2>
         <p className="hint">
-          A partir dos exercícios iniciados em <b>1º de janeiro de 2027</b>, a demonstração do
-          resultado passa a ter cinco categorias (operacional, investimento, financiamento,
-          tributos sobre o lucro e operações descontinuadas) e dois subtotais obrigatórios. 2026
-          precisa ser reapresentado como comparativo — por isso o trabalho começa agora.
+          Cinco categorias e dois subtotais obrigatórios.
           {diasGoLive > 0
-            ? ` Faltam ${diasGoLive} dias para o prazo do go-live (${goLive.prazo}).`
+            ? ` Faltam ${diasGoLive} dias para o go-live (${goLive.prazo}).`
             : ` O prazo do go-live (${goLive.prazo}) já passou.`}
         </p>
         <div className="row">
@@ -165,11 +162,16 @@ export function EtapaCPC51({
       <div className="card">
         <h2>Do operacional de hoje ao operacional do CPC 51</h2>
         <p className="hint">
-          O lucro líquido não muda, mas o <b>resultado operacional</b> muda — e é essa a pergunta
-          que a diretoria faz em seguida. A ponte abaixo é conta a conta, agrupada pelo motivo do
-          movimento: o que saiu para investimento ou financiamento, e o que entrou porque o
-          "não operacional" deixou de existir.
+          O lucro líquido não muda; o <b>resultado operacional</b> muda.
         </p>
+        <details className="explica">
+          <summary>Como ler a ponte</summary>
+          <p>
+            Cada linha é um grupo de contas, agrupado pelo motivo do movimento: o que saiu para
+            investimento ou financiamento, e o que entrou porque o "não operacional" deixou de
+            existir — o operacional passou a ser a categoria residual.
+          </p>
+        </details>
         <div className="dre" style={{ marginBottom: 0 }}>
           {conciliacao.pontes.map((p, i) => (
             <div className="line" data-k={p.t === "sub" ? "sub" : ""} key={i}>

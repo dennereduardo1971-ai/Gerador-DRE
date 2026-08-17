@@ -210,8 +210,8 @@ export function Painel({ dre, temDados, balancete, dresPorCompetencia = [], empr
       {(!temDados || !balancete) && (
         <div className="warn">
           {!balancete
-            ? "Carregue o balancete de verificação na etapa 1 para o painel mostrar também a estrutura patrimonial e os índices de liquidez e endividamento."
-            : "Importe o razão para o painel mostrar também as margens, a cascata do resultado e a composição das despesas."}
+            ? "Falta o balancete: sem ele não há estrutura patrimonial nem índices."
+            : "Falta o razão: sem ele não há margens, cascata nem ranking de despesas."}
         </div>
       )}
     </>

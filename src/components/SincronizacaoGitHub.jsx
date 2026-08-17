@@ -51,11 +51,11 @@ export function SincronizacaoGitHub({ onSincronizado }) {
         <button className="btn ghost" onClick={() => setAberto(!aberto)}>{aberto ? "Ocultar" : "Configurar"}</button>
       </div>
       <p className="hint" style={{ marginTop: 8 }}>
-        Guarda o histórico num arquivo JSON dentro de um repositório seu — funciona como um
-        salvamento em nuvem simples, sem precisar de servidor. O token fica salvo só neste
-        navegador. Use um <b>fine-grained token</b> (github.com/settings/personal-access-tokens)
-        restrito a este repositório, com permissão de "Contents" em leitura e escrita — nunca um
-        token clássico com acesso à conta inteira.
+        Guarda o histórico num JSON dentro de um repositório seu. O token fica só neste navegador.
+      </p>
+      <p className="hint" style={{ marginTop: -8 }}>
+        Use um <b>fine-grained token</b> restrito a este repositório, com "Contents" em leitura e
+        escrita — <b>nunca um token clássico</b>, que dá acesso à conta inteira.
       </p>
 
       {aberto && (

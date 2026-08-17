@@ -130,8 +130,7 @@ export function TorresPatrimoniais({ estrutura }) {
         <div>
           <h2>Estrutura patrimonial</h2>
           <p className="hint" style={{ margin: 0 }}>
-            As duas torres terminam na mesma altura: é a igualdade do Balanço, com o resultado do
-            exercício empilhado do lado direito porque ainda não foi para o Patrimônio Líquido.
+            Mesma altura nos dois lados: é a igualdade do Balanço.
             {!plano && " Arraste para girar."}
           </p>
         </div>

@@ -92,9 +92,14 @@ src/
     Eixo.jsx                      # Canal e Balanca — o eixo visual
                                    # compartilhado (ver "Sistema visual")
     SincronizacaoGitHub.jsx         # painel de config da sincronização
+    Icones.jsx                       # os ícones do casco, SVG inline em
+                                      #  currentColor (sem biblioteca)
+    Inicio.jsx                        # a tela "o que eu faço agora?" —
+                                       #  estado, próximo passo, pendências
   App.jsx                        # dono de todo o estado; as Etapas são
                                   # "burras" (recebem props, chamam callbacks);
-                                  # a trilha de navegação é DADO (`SECOES`)
+                                  # a navegação é DADO (`SECOES`) e o casco
+                                  # (topo + menu lateral) mora aqui
   App.css                        # design system em variáveis CSS (--papel,
                                   # --tinta, --marca, --barra-* etc.) — tema
                                   # escuro é um seletor
@@ -106,35 +111,47 @@ Fluxo do app: Importar → Conferir → Classificar → DRE. As demais abas
 são vistas paralelas sobre o mesmo estado agregado (`contas`, calculado
 uma vez em `App.jsx` via `agregarPorConta`).
 
-**A trilha é dado, não JSX.** `SECOES` em `App.jsx` descreve cinco
-seções, cada uma agrupando abas que respondem à mesma pergunta:
+**A navegação é dado, não JSX.** `SECOES` em `App.jsx` descreve cinco
+seções, cada uma agrupando abas que respondem à mesma pergunta. **Início**
+fica solto acima delas, porque não pertence a nenhuma:
 
 | Seção | Pergunta | Abas |
 |---|---|---|
+| — | o que eu faço agora? | Início |
 | Fluxo | como eu chego na DRE? | Importar → Conferir → Classificar → DRE |
 | Análises | o que estes números dizem? | Painel, Balanço, Horizontal, Comparativa |
 | Parâmetros | para onde vai cada conta? | De-Para |
 | Arquivo | o que já foi fechado? | Histórico, Arquivos |
-| CPC 51 · 2027 | como isso fica em 2027? | Demonstração CPC 51, Plano de ação |
+| CPC 51 · 2027 | como isso fica em 2027? | Demonstração, Plano de ação |
 
-Três coisas a não desfazer aqui:
+Quatro coisas a não desfazer aqui:
 
-- **Só "Fluxo" é numerado**, porque só ele é sequencial de verdade. As
-  outras seções recebem losango, para não fingirem ser passos 5, 6 e 7.
+- **Só "Fluxo" é numerado**, porque só ele é sequencial de verdade. O
+  número pendura no canto do ícone em vez de substituí-lo, para o
+  ícone continuar sendo o que se reconhece de relance no trilho
+  recolhido; as outras seções não recebem número nenhum, para não
+  fingirem ser passos 5, 6 e 7.
 - **A regra de "quando esta aba abre" se escreve uma vez**, em
-  `abaDisponivel()`. Ela governa a trilha E o estado vazio do `<main>`;
-  eram duas cópias antes, e aba nova aberta na trilha caía em tela
+  `abaDisponivel()`. Ela governa o menu E o estado vazio do `<main>`;
+  eram duas cópias antes, e aba nova aberta no menu caía em tela
   branca quando alguém esquecia da segunda.
 - **Parâmetros não é uma linha em Análises.** De-Para é cadastro, não
   leitura de resultado — e cadastro que se procura em "Análises" é
   cadastro que ninguém acha. É também a seção onde entram os módulos de
   parametrização do caminho para ERP.
+- **Início não é o Painel.** Início responde "por onde começo e o que
+  está me esperando"; Painel responde "e daí?". Por isso Início não tem
+  gráfico nenhum — os três números do topo são isca para o Painel, não
+  leitura de resultado. Pôr cascata ou ranking ali faz as duas telas
+  virarem a mesma tela, e uma delas passa a sobrar.
 
-O sub-rótulo de cada aba (`estadoDaAba`) traz o número que importa
-daquela tela, e um ponto **âmbar** — nunca vermelho, que aqui pertence ao
-dado — marca pendência. Em 390px os sub-rótulos informativos somem, mas
-os de pendência ficam: `display: none` tira o texto também da árvore de
-acessibilidade, e o ponto é `aria-hidden`.
+O estado de cada aba (`estadoDaAba`) aparece como **selo** ao lado do
+nome: um número (`17` contas, `3` a resolver) ou `!`/`✓`. Selo em **âmbar**
+— nunca vermelho, que aqui pertence ao dado — marca pendência. O selo é
+`aria-hidden` e o significado por extenso vai no `aria-label` do botão
+("De-Para — 3 contas a resolver"), porque "3" sozinho não diz nada a quem
+usa leitor de tela. Ele foi escolhido no lugar do sub-rótulo em frase
+justamente por caber no trilho recolhido, onde vira um ponto no canto.
 
 ## Sistema visual ("Razão")
 
@@ -151,6 +168,40 @@ Duas regras que não devem ser desfeitas sem motivo:
    (verificado: Archivo tem a feature `tnum`; NÃO tem `zero`, então não
    adianta pedir zero cortado). Mono em coluna de valor engorda a tabela
    e dá cara de editor de código.
+
+### O casco: topo de contexto e menu lateral
+
+Três peças: faixa fixa no topo, menu lateral que recolhe, conteúdo.
+
+O topo carrega **contexto, não apresentação**. Existia ali um parágrafo
+explicando o app; um parágrafo se lê uma vez e depois é ruído permanente.
+No lugar entraram três selos (`ctx-chip`) que dizem o tempo todo as três
+coisas que mudam o que está na tela — qual arquivo, qual período, qual
+fonte — e cada um leva à tela que muda aquilo.
+
+O menu recolhe para um trilho de 64px só com ícones, e a escolha fica em
+`localStorage` (é preferência de quem usa, não estado do arquivo: não
+entra na sessão em IndexedDB, que é só para dado de cliente). No celular
+ele vira **gaveta**, não faixa rolável: a faixa cabia, mas com quatorze
+itens obrigava a arrastar às cegas, e o que estava fora da vista não
+existia.
+
+O único movimento do casco é um fade de 0.2s ao trocar de aba, e a
+largura do menu animando ao recolher. Nada mais anima — número que o olho
+precisa ler não se mexe.
+
+### Texto longo mora em `<details class="explica">`
+
+Regra desta interface: **a primeira coisa visível numa tela é o que fazer,
+não a explicação de por quê.** O texto que explica consequência, formato
+de arquivo ou fundamento contábil continua no app, fechado, atrás de um
+`<summary>` de três a cinco palavras.
+
+Duas exceções, e não são estilo: o aviso de repositório público em
+`Arquivos.jsx` e a instrução de token fine-grained em
+`SincronizacaoGitHub.jsx` ficam **abertos**. São avisos de consequência,
+lidos por quem está prestes a clicar — esconder um aviso desses é o
+oposto de "fácil de entender".
 
 ### O canal (elemento de assinatura)
 
@@ -180,9 +231,10 @@ barras viram slivers invisíveis — o número já dizia tudo.
 
 ### Piso de qualidade
 
-Responsivo até 390px (tabelas com descrição textual viram cartões
-empilhados via `.tabela-cartao` + `data-rotulo`; tabelas curtas e
-numéricas rolam na horizontal), foco de teclado visível em todo
+Responsivo até 390px (o menu vira gaveta; tabelas com descrição textual
+viram cartões empilhados via `.tabela-cartao` + `data-rotulo`, e a célula
+`.desc` empilha rótulo sobre conteúdo em vez de dividir em duas colunas;
+tabelas curtas e numéricas rolam na horizontal), foco de teclado visível em todo
 interativo, `prefers-reduced-motion` respeitado, `@media print`
 preservando só a demonstração. A dropzone é operável por teclado
 (Enter/Espaço) e os `<select>` de grupo e checkboxes de tabela têm
@@ -335,6 +387,20 @@ seguro que reescrever a hierarquia de subtotais.
   processando arquivo que ele mesmo escolhe abrir. Documentado no
   README. Não troque de lib sem avisar, `exceljs` (a alternativa mais
   óbvia) não lê `.xls` legado.
+- **Classe nova em `App.css` pode colidir com classe existente.** O
+  arquivo tem mais de 1.700 linhas e nomes curtos e genéricos já estão
+  tomados — `.chip` era o quadradinho 11×11 da legenda dos gráficos.
+  Declarar `.chip` de novo mais acima não dá erro nenhum: a declaração de
+  baixo vence, e o elemento novo aparece com a altura errada e o texto
+  cortado fora da caixa. Nenhum teste pega isso. **Antes de criar uma
+  classe, `grep` pelo nome no `App.css` inteiro**, e prefira um prefixo de
+  contexto (`ctx-chip`, `dp-motivo`, `etapa-selo`) a um substantivo solto.
+- **Célula de texto longo em `.tabela-cartao` precisa de `td.desc`.** No
+  modo cartão (390px) o `td` é uma grade de duas colunas, `1fr auto`. Uma
+  descrição longa engorda a coluna `auto` e espreme a outra até sobrar
+  uma tira de 40px — com uma palavra por linha — para o rótulo e para
+  qualquer conteúdo extra da mesma célula (no De-Para, o motivo da
+  revisão). Célula de texto corrido leva `className="desc"`, que empilha.
 - **Nunca commite os arquivos reais de razão/plano de contas do
   Denner** (números financeiros de instituição real) — ficam em
   `fixtures/`, que está no `.gitignore`.

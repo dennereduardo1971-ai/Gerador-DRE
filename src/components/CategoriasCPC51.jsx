@@ -43,12 +43,15 @@ export function CategoriasCPC51({
     <>
       <div className="card">
         <h2>Política contábil de classificação</h2>
-        <p className="hint">
-          O CPC 51 classifica de forma diferente quem tem, como <b>atividade de negócio
-          principal</b>, investir em ativos ou conceder financiamento a clientes. É a decisão da
-          Fase 1 (passo 2) e a primeira pergunta da auditoria — por isso ela fica aqui, muda a
-          demonstração na hora e sai registrada na planilha exportada.
-        </p>
+        <p className="hint">Muda a demonstração na hora e sai registrada na planilha.</p>
+        <details className="explica">
+          <summary>Por que isso é uma decisão contábil</summary>
+          <p>
+            O CPC 51 classifica de forma diferente quem tem, como <b>atividade de negócio
+            principal</b>, investir em ativos ou conceder financiamento a clientes. É a decisão
+            da Fase 1 (passo 2) e a primeira pergunta da auditoria.
+          </p>
+        </details>
         <div className="checks">
           <label className="check cpc-escolha">
             <input type="checkbox" checked={!!politica.investirEhAtividadePrincipal}
@@ -74,9 +77,7 @@ export function CategoriasCPC51({
       <div className="card">
         <h2>De-Para dos grupos</h2>
         <p className="hint">
-          Cada grupo da sua DRE cai numa das cinco categorias. Os marcados em amarelo dependem de
-          julgamento ou misturam naturezas — são os que a Fase 2 (passo 8) manda desmembrar, e a
-          pauta da reunião da Fase 3.
+          Cada grupo cai numa das cinco categorias. Os marcados em amarelo pedem julgamento.
         </p>
         <div className="cpc-grupos">
           {gruposNaTela.map((g) => {
@@ -95,9 +96,7 @@ export function CategoriasCPC51({
           })}
         </div>
         <p className="hint" style={{ marginTop: 12 }}>
-          A categoria do grupo é o padrão. Para separar dentro de um grupo — juros de mora de
-          aluno em operacional, rendimento de aplicação em investimento — decida conta a conta
-          na tabela abaixo.
+          Para separar dentro de um grupo, decida conta a conta na tabela abaixo.
         </p>
       </div>
 
@@ -107,13 +106,11 @@ export function CategoriasCPC51({
           {mistas.length > 0 ? (
             <>
               <b>{mistas.length} {mistas.length === 1 ? "conta" : "contas"}</b> agregam naturezas
-              diferentes, seja porque movimentam os dois sentidos, seja porque o histórico dos
-              lançamentos discorda da categoria. No ERP elas viram subcontas (Fase 2, passo 8);
-              aqui dá para decidir a categoria de cada uma agora.
+              diferentes. No ERP elas viram subcontas; aqui dá para decidir cada uma agora.
             </>
           ) : (
-            <>Nenhuma conta apontada como mista. A tabela mostra as contas que você já decidiu à
-              mão — use a busca ou "ver todas" para alcançar qualquer outra.</>
+            <>Nenhuma conta mista. A tabela mostra o que você já decidiu à mão — use a busca
+              ou "ver todas" para alcançar qualquer outra.</>
           )}
           {" "}Já decididas manualmente: <b>{manuais}</b>. Ainda no padrão de um grupo que pede
           revisão: <b>{cobertura.aRevisar}</b> ({brl(cobertura.valorARevisar)}).

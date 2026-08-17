@@ -166,8 +166,7 @@ function Balancete({ bal }) {
       </div>
 
       <p className="hint">
-        Saldo devedor em preto, credor entre parênteses. As contas sintéticas já vêm somadas do
-        sistema contábil — o app confere, mas não recalcula por cima.
+        Devedor em preto, credor entre parênteses. As sintéticas já vêm somadas do sistema.
         {visiveis.length !== bal.contas.length && ` Mostrando ${visiveis.length} de ${bal.contas.length} contas.`}
       </p>
     </div>
@@ -253,10 +252,7 @@ export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
         <div className="bal-cab">
           <div>
             <h2>Balanço Patrimonial</h2>
-            <p className="hint">
-              De <b>{arquivo}</b>. Este arquivo já traz o Balanço fechado pela contabilidade —
-              o app o exibe e confere, sem recalcular por cima.
-            </p>
+            <p className="hint">De <b>{arquivo}</b>, já fechado pela contabilidade.</p>
           </div>
           <div className="segmentado" role="tablist">
             <button role="tab" aria-selected={visao === "estrutura"} data-on={visao === "estrutura" ? "1" : "0"}
@@ -278,8 +274,7 @@ export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
               <Coluna titulo="Passivo + Patrimônio Líquido" grupos={passivo} total={r.totalPassivo} base={base} />
             </div>
             <p className="hint">
-              Percentual sobre o total do Ativo. Contas redutoras (depreciação, amortização,
-              perdas estimadas) aparecem entre parênteses, deduzindo do grupo onde estão.
+              Percentual sobre o Ativo. Contas redutoras aparecem entre parênteses.
             </p>
           </>
         )}

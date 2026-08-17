@@ -69,10 +69,7 @@ export function Cronograma51({ status, onStatus, onLimpar }) {
       <div className="card">
         <h2>Plano de ação — implementação do CPC 51</h2>
         <p className="hint">
-          As dez fases do cronograma, de julho de 2026 ao go-live em 2027, com os passos e
-          entregáveis de cada uma. Os itens que este app executa trazem a indicação de onde fazer.
-          O andamento fica salvo neste navegador e não é apagado pelo botão "Limpar tudo" — ali
-          não há dado financeiro, só o estado do projeto.
+          Dez fases, de julho de 2026 ao go-live em 2027. O andamento fica salvo neste navegador.
         </p>
         <div className="checks">
           <div className="check">
@@ -139,11 +136,15 @@ export function Cronograma51({ status, onStatus, onLimpar }) {
       })}
 
       <div className="card">
-        <p className="hint" style={{ marginBottom: 10 }}>
-          Transcrito do documento "Cronograma para implementação das DFs conforme CPC 51". As
-          datas e os responsáveis são os do documento; a indicação "neste app" é acréscimo desta
-          ferramenta.
-        </p>
+        <details className="explica" style={{ marginTop: 0, marginBottom: 10, borderTop: "none", paddingTop: 0 }}>
+          <summary>De onde vem este cronograma</summary>
+          <p>
+            Transcrito do documento "Cronograma para implementação das DFs conforme CPC 51". As
+            datas e os responsáveis são os do documento; a indicação "neste app" é acréscimo
+            desta ferramenta. O andamento não é apagado por "Limpar tudo" — ali não há dado
+            financeiro, só o estado do projeto.
+          </p>
+        </details>
         <button className="btn ghost" onClick={onLimpar}>Zerar andamento do plano</button>
       </div>
     </>

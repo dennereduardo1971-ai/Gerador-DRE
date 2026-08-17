@@ -85,17 +85,10 @@ export function EtapaClassificar({
       <div className="card">
         <h2>Perfil de classificação</h2>
         <p className="hint">
-          Salva as classificações que você fez à mão num arquivo, para reaproveitar no mês
-          seguinte em vez de refazer tudo. O perfil guarda só as <b>decisões</b> (conta → grupo)
-          e os nomes das contas — nenhum valor, nenhum lançamento —, então dá para guardar junto
-          do projeto ou levar para outro computador sem carregar dado financeiro de cliente.
-        </p>
-        <p className="hint">
           {planoAtivo
-            ? <>Plano de contas reconhecido: <b>{planoAtivo.nome}</b> — a classificação por código está ativa.</>
-            : <>Nenhum perfil de plano de contas reconheceu o plano importado, então a
-               classificação está sendo feita pelo nome e pelo histórico das contas. É mais
-               frágil: confira grupo por grupo antes de gerar a DRE.</>}
+            ? <>Plano reconhecido: <b>{planoAtivo.nome}</b> — classificação por código ativa.</>
+            : <>Nenhum perfil reconheceu este plano: a classificação vem do nome e do
+               histórico. Confira grupo por grupo antes de gerar a DRE.</>}
         </p>
         <div className="row">
           <button className="btn ghost" onClick={onSalvarPerfil} disabled={!manuais}>
@@ -109,10 +102,18 @@ export function EtapaClassificar({
         </div>
         {!manuais && (
           <p className="hint" style={{ marginTop: 10 }}>
-            Ainda não há classificação manual para salvar — ajuste algum grupo na tabela abaixo
-            e o botão libera.
+            Nada decidido à mão ainda — ajuste um grupo abaixo e o botão libera.
           </p>
         )}
+
+        <details className="explica">
+          <summary>O que o perfil guarda</summary>
+          <p>
+            Só as <b>decisões</b> (conta → grupo) e os nomes das contas — nenhum valor, nenhum
+            lançamento. Dá para versionar junto do projeto ou levar para outro computador sem
+            carregar dado financeiro de cliente, e no mês seguinte ele evita refazer tudo.
+          </p>
+        </details>
       </div>
 
       {avisoPerfil && <div className="warn">{avisoPerfil}</div>}
@@ -120,9 +121,8 @@ export function EtapaClassificar({
       <div className="card">
         <h2>Contas de resultado</h2>
         <p className="hint">
-          {contasResultado.length} contas identificadas como resultado. A sugestão vem da
-          natureza do saldo e do código — confira e ajuste o que estiver fora do lugar. Tudo o
-          que ficar em "Não entra na DRE" é ignorado no cálculo.
+          {contasResultado.length} contas de resultado. O que ficar em "Não entra na DRE" é
+          ignorado no cálculo.
         </p>
         <div className="filters">
           <div>
@@ -140,13 +140,17 @@ export function EtapaClassificar({
           </div>
         </div>
         <p className="hint" style={{ marginTop: -6 }}>
-          O plano de contas é um arquivo (CSV ou Excel) de duas colunas: código e descrição.
-          Importar o plano de contas pode <b>mudar a sugestão de grupo</b> aqui embaixo — a
-          descrição oficial da conta costuma ser um sinal mais limpo que o histórico dos
-          lançamentos. Contas que você já reclassificou manualmente não são alteradas. (A coluna
-          "Descrição" desta tabela continua mostrando o histórico; o nome do plano de contas
-          aparece nas etapas Conferir e DRE.)
+          Arquivo de duas colunas: código e descrição.
         </p>
+        <details className="explica">
+          <summary>O que muda ao importar o plano</summary>
+          <p>
+            A descrição oficial da conta costuma ser um sinal mais limpo que o histórico dos
+            lançamentos, então a <b>sugestão de grupo</b> pode mudar. Contas que você já
+            reclassificou à mão não são alteradas. A coluna "Descrição" desta tabela continua
+            mostrando o histórico; o nome do plano aparece nas etapas Conferir e DRE.
+          </p>
+        </details>
         <div className="scroll">
           <table className="tabela-cartao">
             <thead>

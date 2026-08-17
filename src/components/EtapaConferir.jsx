@@ -39,11 +39,7 @@ export function EtapaConferir({
 
       {!semRazao && <div className="card">
         <h2>Partidas dobradas</h2>
-        <p className="hint">
-          Débito de um lado do eixo, crédito do outro. Quando o razão fecha, os dois braços
-          têm o mesmo comprimento — o trecho em vermelho, se aparecer, é exatamente a
-          diferença que sobrou.
-        </p>
+        <p className="hint">Fechou quando os dois braços têm o mesmo comprimento.</p>
         <Balanca
           esquerda={tDeb} direita={tCre}
           rotuloEsq={`Débito ${brl(tDeb)}`} rotuloDir={`Crédito ${brl(tCre)}`}
@@ -52,9 +48,14 @@ export function EtapaConferir({
 
       {Math.abs(dif) >= 0.01 && (
         <div className="warn">
-          O razão fecha com diferença de <b>{brl(Math.abs(dif))}</b> entre débitos e créditos.
-          Costuma ser arredondamento ou lançamento cortado na exportação — vale conferir antes
-          de assinar a DRE.
+          Diferença de <b>{brl(Math.abs(dif))}</b> entre débitos e créditos.
+          <details className="explica">
+            <summary>De onde costuma vir</summary>
+            <p>
+              Arredondamento ou lançamento cortado na exportação. Vale conferir antes de
+              assinar a DRE.
+            </p>
+          </details>
         </div>
       )}
 
@@ -78,7 +79,7 @@ export function EtapaConferir({
         <p className="hint">
           {semRazao
             ? "Sai no cabeçalho da demonstração e dos arquivos exportados."
-            : <>Recortam o razão antes de somar os saldos. A <b>competência</b> isola um mês inteiro — é o jeito mais direto de ver a DRE e o Balanço de um período só.</>}
+            : <>Recortam o razão antes de somar. A <b>competência</b> isola um mês inteiro.</>}
         </p>
         <div className="filters">
           {competenciasDisponiveis.length > 0 && (

@@ -111,39 +111,145 @@
 .neg { color: var(--negativo); }
 .pos { color: var(--positivo); }
 
-/* ---------- esqueleto ---------- */
+/* ---------- esqueleto ----------
+   Três peças: uma faixa fixa no topo (identidade, CONTEXTO,
+   ações), um menu lateral que recolhe, e o conteúdo.
+
+   O contexto no topo substitui o parágrafo de apresentação que
+   existia aqui antes. Um parágrafo explica o app uma vez e
+   depois vira ruído permanente; os selos dizem, o tempo todo,
+   as três coisas que mudam o que está na tela — qual arquivo,
+   qual período, qual fonte — e levam à tela que muda cada uma. */
+
+.topo {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--regua);
+}
+
+.topo-in {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 9px 22px;
+}
+
+/* O botão de gaveta só existe no celular; no desktop o menu está
+   sempre lá, e um hambúrguer ao lado dele seria mentira. */
+.topo-menu { display: none; }
+
+.marca-app {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 6px 4px 4px;
+  border: none;
+  border-radius: var(--r-p);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color .12s;
+}
+.marca-app:hover { background: var(--superficie-2); }
+.marca-app:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
+
+/* O glifo é identidade, não dado: por isso pode ser índigo cheio
+   sem disputar significado com o verde/vermelho das telas. */
+.marca-glifo {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--marca);
+  color: var(--marca-tinta);
+  font-size: 10px;
+  font-weight: 700;
+  font-stretch: 88%;
+  letter-spacing: .04em;
+}
+
+.marca-nome {
+  font-size: 15px;
+  font-weight: 600;
+  font-stretch: 104%;
+  letter-spacing: -.014em;
+  white-space: nowrap;
+}
+
+/* ---------- selos de contexto ---------- */
+
+.topo-ctx {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+}
+
+/* `ctx-chip`, não `chip`: `.chip` já era o quadradinho da legenda
+   dos gráficos (11x11px), definido mais abaixo neste arquivo — a
+   colisão achatava o selo de contexto numa tira de 11px de altura,
+   com o texto cortado fora da caixa. */
+.ctx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 76px;
+  max-width: 230px;
+  padding: 5px 11px;
+  border: 1px solid var(--regua);
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color .12s, color .12s, background-color .12s;
+}
+.ctx-chip:hover:not(:disabled) { border-color: var(--regua-forte); color: var(--tinta); }
+.ctx-chip:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
+.ctx-chip:disabled { cursor: default; }
+.ctx-chip[data-forte="1"] {
+  border-color: var(--marca);
+  background: var(--marca-fraca);
+  color: var(--marca);
+  font-weight: 600;
+}
+.ctx-chip .ico { flex: 0 0 auto; opacity: .75; }
+.ctx-chip-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.topo-acoes { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+
+.ico-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--r-p);
+  background: none;
+  color: var(--tinta-2);
+  cursor: pointer;
+  transition: background-color .12s, color .12s;
+}
+.ico-btn:hover { background: var(--superficie-2); color: var(--tinta); }
+.ico-btn:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
+
+/* ---------- grade principal ---------- */
 
 .wrap {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 26px 22px 72px;
-}
-
-.masthead {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding-bottom: 18px;
-  margin-bottom: 22px;
-  border-bottom: 1px solid var(--regua);
-}
-
-.masthead h1 {
-  margin: 0;
-  font-size: 29px;
-  font-weight: 700;
-  font-stretch: 108%;
-  letter-spacing: -.022em;
-  line-height: 1.05;
-}
-
-.masthead p {
-  margin: 7px 0 0;
-  color: var(--tinta-2);
-  font-size: 13.5px;
-  max-width: 56ch;
+  padding: 22px 22px 72px;
 }
 
 .selo {
@@ -155,42 +261,72 @@
   white-space: nowrap;
 }
 
+/* A largura do menu é uma variável, e é ela que anima: o trilho
+   recolhido não é outro layout, é a mesma grade com 64px em vez
+   de 226px. */
+.dre-app { --lateral-w: 226px; }
+.dre-app[data-recolhido="1"] { --lateral-w: 64px; }
+
 .app-grid {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
-  gap: 30px;
+  grid-template-columns: var(--lateral-w) minmax(0, 1fr);
+  gap: 26px;
   align-items: start;
+  transition: grid-template-columns .18s ease;
 }
 
 .painel { min-width: 0; }
 
-/* ---------- trilha de seções ----------
-   Vertical no desktop porque o fluxo É sequencial: isso é
-   navegação com estado, não migalha de pão. Numeração só no
-   grupo "Fluxo" (o fluxo de verdade); Análises, Parâmetros,
-   Arquivo e CPC 51 são vistas paralelas e recebem losango.
+/* Troca de aba com um respiro. É o único movimento do casco: dá a
+   sensação de que a tela respondeu, sem animar nada que o olho
+   precise acompanhar para ler número. */
+.painel { animation: entra .2s ease-out; }
+@keyframes entra {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
 
-   As seções vêm de `SECOES` em App.jsx — a trilha é dado, e o
-   CSS não sabe (nem precisa saber) quantos grupos existem. */
+.veu { display: none; }
 
-.trilha {
+/* ---------- menu lateral ----------
+   Vertical porque o fluxo É sequencial: navegação com estado, não
+   migalha de pão. Numeração só no grupo "Fluxo" (o fluxo de
+   verdade); as outras seções são vistas paralelas e recebem só o
+   ícone, para não fingirem ser passos 5, 6 e 7.
+
+   As seções vêm de `SECOES` em App.jsx — o menu é dado, e o CSS
+   não sabe (nem precisa saber) quantos grupos existem. */
+
+.lateral {
   position: sticky;
-  top: 22px;
+  top: 74px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 6px;
+  max-height: calc(100vh - 96px);
+  min-width: 0;
+}
+
+.lateral-rolagem {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .trilha-grupo { display: flex; flex-direction: column; gap: 2px; }
-.trilha-grupo > .rotulo { padding: 0 10px 7px; }
+.trilha-grupo > .rotulo { padding: 0 10px 4px; }
 
 .etapa {
+  position: relative;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 9px;
   align-items: center;
   width: 100%;
-  padding: 9px 10px;
+  padding: 7px 10px;
   border: none;
   border-radius: var(--r-p);
   background: none;
@@ -204,72 +340,386 @@
 
 .etapa:hover:not(:disabled) { background: var(--superficie); color: var(--tinta); }
 .etapa:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
-.etapa:disabled { opacity: .42; cursor: not-allowed; }
+.etapa:disabled { opacity: .4; cursor: not-allowed; }
 
 .etapa[data-on="1"] {
   background: var(--marca-fraca);
   color: var(--tinta);
   font-weight: 600;
 }
+/* Fio de marca na aba ativa: a mesma informação do fundo, dita de
+   novo pela forma — sobrevive ao trilho recolhido e a quem não
+   distingue bem o contraste do fundo fraco. */
+.etapa[data-on="1"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--marca);
+}
+.etapa[data-on="1"] .ico { color: var(--marca); }
 
-.etapa-num {
+.etapa-ico {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--regua-forte);
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 600;
+  width: 26px;
+  height: 26px;
+}
+
+/* O número do passo pendura no ícone, em vez de substituí-lo: o
+   ícone é o que se reconhece de relance no trilho recolhido, e a
+   numeração continua marcando só o Fluxo. */
+.etapa-num {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 2px;
+  border-radius: 999px;
+  background: var(--regua);
+  color: var(--tinta-2);
+  font-size: 9px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--tinta-2);
+  line-height: 1;
 }
+.etapa[data-on="1"] .etapa-num,
+.etapa[data-feito="1"] .etapa-num { background: var(--marca); color: var(--marca-tinta); }
 
-.etapa[data-on="1"] .etapa-num { border-color: var(--marca); color: var(--marca); }
-.etapa[data-feito="1"] .etapa-num {
-  border-color: var(--marca);
-  background: var(--marca);
-  color: var(--marca-tinta);
-}
-
-/* marcador das vistas paralelas: losango, não número */
-.etapa-marca {
-  justify-self: center;
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--regua-forte);
-  transform: rotate(45deg);
-}
-.etapa[data-on="1"] .etapa-marca { border-color: var(--marca); background: var(--marca); }
-
-.etapa-txt { min-width: 0; }
-.etapa-nome { display: block; }
-.etapa-sub {
-  display: block;
-  margin-top: 1px;
-  font-size: 11.5px;
-  font-weight: 400;
-  color: var(--tinta-2);
+.etapa-nome {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Pendência na própria trilha: âmbar, nunca vermelho. Vermelho neste
-   projeto pertence ao DADO (saldo negativo, diferença que não fecha na
-   demonstração); gastá-lo em rótulo de navegação faria a tela gritar
-   duas coisas diferentes com a mesma cor. O ponto é redundante com o
-   texto do sub-rótulo de propósito — quem lê rápido vê o ponto, quem
-   usa leitor de tela lê a frase, e o ponto fica `aria-hidden`. */
-.etapa-sub[data-alerta="1"] { color: var(--atencao); }
-.etapa-alerta {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: var(--atencao);
-  vertical-align: middle;
+/* Pendência no próprio menu: âmbar, nunca vermelho. Vermelho neste
+   projeto pertence ao DADO (saldo negativo, diferença que não fecha
+   na demonstração); gastá-lo em rótulo de navegação faria a tela
+   gritar duas coisas diferentes com a mesma cor.
+
+   O selo é `aria-hidden` e o significado por extenso vai no
+   `aria-label` do botão ("De-Para — 3 contas a resolver"), porque
+   "3" sozinho não diz nada a quem usa leitor de tela. */
+.etapa-selo {
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--tinta-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.etapa-selo[data-alerta="1"] { background: var(--atencao-fraca); color: var(--atencao); }
+
+.recolher {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  padding: 8px 10px;
+  margin-top: 2px;
+  border: none;
+  border-top: 1px solid var(--regua);
+  border-radius: 0;
+  background: none;
+  color: var(--tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.recolher .ico { justify-self: center; }
+.recolher:hover { color: var(--tinta); }
+.recolher:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
+
+/* ---------- trilho recolhido ----------
+   Só o ícone. O rótulo de seção vira um fio, porque uma seção sem
+   nome ainda precisa se separar da seguinte; o selo de pendência
+   vira ponto no canto, para não sumir justamente o que é urgente. */
+
+.dre-app[data-recolhido="1"] .etapa { grid-template-columns: minmax(0, 1fr); padding: 8px; }
+.dre-app[data-recolhido="1"] .etapa-ico { justify-self: center; }
+.dre-app[data-recolhido="1"] .etapa-nome,
+.dre-app[data-recolhido="1"] .recolher .etapa-nome { display: none; }
+.dre-app[data-recolhido="1"] .trilha-grupo > .rotulo {
+  height: 1px;
+  padding: 0;
+  margin: 6px 10px;
+  overflow: hidden;
+  text-indent: -999em;
+  background: var(--regua);
+}
+.dre-app[data-recolhido="1"] .etapa-selo {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 8px;
+  height: 8px;
+  padding: 0;
+  overflow: hidden;
+  text-indent: -999em;
+  background: var(--regua-forte);
+}
+.dre-app[data-recolhido="1"] .etapa-selo[data-alerta="1"] { background: var(--atencao); }
+.dre-app[data-recolhido="1"] .recolher { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------- tela Início ----------
+   Nenhum texto passa de uma linha aqui: quem abre o app quer saber
+   onde clicar. O que precisa de explicação mora num `<details>`
+   dentro da tela que executa a tarefa. */
+
+.inicio-topo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--regua);
+}
+
+.inicio-tit {
+  margin: 3px 0 0;
+  font-size: 26px;
+  font-weight: 700;
+  font-stretch: 106%;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.inicio-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 7px;
+  color: var(--tinta-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.inicio-meta span + span::before {
+  content: "·";
+  margin-right: 14px;
+  color: var(--regua-forte);
+}
+
+.inicio-nums { display: flex; flex-wrap: wrap; gap: 26px; }
+.mini-k {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-stretch: 96%;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+.mini-v {
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.018em;
+  white-space: nowrap;
+}
+
+/* O próximo passo: um cartão só, do tamanho de um botão de verdade.
+   A tela sugere UM passo porque sugerir três é não sugerir nenhum. */
+.passo {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--marca);
+  border-radius: var(--r);
+  background: var(--marca-fraca);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .12s, box-shadow .12s;
+}
+.passo:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(18, 26, 22, .09); }
+.passo:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.passo[data-alerta="1"] { border-color: var(--atencao); background: var(--atencao-fraca); }
+
+.passo-ico {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: var(--marca);
+  color: var(--marca-tinta);
+}
+.passo[data-alerta="1"] .passo-ico { background: var(--atencao); color: var(--superficie); }
+
+.passo-txt { min-width: 0; }
+.passo-tit {
+  display: block;
+  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 600;
+  font-stretch: 104%;
+  letter-spacing: -.014em;
+}
+.passo-sub { display: block; color: var(--tinta-2); font-size: 13px; }
+
+.passo-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--r-p);
+  background: var(--marca);
+  color: var(--marca-tinta);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.passo[data-alerta="1"] .passo-cta { background: var(--atencao); color: var(--superficie); }
+
+/* ---------- pendências ---------- */
+
+.pend {
+  padding: 14px 16px 8px;
+  margin-bottom: 20px;
+  border: 1px solid var(--regua);
+  border-radius: var(--r);
+  background: var(--superficie);
+}
+.pend ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.pend li + li { border-top: 1px solid var(--regua); }
+.pend li button {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 2px;
+  border: none;
+  background: none;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.pend li button:hover { color: var(--atencao); }
+.pend li button:focus-visible { outline: 2px solid var(--marca); outline-offset: -2px; }
+.pend li .ico { color: var(--atencao); }
+.pend li b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.secao-rot { display: block; margin-bottom: 8px; }
+
+/* ---------- atalhos ---------- */
+
+.atalhos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.atalho {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 16px;
+  gap: 11px;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid var(--regua);
+  border-radius: var(--r);
+  background: var(--superficie);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .12s, transform .12s, box-shadow .12s;
+}
+.atalho:hover:not(:disabled) {
+  border-color: var(--marca);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(18, 26, 22, .08);
+}
+.atalho:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
+.atalho:disabled { opacity: .45; cursor: not-allowed; }
+
+.atalho-ico {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--superficie-2);
+  color: var(--tinta-2);
+}
+.atalho:hover:not(:disabled) .atalho-ico { background: var(--marca-fraca); color: var(--marca); }
+.atalho[data-alerta="1"] .atalho-ico { background: var(--atencao-fraca); color: var(--atencao); }
+
+.atalho-txt { min-width: 0; }
+.atalho-nome { display: block; font-size: 14px; font-weight: 600; }
+.atalho-val {
+  display: block;
+  margin-top: 1px;
+  color: var(--tinta-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atalho-seta { color: var(--regua-forte); }
+.atalho:hover:not(:disabled) .atalho-seta { color: var(--marca); }
+
+/* ---------- explicação sob demanda ----------
+   O texto longo não sumiu: ele deixou de ser a primeira coisa que
+   se lê. Fechado por padrão, aberto por quem tem a dúvida. */
+
+.explica {
+  margin: 10px 0 0;
+  border-top: 1px solid var(--regua);
+  padding-top: 10px;
+  font-size: 13px;
+}
+.explica > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--marca);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.explica > summary::-webkit-details-marker { display: none; }
+.explica > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform .12s;
+}
+.explica[open] > summary::before { transform: rotate(90deg); }
+.explica > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.explica p {
+  margin: 9px 0 0;
+  color: var(--tinta-2);
+  max-width: 74ch;
 }
 
 /* ---------- cartões ---------- */
@@ -830,40 +1280,75 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
    ============================================================ */
 
 @media (max-width: 920px) {
-  .app-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  /* A faixa rolável virou GAVETA. A faixa mantinha treze abas numa
+     única linha que rolava para o lado: cabia, mas obrigava a
+     arrastar às cegas para achar a aba que se queria, e o que
+     estava fora da vista simplesmente não existia. A gaveta mostra
+     a lista inteira de uma vez, com os rótulos de seção intactos. */
+  .app-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .topo-menu { display: grid; }
+  .topo-ctx { display: none; }
 
-  /* a trilha vira uma faixa rolável, mantendo numeração e estado */
-  .trilha {
+  .lateral {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60;
+    width: 264px;
+    max-width: 84vw;
+    max-height: none;
+    padding: 14px 12px;
+    background: var(--superficie);
+    border-right: 1px solid var(--regua);
+    box-shadow: 0 0 40px rgba(0, 0, 0, .18);
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+  }
+  .lateral[data-aberto="1"] { transform: none; }
+
+  .veu {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(10, 16, 13, .42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+  .veu[data-on="1"] { opacity: 1; pointer-events: auto; }
+
+  /* Dentro da gaveta o menu está sempre por extenso: recolher um
+     painel que já é temporário não ganha largura nenhuma. */
+  .recolher { display: none; }
+  .dre-app[data-recolhido="1"] .etapa { grid-template-columns: 26px minmax(0, 1fr) auto; padding: 8px 10px; }
+  .dre-app[data-recolhido="1"] .etapa-ico { justify-self: start; }
+  .dre-app[data-recolhido="1"] .etapa-nome { display: block; }
+  .dre-app[data-recolhido="1"] .trilha-grupo > .rotulo {
+    height: auto;
+    padding: 0 10px 6px;
+    margin: 0;
+    text-indent: 0;
+    background: none;
+  }
+  .dre-app[data-recolhido="1"] .etapa-selo {
     position: static;
-    flex-direction: row;
-    gap: 20px;
-    overflow-x: auto;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--regua);
-    scrollbar-width: thin;
+    min-width: 19px;
+    height: 18px;
+    padding: 0 5px;
+    text-indent: 0;
+    background: var(--superficie-2);
   }
-  /* nada aqui pode encolher: é uma faixa que rola, não um flex
-     que se espreme até os rótulos se sobreporem */
-  .trilha-grupo { flex: 0 0 auto; flex-direction: row; gap: 4px; }
-  .trilha-grupo > .rotulo {
-    flex: 0 0 auto;
-    align-self: center;
-    padding: 0 4px 0 0;
-    white-space: nowrap;
-  }
-  .etapa { flex: 0 0 auto; width: auto; white-space: nowrap; padding: 7px 11px; }
-  /* Na faixa, o sub-rótulo informativo (nome do arquivo, contagem de
-     contas) some — não cabe e não é urgente. O de PENDÊNCIA fica: é a
-     única forma de a informação chegar a quem usa leitor de tela, já que
-     o ponto âmber é `aria-hidden` e `display: none` tira o texto também
-     da árvore de acessibilidade. */
-  .etapa-sub { display: none; }
-  .etapa-sub[data-alerta="1"] { display: block; }
+  .dre-app[data-recolhido="1"] .etapa-selo[data-alerta="1"] { background: var(--atencao-fraca); }
 }
 
 @media (max-width: 760px) {
   .wrap { padding: 18px 14px 56px; }
-  .masthead h1 { font-size: 24px; }
+  .topo-in { padding: 8px 14px; }
+  .inicio-tit { font-size: 21px; }
+  .passo { grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  .passo-cta { grid-column: 2; justify-self: start; }
   .card { padding: 15px; }
   .dre-head { padding: 16px 14px 13px; }
   .foot { padding: 13px 14px; }
@@ -913,6 +1398,16 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
     text-transform: uppercase;
     color: var(--tinta-2);
   }
+  /* Célula de texto corrido empilha: rótulo em cima, conteúdo embaixo.
+     Em duas colunas, uma descrição longa engordava a coluna `auto` e
+     espremia o resto da célula — no De-Para, onde a mesma célula ainda
+     carrega o motivo da revisão, o motivo virava uma tira de 40px com
+     uma palavra por linha. */
+  .tabela-cartao td.desc {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    align-items: start;
+  }
   .tabela-cartao td[data-rotulo=""] { grid-template-columns: minmax(0, 1fr); }
   .tabela-cartao td[data-rotulo=""]::before { content: none; }
   .tabela-cartao td.num { text-align: right; }
@@ -926,7 +1421,7 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
    ============================================================ */
 
 @media print {
-  .trilha, .card, .btn, .masthead p, .canal { display: none !important; }
+  .lateral, .topo, .veu, .card, .btn, .canal { display: none !important; }
   .app-grid { display: block; }
   .dre-app { background: #fff; color: #000; }
   .dre { border: none; box-shadow: none; }

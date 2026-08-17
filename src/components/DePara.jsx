@@ -61,16 +61,8 @@ export function DePara({
       <div className="card">
         <h2>De-Para — plano de contas × DRE × CPC 51</h2>
         <p className="hint">
-          Uma linha por conta de resultado: de onde ela vem no plano de contas do cliente e para
-          onde ela vai nas duas estruturas. É a tabela que a TI carrega no ERP e a primeira coisa
-          que a auditoria pede — por isso a <b>origem de cada decisão</b> fica registrada ao lado
-          do destino: mapeamento herdado do padrão e mapeamento conferido conta a conta não podem
-          parecer a mesma coisa.
-        </p>
-        <p className="hint">
-          O que você mudar aqui é a mesma decisão das etapas Classificar e Demonstração CPC 51 —
-          a DRE se refaz na hora. Para reaproveitar no mês seguinte, salve o perfil na etapa
-          Classificar.
+          Uma linha por conta: de onde vem e para onde vai nas duas estruturas.
+          Mudar aqui refaz a DRE na hora.
         </p>
         <div className="row">
           <button className="btn" onClick={onBaixarExcel}>Baixar Excel</button>
@@ -81,6 +73,20 @@ export function DePara({
             </button>
           )}
         </div>
+
+        <details className="explica">
+          <summary>Por que esta tela existe</summary>
+          <p>
+            É a tabela que a TI carrega no ERP e a primeira coisa que a auditoria pede — por
+            isso a <b>origem de cada decisão</b> fica registrada ao lado do destino: mapeamento
+            herdado do padrão e mapeamento conferido conta a conta não podem parecer a mesma
+            coisa.
+          </p>
+          <p>
+            O que você muda aqui é a mesma decisão das etapas Classificar e Demonstração
+            CPC 51. Para reaproveitar no mês seguinte, salve o perfil na etapa Classificar.
+          </p>
+        </details>
       </div>
 
       {/* 1. Quanto falta. */}
@@ -224,11 +230,7 @@ export function DePara({
       {/* 4. A conferência pelo outro lado: por destino, não por origem. */}
       <div className="card">
         <h2>Leitura por destino</h2>
-        <p className="hint">
-          O mesmo mapeamento visto do lado da DRE. É assim que se confere um De-Para grande: em
-          vez de ler 400 linhas, olha-se se as contas que caíram em cada grupo fazem sentido —
-          e o clique no grupo filtra a tabela acima.
-        </p>
+        <p className="hint">O mesmo mapeamento pelo lado da DRE. Clique num grupo para filtrar a tabela acima.</p>
         <div className="scroll" style={{ maxHeight: "none" }}>
           <table>
             <thead>
@@ -260,12 +262,16 @@ export function DePara({
       <div className="card">
         <h2>O que este arquivo serve para</h2>
         <p className="hint">
-          O De-Para exportado é o entregável da <b>Fase 2</b> do cronograma do CPC 51 (planilha
-          De-Para do plano de contas) e a especificação de entrada da <b>Fase 4</b> (parametrização
-          no ERP). O Excel sai com filtro automático ligado e uma aba de resumo por grupo; o CSV é
-          o formato que a TI costuma pedir para carga.
-          {empresa || cnpj ? "" : " Preencha empresa e CNPJ na etapa Conferir para que saiam no cabeçalho."}
+          Excel com filtro e resumo por grupo; CSV para carga no ERP.
+          {empresa || cnpj ? "" : " Preencha empresa e CNPJ na etapa Conferir para saírem no cabeçalho."}
         </p>
+        <details className="explica">
+          <summary>Onde ele entra no cronograma</summary>
+          <p>
+            É o entregável da <b>Fase 2</b> (planilha De-Para do plano de contas) e a
+            especificação de entrada da <b>Fase 4</b> (parametrização no ERP).
+          </p>
+        </details>
       </div>
     </>
   );

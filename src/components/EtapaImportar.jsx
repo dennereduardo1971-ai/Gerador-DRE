@@ -61,11 +61,7 @@ export function EtapaImportar({ carregando, progresso, onImportar, onImportarBal
         <div className="bal-cab">
           <div>
             <h2>Balancete de verificação <span className="rotulo">opcional</span></h2>
-            <p className="hint" style={{ margin: 0 }}>
-              Traz o Balanço Patrimonial pronto, com saldo anterior, movimento e saldo atual de
-              cada conta. Pode ser carregado sozinho, sem razão nenhum — e, se houver razão do
-              mesmo período, o app confere o resultado do exercício contra o Lucro Líquido da DRE.
-            </p>
+            <p className="hint" style={{ margin: 0 }}>Traz o Balanço Patrimonial pronto.</p>
           </div>
           <button className="btn ghost" onClick={() => balRef.current?.click()}>
             {abertura?.balancete ? "Trocar balancete" : "Carregar balancete"}
@@ -75,18 +71,22 @@ export function EtapaImportar({ carregando, progresso, onImportar, onImportarBal
           style={{ display: "none" }}
           onChange={(e) => { onImportarBalancete(e.target.files[0]); e.target.value = ""; }} />
         {abertura?.aviso && <p className="hint" style={{ marginTop: 12 }}>{abertura.aviso}</p>}
+
+        {/* O texto longo não sumiu do app: saiu da frente. Quem já sabe o
+            que é um balancete não precisa lê-lo toda vez que importa. */}
+        <details className="explica">
+          <summary>Para que serve</summary>
+          <p>
+            Traz saldo anterior, movimento e saldo atual de cada conta. Pode ser carregado
+            sozinho, sem razão nenhum — e, se houver razão do mesmo período, o app confere o
+            resultado do exercício contra o Lucro Líquido da DRE.
+          </p>
+        </details>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
         <h2>O que o arquivo precisa ter</h2>
-        <p className="hint">
-          Uma linha por lançamento, com conta e valor de débito e de crédito em colunas
-          separadas — o formato padrão de exportação de razão. As colunas são reconhecidas
-          pelo nome; se o seu sistema usa outros títulos, dá para ajustar na etapa 2. Funciona
-          tanto com CSV quanto com planilhas Excel — se o Excel tiver mais de uma aba, o app usa
-          a primeira que tiver dados. Arquivos grandes (dezenas de milhares de linhas) são lidos
-          em partes, sem travar a página.
-        </p>
+        <p className="hint">Uma linha por lançamento, débito e crédito em colunas separadas.</p>
         <table className="tabela-cartao">
           <thead>
             <tr><th>Coluna</th><th>Serve para</th><th>Obrigatória</th></tr>
@@ -107,6 +107,16 @@ export function EtapaImportar({ carregando, progresso, onImportar, onImportarBal
             ))}
           </tbody>
         </table>
+
+        <details className="explica">
+          <summary>Se o meu arquivo for diferente</summary>
+          <p>
+            As colunas são reconhecidas pelo nome; se o seu sistema usa outros títulos, dá para
+            ajustar na etapa Conferir. Funciona com CSV e com planilhas Excel — se a planilha
+            tiver mais de uma aba, o app usa a primeira com dados. Arquivos com dezenas de
+            milhares de linhas são lidos em partes, sem travar a página.
+          </p>
+        </details>
       </div>
     </>
   );
