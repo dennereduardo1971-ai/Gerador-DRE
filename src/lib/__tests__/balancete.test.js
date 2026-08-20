@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { achatar, coberturaBalancete, contasDeMovimento, gruposDe, nomesDoBalancete, parsearBalancete, valorDC } from "../balancete.js";
+import { achatar, coberturaBalancete, contasDeMovimento, gruposDe, nomesDoBalancete, parsearBalancete, periodoDoBalancete, periodoLegivel, valorDC } from "../balancete.js";
 
 /* Recorte fiel do balancete real (ctbr041.xlsx): mesma estrutura de
  * cabeçalho, mesma pontuação de código, mesma mistura de colunas
@@ -33,16 +33,16 @@ describe("valorDC", () => {
   it("lê a natureza pelo sufixo D/C, não pelo sinal", () => {
     expect(valorDC("1.234,56 D")).toBeCloseTo(1234.56, 2);
     expect(valorDC("1.234,56 C")).toBeCloseTo(-1234.56, 2);
-    expect(valorDC("      255.099.955,67 D")).toBeCloseTo(255099955.67, 2);
+    expect(valorDC("      987.654.321,09 D")).toBeCloseTo(987654321.09, 2);
   });
 
   it("desempata o ponto pela vírgula, como numeroBR", () => {
     // As duas formas convivem no mesmo arquivo: colunas formatadas em
     // pt-BR e colunas numéricas cruas. Tratar o ponto como milhar nos
     // dois casos multiplicava o movimento do período por cem.
-    expect(valorDC("393.899.653,88")).toBeCloseTo(393899653.88, 2);
-    expect(valorDC("393899653.88")).toBeCloseTo(393899653.88, 2);
-    expect(valorDC(393899653.88)).toBeCloseTo(393899653.88, 2);
+    expect(valorDC("123.456.789,01")).toBeCloseTo(123456789.01, 2);
+    expect(valorDC("123456789.01")).toBeCloseTo(123456789.01, 2);
+    expect(valorDC(123456789.01)).toBeCloseTo(123456789.01, 2);
   });
 
   it("devolve 0 para vazio e lixo, nunca NaN", () => {
@@ -123,8 +123,8 @@ describe("resumo — o desequilíbrio é o resultado do exercício", () => {
     //
     // E vale só neste recorte: ESTE balancete traz só as contas 1 e 2.
     // Num balancete COMPLETO os dois lados se anulam por partida dobrada
-    // — no arquivo real de jun/2026, débito = crédito = 104.386.603,85,
-    // diferença zero. Ver "resultado — período não é acumulado" abaixo.
+    // — débito e crédito do período saem iguais, diferença zero. Ver
+    // "resultado — período não é acumulado" abaixo.
     expect(r.debitoPeriodo - r.creditoPeriodo).toBeCloseTo(r.resultadoExercicio, 2);
   });
 
@@ -335,7 +335,7 @@ describe("resultado — período não é acumulado", () => {
   it("separa o acumulado do exercício do resultado do período", () => {
     // Confundir os dois acusava divergência de período dentro de UM
     // arquivo só: a DRE sai do movimento, a equação do Balanço sai do
-    // saldo. No arquivo real de jun/2026: 930.559,09 x 512.069,00.
+    // saldo.
     expect(r.resultadoAcumulado).toBeCloseTo(350, 2);
     expect(r.resultadoPeriodo).toBeCloseTo(100, 2);
   });
@@ -376,5 +376,47 @@ describe("balancete filtrado — menos contas, mesma leitura", () => {
     expect(coberturaBalancete(bal)).toMatchObject({ patrimonial: false, resultado: true });
     expect(bal.resumo.resultadoPeriodo).toBeCloseTo(100, 2);
     expect(bal.resumo.resultadoAcumulado).toBeCloseTo(350, 2);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * O período vem do próprio arquivo.
+ *
+ * O relatório grava as respostas da extração numa aba à parte. Ler dali
+ * evita pedir ao usuário um período que o arquivo já declara — e é o que
+ * deixa o histórico se rotular sozinho.
+ * ------------------------------------------------------------------ */
+describe("periodoDoBalancete", () => {
+  const PARAMETROS = {
+    nome: "Parametros",
+    linhas: [
+      ["Pergunta 01 : Data Inicial ?", "01/06/2026"],
+      ["Pergunta 02 : Data Final ?", "30/06/2026"],
+      ["Pergunta 03 : Conta Inicial ?", "1"],
+    ],
+  };
+
+  it("lê data inicial e final da aba de parâmetros", () => {
+    const p = periodoDoBalancete([PARAMETROS, { nome: "Dados", linhas: BALANCETE }]);
+    expect(p.inicio).toBe("01/06/2026");
+    expect(p.fim).toBe("30/06/2026");
+  });
+
+  it("escreve o mês por extenso quando o período é o mês inteiro", () => {
+    expect(periodoLegivel("01/06/2026", "30/06/2026")).toBe("junho de 2026");
+    expect(periodoLegivel("01/02/2026", "28/02/2026")).toBe("fevereiro de 2026");
+  });
+
+  it("não força nome de mês quando o recorte não é um mês fechado", () => {
+    // Um acumulado de seis meses não é "junho": dizer que é mentiria
+    // sobre o que o arquivo cobre.
+    expect(periodoLegivel("01/01/2026", "30/06/2026")).toBe("01/01/2026 a 30/06/2026");
+    expect(periodoLegivel("05/06/2026", "20/06/2026")).toBe("05/06/2026 a 20/06/2026");
+  });
+
+  it("devolve null quando não há período declarado, em vez de inventar", () => {
+    expect(periodoDoBalancete([{ nome: "Dados", linhas: BALANCETE }])).toBe(null);
+    expect(periodoDoBalancete(null)).toBe(null);
+    expect(periodoDoBalancete([])).toBe(null);
   });
 });

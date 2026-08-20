@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
 import { agregarPorConta, avisosDoMapeamento, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
-import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
+import { importarAbasSimples, importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { parsearAbertura } from "./lib/abertura.js";
-import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalancete } from "./lib/balancete.js";
+import { coberturaBalancete, contasDeMovimento, detectarColunas, nomesDoBalancete, parsearBalancete, periodoDoBalancete } from "./lib/balancete.js";
 import { baixarCSV, baixarExcel, periodoLegivel } from "./lib/exportacao.js";
 import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
@@ -14,7 +14,7 @@ import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
 import { baixarCSVDeParaCompleto, baixarExcelDePara } from "./lib/exportacaoDePara.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
 import { useTema } from "./lib/useTema.js";
-import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
+import { salvarNoHistorico, salvarOuAtualizar, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
 import { lerConfigGitHub } from "./lib/githubApi.js";
 import { lerSessao, limparSessao, salvarSessao } from "./lib/sessao.js";
 import { baixarPerfil, montarPerfil } from "./lib/perfil.js";
@@ -118,6 +118,56 @@ const SEMPRE_ABERTAS = ["inicio", "importar", "historico", "arquivos", "plano"];
 const CHAVE_MENU = "dre.menu.recolhido";
 /* O balancete completo desenha estas duas sozinho, sem razão. */
 const BASTA_BALANCETE = ["balanco", "painel"];
+
+/* A mensagem que a tela mostra depois de ler um balancete.
+ *
+ * Ela responde três perguntas, nessa ordem, porque é a ordem em que elas
+ * derrubam o trabalho de quem confere: o arquivo é consistente consigo
+ * mesmo? ele cobre o que eu preciso? de que período ele é?
+ *
+ * A cobertura importa mais do que parece. O relatório de fechamento
+ * costuma sair filtrado só nas contas 1 e 2, e nesse caso ele monta o
+ * Balanço mas NÃO a DRE. Sem este aviso o app mostraria uma DRE zerada,
+ * que é pior do que não mostrar nada: parece resultado, não parece
+ * arquivo incompleto. */
+function avisoDoBalancete(bal, periodo) {
+  const r = bal.resumo;
+  const partes = [
+    `Balancete de verificação carregado: ${r.nContas} contas (${r.nFolhas} analíticas)` +
+      (periodo?.legivel ? `, período de ${periodo.legivel}` : "") + ".",
+  ];
+
+  partes.push(
+    r.integro
+      ? "Conferência interna do arquivo: anterior + movimento = atual em todas as linhas, e cada conta sintética bate com suas filhas."
+      : `Atenção: ${r.inconsistentes} linha(s) e ${r.sinteticasErradas} sintética(s) não fecham dentro do próprio arquivo.`
+  );
+
+  // A hierarquia não é dedutível só do código quando a máscara do
+  // relatório é ambígua; quando o app precisa remontar um ramo para a
+  // sintética fechar, ele diz que remontou — não é silencioso.
+  if (bal.reconciliadas.length) {
+    partes.push(
+      `A hierarquia de ${bal.reconciliadas.length} ramo(s) foi remontada pelos próprios totais do arquivo ` +
+      `(${bal.reconciliadas.map((m) => `${m.de} → ${m.para}`).join(", ")}), porque a numeração das contas sozinha não fechava.`
+    );
+  }
+
+  const cob = coberturaBalancete(bal);
+  if (!cob.resultado) {
+    partes.push(
+      "Este arquivo traz só as contas patrimoniais, então dá para montar o Balanço mas não a DRE. " +
+      "Para ter as duas, exporte o mesmo relatório sem filtrar por conta (da 1 até a 7)."
+    );
+  } else if (!cob.patrimonial) {
+    partes.push(
+      "Este arquivo traz só as contas de resultado, então dá para montar a DRE mas não o Balanço. " +
+      "Para ter as duas, exporte o mesmo relatório sem filtrar por conta (da 1 até a 7)."
+    );
+  }
+
+  return partes.join(" ");
+}
 
 export default function App() {
   const [aba, setAba] = useState("inicio");
@@ -323,8 +373,15 @@ export default function App() {
 
   function importarAbertura(file) {
     if (!file) return;
-    importarLinhasSimples(file)
-      .then((linhasBrutas) => {
+    /* Lê TODAS as abas: a dos dados é a que tem cabeçalho de balancete
+       (não a primeira, porque o relatório vem com uma aba "Parametros" na
+       frente), e é justamente essa aba de parâmetros que declara o
+       período coberto pelo arquivo. */
+    importarAbasSimples(file)
+      .then((abas) => {
+        const daAba = abas.find((a) => detectarColunas(a.linhas)) || abas[0];
+        const linhasBrutas = daAba ? daAba.linhas : [];
+        const periodo = periodoDoBalancete(abas);
         /* Tenta primeiro o balancete completo (hierárquico, com saldo
            anterior/débito/crédito/atual). Se o arquivo for esse, ele traz
            o Balanço inteiro pronto e vira a fonte da tela. Só se não for é
@@ -336,18 +393,8 @@ export default function App() {
             saldos: completo.saldosAbertura,
             arquivo: file.name,
             balancete: completo,
-            aviso: `Balancete de verificação carregado: ${completo.resumo.nContas} contas ` +
-              `(${completo.resumo.nFolhas} analíticas).` +
-              (completo.resumo.integro
-                ? " Conferência interna do arquivo: anterior + movimento = atual em todas as linhas, e cada conta sintética bate com suas filhas."
-                : ` Atenção: ${completo.resumo.inconsistentes} linha(s) e ${completo.resumo.sinteticasErradas} sintética(s) não fecham dentro do próprio arquivo.`) +
-              // A hierarquia não é dedutível só do código quando a máscara
-              // do relatório é ambígua; quando o app precisa remontar um
-              // ramo para a sintética fechar, ele diz que remontou.
-              (completo.reconciliadas.length
-                ? ` A hierarquia de ${completo.reconciliadas.length} ramo(s) foi remontada pelos próprios totais do arquivo ` +
-                  `(${completo.reconciliadas.map((m) => `${m.de} → ${m.para}`).join(", ")}), porque a numeração das contas sozinha não fechava.`
-                : ""),
+            periodo,
+            aviso: avisoDoBalancete(completo, periodo),
           });
           return;
         }
@@ -455,6 +502,28 @@ export default function App() {
     () => montarDRE(contasResultado, grupoDe),
     [contasResultado, classif, sugestao]
   );
+
+  /* HISTÓRICO SE ALIMENTA SOZINHO AO LER UM BALANCETE.
+     O balancete declara o próprio período, então não há o que perguntar
+     ao usuário: assim que um arquivo com contas de resultado é lido e
+     classificado, o retrato daquele mês entra no histórico.
+
+     A chave é o período, não o clique. Reimportar o mesmo mês atualiza a
+     linha em vez de duplicar, e reclassificar uma conta depois corrige o
+     retrato — senão o histórico guardaria para sempre a versão anterior à
+     correção, que é justamente a errada.
+
+     Espera `sessaoCarregada` pelo mesmo motivo que a gravação da sessão
+     espera: antes disso o estado ainda é o vazio do primeiro render. */
+  useEffect(() => {
+    if (!sessaoCarregada || !abertura.balancete) return;
+    const periodo = abertura.periodo?.legivel;
+    if (!periodo || !contasResultado.length) return;
+    const chave = `balancete|${empresa || "sem-empresa"}|${periodo}`;
+    if (salvarOuAtualizar({ empresa, cnpj, periodo, dre, chave })) {
+      setHistorico(listarHistorico());
+    }
+  }, [sessaoCarregada, abertura.balancete, abertura.periodo, contasResultado, dre, empresa, cnpj]);
 
   /* ---------- CPC 51 ----------
      A categoria é um eixo PARALELO ao grupo: a mesma conta tem um grupo

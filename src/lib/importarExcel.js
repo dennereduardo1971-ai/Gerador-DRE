@@ -109,6 +109,24 @@ export async function importarExcelComoLinhas(file) {
   return XLSX.utils.sheet_to_json(wb.Sheets[candidatas[0]], { header: 1, defval: "" });
 }
 
+/** Todas as abas do arquivo, cada uma como array de arrays.
+ *
+ *  Existe porque um relatório contábil não guarda tudo o que interessa na
+ *  mesma aba: o balancete traz os dados numa aba e os PARÂMETROS da
+ *  extração — inclusive o período que ele cobre — em outra. Quem só quer
+ *  os dados usa `importarExcelComoLinhas`, que já escolhe a aba certa por
+ *  conteúdo; quem precisa cruzar as abas (achar o período na aba de
+ *  parâmetros, por exemplo) usa esta. */
+export async function importarExcelAbas(file) {
+  const [XLSX, buf] = await Promise.all([import("xlsx"), file.arrayBuffer()]);
+  const wb = XLSX.read(buf, { type: "array" });
+  const abasComDados = wb.SheetNames.filter((nome) => temDados(XLSX, wb.Sheets[nome]));
+  return (abasComDados.length ? abasComDados : wb.SheetNames).map((nome) => ({
+    nome,
+    linhas: XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, defval: "" }),
+  }));
+}
+
 const EXTENSOES_EXCEL = [".xlsx", ".xls", ".xlsm", ".xlsb", ".ods"];
 
 export function ehArquivoExcel(nome) {

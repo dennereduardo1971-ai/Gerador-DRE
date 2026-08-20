@@ -31,8 +31,8 @@ const norm = (s) =>
  *  app (o ativo soma positivo, o passivo soma negativo).
  *
  *  O ponto é ambíguo e as duas formas convivem no MESMO arquivo: as
- *  colunas formatadas vêm em pt-BR ("393.899.653,88 D") e as colunas
- *  numéricas cruas vêm com ponto decimal ("393899653.88"). A regra que
+ *  colunas formatadas vêm em pt-BR ("123.456.789,01 D") e as colunas
+ *  numéricas cruas vêm com ponto decimal ("123456789.01"). A regra que
  *  desempata é a vírgula, igual à de `numeroBR`: se há vírgula, o ponto é
  *  separador de milhar; se não há, o ponto é decimal. Tratar o ponto como
  *  milhar nos dois casos multiplicava o movimento do período por cem. */
@@ -112,8 +112,8 @@ function fecha(c, porCodigo) {
  *  saem com valores IDÊNTICOS em todas as colunas, e as folhas do grupo
  *  ("4.1.10.11.4" DOCENTES PJ, "4.1.10.12.0" SEGURO VIDA...) numeram a
  *  partir do código de cinco dígitos, não do de seis. Pelo prefixo puro
- *  elas penduram no avô, e aí NENHUM dos dois fecha: sobram 400.387,33
- *  em um e faltam exatamente os mesmos 400.387,33 no outro.
+ *  elas penduram no avô, e aí NENHUM dos dois fecha: sobra um valor num
+ *  e falta exatamente o mesmo valor no outro.
  *
  *  O reparo é guardado pela conferência que o próprio arquivo permite: só
  *  tenta quando pai ou filha não fecham, e só PERMANECE se, depois de
@@ -252,14 +252,14 @@ function somarRaizes(contas, folhas, digitos, campo) {
  *  um alarme falso no arquivo real. O saldo ATUAL das contas de resultado
  *  é acumulado no exercício (o relatório pergunta a data do saldo
  *  anterior de receitas/despesas); o MOVIMENTO é só o período pedido.
- *  No balancete de jun/2026 do IESB:
+ *  Em números de exemplo, num balancete de junho:
  *
- *    Ativo − (Passivo + PL) = 930.559,09  → resultado ACUMULADO jan–jun
- *    movimento de 1 e 2     = 512.069,00  → resultado do PERÍODO (junho)
+ *    Ativo − (Passivo + PL) = 500.000,00  → resultado ACUMULADO do ano
+ *    movimento de 1 e 2     = 300.000,00  → resultado do PERÍODO (junho)
  *
- *  e a DRE montada a partir deste mesmo arquivo apura 512.069,00, porque
- *  `contasDeMovimento` usa débito e crédito do período. Confrontá-la com
- *  os 930.559,09 acusava "os dois arquivos podem não cobrir o mesmo
+ *  e a DRE montada a partir deste mesmo arquivo apura os 300.000,00,
+ *  porque `contasDeMovimento` usa débito e crédito do período. Confrontá-
+ *  la com o acumulado acusava "os dois arquivos podem não cobrir o mesmo
  *  período" sobre UM arquivo só. Por isso os dois saem daqui separados.
  *
  *  As contas patrimoniais e as de resultado dão o mesmo número por
@@ -411,4 +411,65 @@ export function gruposDe(bal, digito) {
       ...g,
       itens: g.filhos.map((f) => bal.porCodigo.get(f)).sort((a, b) => a.codigo.localeCompare(b.codigo)),
     }));
+}
+
+/* ------------------------------------------------------------------ *
+ * O período que o balancete cobre.
+ *
+ * O relatório do sistema contábil grava numa aba à parte ("Parametros")
+ * as respostas usadas na extração — entre elas a data inicial e a final.
+ * Ler isso evita pedir ao usuário que digite um período que o arquivo já
+ * declara, e é o que permite rotular sozinho o retrato salvo no
+ * histórico.
+ *
+ * É best-effort de propósito: se a aba não vier, ou vier com outro texto,
+ * devolve null e o app segue sem rótulo automático — nunca inventa uma
+ * data, porque um período errado num arquivo entregue ao cliente é pior
+ * do que período nenhum.
+ * ------------------------------------------------------------------ */
+
+const MES_EXTENSO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+const ehData = (v) => /^\s*\d{2}\/\d{2}\/\d{4}\s*$/.test(String(v ?? ""));
+
+/** Procura "Data Inicial" e "Data Final" em qualquer aba, em qualquer
+ *  coluna: a resposta é a primeira célula com cara de data na mesma
+ *  linha do rótulo. */
+export function periodoDoBalancete(abas) {
+  if (!Array.isArray(abas)) return null;
+  let inicio = null, fim = null;
+
+  for (const aba of abas) {
+    for (const linha of aba?.linhas || []) {
+      if (!Array.isArray(linha)) continue;
+      const rotulo = norm(linha.find((c) => String(c ?? "").trim()) ?? "");
+      if (!rotulo.includes("data")) continue;
+      const data = linha.slice(1).find(ehData);
+      if (!data) continue;
+      if (rotulo.includes("datainicial") && !inicio) inicio = String(data).trim();
+      else if (rotulo.includes("datafinal") && !fim) fim = String(data).trim();
+    }
+  }
+
+  if (!inicio && !fim) return null;
+  return { inicio, fim, legivel: periodoLegivel(inicio, fim) };
+}
+
+/** "01/06/2026"–"30/06/2026" → "junho de 2026". Quando as datas não são o
+ *  mês inteiro, ou cruzam meses, escreve o intervalo em vez de forçar um
+ *  nome de mês que mentiria sobre o recorte. */
+export function periodoLegivel(inicio, fim) {
+  const partes = (d) => {
+    const m = String(d ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return m ? { dia: +m[1], mes: +m[2], ano: +m[3] } : null;
+  };
+  const a = partes(inicio), b = partes(fim);
+  if (!a || !b) return inicio || fim || "";
+  const mesmoMes = a.mes === b.mes && a.ano === b.ano;
+  const ultimoDia = new Date(b.ano, b.mes, 0).getDate();
+  if (mesmoMes && a.dia === 1 && b.dia === ultimoDia) {
+    return `${MES_EXTENSO[a.mes - 1]} de ${a.ano}`;
+  }
+  return `${inicio} a ${fim}`;
 }

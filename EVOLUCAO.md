@@ -39,17 +39,18 @@ Duas regras que não se afrouxam:
 
 ## Estado atual
 
-_Atualizado em 17/08/2026._
+_Atualizado em 20/08/2026._
 
 | | |
 |---|---|
-| Testes | 230 (Vitest, 15 arquivos) |
-| Lint | `npx oxlint src/` — **zero avisos** (os 2 de `historico.js` foram corrigidos) |
-| Bundle | app 416 kB (128 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
+| Testes | 234 (Vitest, 15 arquivos) |
+| Lint | `npx oxlint src/` — zero avisos em `src/` (`fixtures/validar.mjs` tem 1 erro pré-existente, fora de `src/`) |
+| Bundle | app 422 kB (130 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
 | CSS | 41 kB (8,3 kB gzip) |
-| Código | ~8.955 linhas em `src/` (App.jsx + lib + components) |
-| Maiores arquivos | `App.jsx` (875), `cpc51.js` (455), `cronograma51.js` (370) |
-| Validação contra DRE real | `node fixtures/validar.mjs` — **não roda nesta máquina** (os arquivos reais são gitignorados) |
+| Código | ~9.000 linhas em `src/` (App.jsx + lib + components) |
+| Maiores arquivos | `App.jsx` (951), `cpc51.js` (455), `balancete.js` (475) |
+| Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina) |
+| Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante de parametrização) conferidos fora do repositório: período, integridade, reconciliação de hierarquia e DRE batendo ao centavo nos 6 |
 | Skills versionadas | 6 (`manter-evolucao`, `testar-com-arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`, `nova-funcionalidade`, `otimizar-app`) |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) |
 
@@ -66,6 +67,77 @@ dado em `SECOES` (`App.jsx`):
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 20/08/2026 — merge de dois trabalhos paralelos no balancete + remoção de valores reais
+
+Pedido inicial era só "faz o deploy". Ao mesclar o branch de trabalho na
+`main`, apareceu conflito de verdade: outra sessão (Claude Sonnet 5, aqui
+mesmo, em paralelo) já tinha resolvido boa parte do mesmo problema —
+aba errada do relatório, hierarquia ambígua, período × acumulado — só que
+com uma solução MELHOR para a hierarquia do que a minha.
+
+**O que foi comparado antes de decidir.** As duas sessões atacaram os
+mesmos três problemas do balancete real do IESB. Rodei a versão da `main`
+sozinha (sem nenhuma mudança minha) contra os 6 arquivos reais do
+cliente antes de decidir qualquer coisa:
+
+- Sheet-picking: a `main` usa `pontuarAbaDeContas` (pontua cada aba pelo
+  número de linhas com cara de código de conta), embutido direto em
+  `importarExcelComoLinhas` — mais genérico que o predicado explícito que
+  eu tinha feito.
+- Hierarquia: a `main` tem `reconciliarHierarquia`, que detecta o NÍVEL
+  DE PASSAGEM (sintética que repete os valores do próprio pai — caso real
+  do "Custo Total Docentes" vs "Custo com Pessoal Docentes") e só aplica
+  o reparo se ele verificavelmente fizer as duas pontas fecharem. Isso é
+  estritamente melhor do que a saída que eu tinha escolhido na sessão
+  anterior (uma conferência "por raiz" que contorna o problema sem
+  consertar a árvore). Testado nos 6 arquivos: `integro=true` e
+  `sinteticasErradas=0` em todos, sem exceção.
+- Período × acumulado: a `main` resolveu com `resultadoPeriodo` /
+  `resultadoAcumulado` / `resultadoConfere` dentro de `resumir()` — mais
+  simples que o `contasAcumuladas()` que eu tinha criado (que dava uma
+  DRE acumulada linha a linha; ninguém pediu isso, então descartei em
+  nome de menos código).
+
+**Decisão:** a versão da `main` venceu nesses três pontos. O merge
+manteve o trabalho dela em `balancete.js`, `balancete.test.js`,
+`importarExcel.js` e `BalancoCompleto.jsx`, e ACRESCENTOU por cima só o
+que era exclusivo do meu branch e a `main` não tinha:
+
+- `periodoDoBalancete`/`periodoLegivel` — leitura do período pela aba de
+  parâmetros do relatório.
+- `salvarOuAtualizar` em `historico.js` — histórico se alimentando
+  sozinho ao reconhecer um balancete, com chave por período (reimportar
+  atualiza, não duplica).
+- Reordenação de `EtapaImportar.jsx` — balancete primeiro, razão atrás de
+  "opções avançadas" (preservando o padrão `<details>` que a `main` já
+  tinha introduzido nessa tela).
+
+Confirmado depois do merge, rodando a cadeia completa (leitura de todas
+as abas → escolha por conteúdo → período → DRE) contra os 6 arquivos
+reais outra vez: período lido certo nos 6, `integro=true` nos 6,
+`resultadoPeriodo` da DRE batendo com o do balancete nos 6.
+
+**O outro achado da auditoria: valores reais tinham voltado.** A sessão
+que fez o trabalho da `main` não sabia que uma sessão anterior já tinha
+removido saldo/resultado real de comentário e teste — e, ao documentar o
+próprio trabalho com precisão, reintroduziu vários (a mesma classe de
+vazamento, maior desta vez: oito ocorrências entre `CLAUDE.md`,
+`balancete.js` e o teste). Trocados de novo por números fictícios
+consistentes entre si (a mesma identidade Ativo − Passivo = resultado
+continua batendo, só que com números que não são de ninguém). A regra
+"nunca escreva valor real em comentário, teste ou doutrina" — que também
+tinha se perdido nesse meio-tempo — voltou para `CLAUDE.md`.
+
+**O que isso não resolve:** os valores de ambas as rodadas continuam no
+histórico do Git. Ver a entrada de 20/08 anterior sobre isso — a decisão
+de reescrever histórico ou tornar o repositório privado continua em
+aberto.
+
+Medido: 234 testes (de 230 da `main`), lint zero avisos em `src/`, build
+ok. `fixtures/validar.mjs` não rodou (arquivos reais ausentes nesta
+máquina).
+
 
 ### 17/08/2026 — balancete `ctbr041`: aba certa, nível de passagem e período × acumulado
 

@@ -111,7 +111,11 @@ src/
 
 Fluxo do app: Importar → Conferir → Classificar → DRE. As demais abas
 são vistas paralelas sobre o mesmo estado agregado (`contas`, calculado
-uma vez em `App.jsx` via `agregarPorConta`).
+uma vez em `App.jsx` via `agregarPorConta`). **Na etapa Importar o
+balancete vem primeiro e o razão está atrás de "opções avançadas"**: o
+balancete já passou pelo fechamento e monta DRE e Balanço sozinho,
+enquanto o razão só é necessário para o que ele não carrega (competência
+mês a mês num arquivo só, centro de custo, lançamento individual).
 
 **A navegação é dado, não JSX.** `SECOES` em `App.jsx` descreve cinco
 seções, cada uma agrupando abas que respondem à mesma pergunta. **Início**
@@ -441,6 +445,15 @@ seguro que reescrever a hierarquia de subtotais.
   uma tira de 40px — com uma palavra por linha — para o rótulo e para
   qualquer conteúdo extra da mesma célula (no De-Para, o motivo da
   revisão). Célula de texto corrido leva `className="desc"`, que empilha.
+- **Nunca escreva VALOR real em comentário, teste ou documentação.**
+  Não basta manter as planilhas fora do Git: saldo, total de Ativo,
+  débito do período e resultado do exercício já vazaram mais de uma vez
+  por essa porta — copiados do arquivo real para dentro de comentário de
+  código, de teste e do próprio `CLAUDE.md`, "só para ilustrar". Num
+  repositório público, isso é a demonstração financeira de uma
+  instituição identificada. Para ilustrar formato, use número fictício e
+  diga que é exemplo. O que pode ser citado é ESTRUTURA (código de conta,
+  nome de conta-síntese, quantidade de níveis), nunca quantia.
 - **Nunca commite os arquivos reais de razão/plano de contas do
   Denner** (números financeiros de instituição real) — ficam em
   `fixtures/`, que está no `.gitignore`.
@@ -484,7 +497,7 @@ valendo para quem quer conferir o build localmente antes:
 
 ```bash
 npm install
-npm test             # 211 testes (conferir em EVOLUCAO.md)
+npm test             # 234 testes (conferir em EVOLUCAO.md)
 npm run build        # gera dist/
 rm -rf docs && cp -r dist docs   # normalmente desnecessário: o CI faz
 ```
@@ -704,8 +717,8 @@ Sete armadilhas deste formato, todas cobertas por teste:
   DOCENTES) e `4.1.10.10` (CUSTO COM PESSOAL - DOCENTES) saem com valores
   **idênticos nas cinco colunas**, e as folhas do ramo numeram a partir do
   código de cinco dígitos (`4.1.10.11.4` = `4110114`), não do de seis.
-  Pelo prefixo puro sobram 400.387,33 numa sintética e faltam os mesmos
-  400.387,33 na outra. `reconciliarHierarquia` move as filhas para a
+  Pelo prefixo puro sobra um valor numa sintética e falta o mesmo valor
+  na outra. `reconciliarHierarquia` move as filhas para a
   sintética de passagem — e **só mantém o movimento se os dois lados
   passarem a fechar**, então um arquivo cuja hierarquia por prefixo já
   bate nunca é tocado, e um que não fecha de verdade continua sendo
@@ -714,30 +727,31 @@ Sete armadilhas deste formato, todas cobertas por teste:
 - **As sintéticas já vêm somadas.** Totalizar tudo dá o dobro; só as
   folhas entram em qualquer soma calculada aqui.
 - **O ponto é ambíguo dentro do mesmo arquivo**: colunas formatadas vêm
-  em pt-BR (`393.899.653,88`) e colunas numéricas cruas vêm com ponto
-  decimal (`393899653.88`). Quem desempata é a vírgula, igual a
+  em pt-BR (`123.456.789,01`) e colunas numéricas cruas vêm com ponto
+  decimal (`123456789.01`). Quem desempata é a vírgula, igual a
   `numeroBR`. Tratar ponto como milhar nos dois casos multiplicava o
   movimento do período por cem.
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença entre Ativo e Passivo + PL é o resultado do exercício, que
-  está nas contas 3 a 7. No arquivo real de jun/2026: 253.582.263,93 −
-  252.651.704,84 = 930.559,09. **Nunca trate isso como erro de
+  está nas contas 3 a 7. Em números de exemplo: Ativo 200.000.000,00 −
+  Passivo 199.500.000,00 = 500.000,00. **Nunca trate isso como erro de
   importação.**
 - **Resultado do PERÍODO não é resultado ACUMULADO — e confundir os dois
   gera alarme falso.** O saldo atual das contas de resultado é acumulado
   no exercício (o relatório pergunta a data do saldo anterior de
-  receitas/despesas); o movimento é só o período pedido. No mesmo arquivo:
-  acumulado jan–jun = 930.559,09, período (junho) = 512.069,00 — e a DRE,
-  que `contasDeMovimento` monta de débito e crédito **do período**, apura
-  512.069,00. Confrontá-la com os 930.559,09 acusava "os dois arquivos
-  podem não cobrir o mesmo período" sobre UM arquivo só. `resumir` devolve
+  receitas/despesas); o movimento é só o período pedido. Em números de
+  exemplo, num arquivo de junho: acumulado do exercício = 500.000,00,
+  período (só junho) = 300.000,00 — e a DRE, que `contasDeMovimento`
+  monta de débito e crédito **do período**, apura os 300.000,00.
+  Confrontá-la com o acumulado acusava "os dois arquivos podem não cobrir
+  o mesmo período" sobre UM arquivo só. `resumir` devolve
   `resultadoAcumulado` e `resultadoPeriodo` separados, e a tela confronta
   a DRE com o do período (dizendo quando ela bate com o acumulado, que é o
   caso do razão do exercício inteiro).
 - **"Débitos − créditos = resultado" só vale no balancete FILTRADO em 1 e
   2.** Num balancete completo os dois lados se anulam por partida dobrada:
-  no arquivo real, débito = crédito = 104.386.603,85, ou seja a diferença
-  é **zero**, não 930.559,09. A identidade que vale sempre é
+  débito e crédito do período saem IGUAIS, ou seja a diferença entre eles
+  é **zero**, não o resultado do exercício. A identidade que vale sempre é
   Δ(Ativo + Passivo) do período = resultado do período — e quando o
   arquivo traz os dois lados, as contas patrimoniais e as de resultado
   apuram esse mesmo número por caminhos independentes (`resultadoConfere`).
