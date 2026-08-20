@@ -64,14 +64,40 @@ export async function importarExcel(file, onProgress) {
 }
 
 /** Lê um arquivo Excel como array de arrays (sem assumir cabeçalho) — usado
- *  pelo plano de contas, que é só duas colunas (código, descrição), ao
- *  contrário do razão principal que precisa dos nomes das colunas. */
-export async function importarExcelComoLinhas(file) {
+ *  pelo plano de contas e pelo balancete, que não têm o formato de uma
+ *  tabela com nomes de coluna previsíveis como o razão.
+ *
+ *  `preferir` existe porque "a primeira aba com dados" é um palpite ruim.
+ *  O balancete que o sistema contábil emite vem com uma aba "Parametros"
+ *  ANTES da aba de dados — 30 linhas de configuração do relatório, que
+ *  contam como "dados" e ganhavam a escolha. Resultado: o app lia os
+ *  parâmetros do relatório, não achava conta nenhuma e dizia ao usuário
+ *  que o arquivo não servia.
+ *
+ *  Com `preferir`, quem chama diz o que está procurando ("uma aba onde eu
+ *  consiga achar cabeçalho de balancete") e a decisão passa a ser pelo
+ *  CONTEÚDO, não pela posição nem pelo nome da aba — que também varia. */
+export async function importarExcelComoLinhas(file, preferir) {
+  const abas = await importarExcelAbas(file);
+  const escolhida = (preferir && abas.find((a) => preferir(a.linhas))) || abas[0];
+  return escolhida ? escolhida.linhas : [];
+}
+
+/** Todas as abas do arquivo, cada uma como array de arrays.
+ *
+ *  Existe porque um relatório contábil não guarda tudo o que interessa na
+ *  mesma aba: o balancete traz os dados numa aba e os PARÂMETROS da
+ *  extração — inclusive o período que ele cobre — em outra. Quem só quer
+ *  os dados usa `importarExcelComoLinhas`; quem precisa cruzar as abas
+ *  usa esta. */
+export async function importarExcelAbas(file) {
   const [XLSX, buf] = await Promise.all([import("xlsx"), file.arrayBuffer()]);
   const wb = XLSX.read(buf, { type: "array" });
-  const abasComDados = wb.SheetNames.filter((nome) => temDados(XLSX, wb.Sheets[nome]));
-  const aba = abasComDados[0] || wb.SheetNames[0];
-  return XLSX.utils.sheet_to_json(wb.Sheets[aba], { header: 1, defval: "" });
+  const candidatas = wb.SheetNames.filter((nome) => temDados(XLSX, wb.Sheets[nome]));
+  return (candidatas.length ? candidatas : wb.SheetNames).map((nome) => ({
+    nome,
+    linhas: XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, defval: "" }),
+  }));
 }
 
 const EXTENSOES_EXCEL = [".xlsx", ".xls", ".xlsm", ".xlsb", ".ods"];

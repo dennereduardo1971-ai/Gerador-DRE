@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { achatar, coberturaBalancete, contasDeMovimento, gruposDe, nomesDoBalancete, parsearBalancete, valorDC } from "../balancete.js";
+import { achatar, coberturaBalancete, contasAcumuladas, contasDeMovimento, gruposDe, nomesDoBalancete, parsearBalancete, periodoDoBalancete, periodoLegivel, valorDC } from "../balancete.js";
 
 /* Recorte fiel do balancete real (ctbr041.xlsx): mesma estrutura de
  * cabeçalho, mesma pontuação de código, mesma mistura de colunas
@@ -127,7 +127,7 @@ describe("resumo — o desequilíbrio é o resultado do exercício", () => {
 
   it("confere a integridade interna do arquivo", () => {
     expect(r.inconsistentes).toBe(0);
-    expect(r.sinteticasErradas).toBe(0);
+    expect(r.raizesErradas).toBe(0);
     expect(r.integro).toBe(true);
   });
 
@@ -208,5 +208,161 @@ describe("balancete como fonte da DRE", () => {
     expect(nomes["1"]).toBe("ATIVO");
     expect(nomes["11110"]).toBe("CAIXA");
     expect(nomes["1111001"]).toBe("FUNDO FIXO");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * As duas leituras do MESMO arquivo: mês e acumulado.
+ *
+ * Um balancete mensal traz o movimento do período (resultado do mês) e o
+ * saldo atual (resultado acumulado do exercício). O app já lia o
+ * primeiro; ignorar o segundo fazia a tela acusar divergência contra o
+ * Balanço todo mês, porque comparava o acumulado do Balanço com a DRE do
+ * mês. Estes testes congelam a distinção.
+ * ------------------------------------------------------------------ */
+describe("mês × acumulado", () => {
+  /* Conta de resultado com histórico: já vinham R$ 900 acumulados de
+     meses anteriores (saldo anterior) e o mês corrente somou R$ 100. */
+  const COM_RESULTADO = [
+    CABECALHO,
+    ["1", "ATIVO", "      1.000,00 D", 100, 0, "        100,00 D", "      1.100,00 D"],
+    ["1.1.11.00.1", "CAIXA", "      1.000,00 D", 100, 0, "        100,00 D", "      1.100,00 D"],
+    ["2", "PASSIVO", "        100,00 C", 0, 0, "          0,00", "        100,00 C"],
+    ["2.1.10.00.1", "FORNECEDOR A", "        100,00 C", 0, 0, "          0,00", "        100,00 C"],
+    ["3", "RECEITAS", "        900,00 C", 0, 100, "        100,00 C", "      1.000,00 C"],
+    ["3.1.10.00.1", "MENSALIDADES", "        900,00 C", 0, 100, "        100,00 C", "      1.000,00 C"],
+  ];
+  const bal = parsearBalancete(COM_RESULTADO);
+
+  it("contasDeMovimento devolve o resultado só do MÊS", () => {
+    const rec = contasDeMovimento(bal).find((c) => c.conta === "3110001");
+    expect(rec.saldo).toBeCloseTo(100, 2); // crédito − débito do período
+  });
+
+  it("contasAcumuladas devolve o resultado do EXERCÍCIO até a data", () => {
+    const rec = contasAcumuladas(bal).find((c) => c.conta === "3110001");
+    expect(rec.saldo).toBeCloseTo(1000, 2); // 900 anteriores + 100 do mês
+  });
+
+  it("as duas mantêm a convenção de sinal: receita credora é positiva", () => {
+    const mov = contasDeMovimento(bal).find((c) => c.conta === "3110001");
+    const acu = contasAcumuladas(bal).find((c) => c.conta === "3110001");
+    expect(mov.saldo).toBeGreaterThan(0);
+    expect(acu.saldo).toBeGreaterThan(0);
+  });
+
+  it("o acumulado é o que reproduz o desequilíbrio do Balanço", () => {
+    /* Ativo − (Passivo + PL) tem que dar o resultado ACUMULADO, não o do
+       mês. É essa igualdade que a tela confere — e era ela que dava
+       alarme falso quando comparada contra a DRE mensal. */
+    const acumulado = contasAcumuladas(bal)
+      .filter((c) => c.conta[0] >= "3")
+      .reduce((s, c) => s + c.saldo, 0);
+    expect(bal.resumo.resultadoExercicio).toBeCloseTo(acumulado, 2);
+    // e o do mês, neste arquivo, é outro número — de propósito
+    const doMes = contasDeMovimento(bal)
+      .filter((c) => c.conta[0] >= "3")
+      .reduce((s, c) => s + c.saldo, 0);
+    expect(doMes).not.toBeCloseTo(acumulado, 2);
+  });
+});
+
+describe("integridade não depende da árvore", () => {
+  /* A hierarquia é reconstruída pelo prefixo mais longo existente, e num
+     plano de contas real isso erra o galho de algumas folhas: 4110110
+     pertence à sintética 411010, que NÃO é prefixo dela. Nenhum total
+     muda por causa disso — o conjunto de folhas é o mesmo. Por isso a
+     conferência é por raiz, e não sintética a sintética. */
+  const ARVORE_AMBIGUA = [
+    CABECALHO,
+    ["4", "DESPESAS", "          0,00", 300, 0, "        300,00 D", "        300,00 D"],
+    ["4.1.10.1", "CUSTO TOTAL", "          0,00", 300, 0, "        300,00 D", "        300,00 D"],
+    ["4.1.10.10", "CUSTO COM PESSOAL", "          0,00", 300, 0, "        300,00 D", "        300,00 D"],
+    ["4.1.10.10.1", "SALARIOS", "          0,00", 200, 0, "        200,00 D", "        200,00 D"],
+    ["4.1.10.11.0", "EXAMES PERIODICOS", "          0,00", 100, 0, "        100,00 D", "        100,00 D"],
+  ];
+  const bal = parsearBalancete(ARVORE_AMBIGUA);
+
+  it("a folha de prefixo diferente cai em outro galho", () => {
+    // 4110110 não tem 411010 como prefixo, então pendura em 41101.
+    expect(bal.porCodigo.get("4110110").pai).toBe("41101");
+    expect(bal.porCodigo.get("4110101").pai).toBe("411010");
+  });
+
+  it("mesmo assim a raiz fecha, e o arquivo é dado como íntegro", () => {
+    expect(bal.resumo.raizesErradas).toBe(0);
+    expect(bal.resumo.integro).toBe(true);
+  });
+
+  it("o desencontro da árvore é reportado à parte, sem virar erro", () => {
+    expect(bal.resumo.sinteticasAproximadas).toBeGreaterThan(0);
+  });
+
+  it("nenhuma folha se perde: elas somam o total da raiz", () => {
+    const soma = bal.folhas.reduce((s, c) => s + c.atual, 0);
+    expect(soma).toBeCloseTo(bal.porCodigo.get("4").atual, 2);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * O período vem do próprio arquivo.
+ *
+ * O relatório grava as respostas da extração numa aba à parte. Ler dali
+ * evita pedir ao usuário um período que o arquivo já declara — e é o que
+ * deixa o histórico se rotular sozinho.
+ * ------------------------------------------------------------------ */
+describe("periodoDoBalancete", () => {
+  const PARAMETROS = {
+    nome: "Parametros",
+    linhas: [
+      ["Pergunta 01 : Data Inicial ?", "01/06/2026"],
+      ["Pergunta 02 : Data Final ?", "30/06/2026"],
+      ["Pergunta 03 : Conta Inicial ?", "1"],
+    ],
+  };
+
+  it("lê data inicial e final da aba de parâmetros", () => {
+    const p = periodoDoBalancete([PARAMETROS, { nome: "Dados", linhas: BALANCETE }]);
+    expect(p.inicio).toBe("01/06/2026");
+    expect(p.fim).toBe("30/06/2026");
+  });
+
+  it("escreve o mês por extenso quando o período é o mês inteiro", () => {
+    expect(periodoLegivel("01/06/2026", "30/06/2026")).toBe("junho de 2026");
+    expect(periodoLegivel("01/02/2026", "28/02/2026")).toBe("fevereiro de 2026");
+  });
+
+  it("não força nome de mês quando o recorte não é um mês fechado", () => {
+    // Um acumulado de seis meses não é "junho": dizer que é mentiria
+    // sobre o que o arquivo cobre.
+    expect(periodoLegivel("01/01/2026", "30/06/2026")).toBe("01/01/2026 a 30/06/2026");
+    expect(periodoLegivel("05/06/2026", "20/06/2026")).toBe("05/06/2026 a 20/06/2026");
+  });
+
+  it("devolve null quando não há período declarado, em vez de inventar", () => {
+    expect(periodoDoBalancete([{ nome: "Dados", linhas: BALANCETE }])).toBe(null);
+    expect(periodoDoBalancete(null)).toBe(null);
+    expect(periodoDoBalancete([])).toBe(null);
+  });
+});
+
+/* A aba certa é a que TEM cabeçalho de balancete. O relatório real vem
+ * com uma aba de parâmetros ANTES da aba de dados, e "a primeira aba com
+ * dados" escolhia a errada — o app lia os parâmetros, não achava conta
+ * nenhuma e dizia ao usuário que o arquivo não servia. */
+describe("escolha da aba pelo conteúdo", () => {
+  const PARAMETROS = [
+    ["Pergunta 01 : Data Inicial ?", "01/06/2026"],
+    ["Pergunta 02 : Data Final ?", "30/06/2026"],
+  ];
+
+  it("a aba de parâmetros não passa por balancete", () => {
+    expect(parsearBalancete(PARAMETROS)).toBe(null);
+  });
+
+  it("a aba de dados passa, e é ela que o predicado encontra", () => {
+    const abas = [{ linhas: PARAMETROS }, { linhas: BALANCETE }];
+    const escolhida = abas.find((a) => parsearBalancete(a.linhas));
+    expect(escolhida.linhas).toBe(BALANCETE);
   });
 });

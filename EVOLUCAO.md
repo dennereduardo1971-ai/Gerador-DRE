@@ -39,23 +39,83 @@ Duas regras que não se afrouxam:
 
 ## Estado atual
 
-_Atualizado em 10/08/2026._
+_Atualizado em 20/08/2026._
 
 | | |
 |---|---|
-| Testes | 198 (Vitest, 13 arquivos) |
+| Testes | 212 (Vitest, 13 arquivos) |
 | Lint | `npx oxlint src/` — 2 avisos pré-existentes em `historico.js` |
-| Bundle | app 391 kB (121 kB gzip) + `xlsx` 424 kB em chunk sob demanda |
+| Bundle | app 396 kB (123 kB gzip) + `xlsx` 424 kB em chunk sob demanda |
 | CSS | 30 kB (6,6 kB gzip) |
-| Código | ~7.800 linhas em `src/` |
-| Maiores arquivos | `App.jsx` (672), `cpc51.js` (455), `cronograma51.js` (370) |
-| Validação contra DRE real | `node fixtures/validar.mjs` — **não roda nesta máquina** (os arquivos reais são gitignorados) |
+| Código | ~8.200 linhas em `src/` |
+| Maiores arquivos | `App.jsx` (761), `cpc51.js` (455), `balancete.js` (421) |
+| Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (só `validar.mjs` está na pasta; os dados reais são gitignorados) |
+| Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante de parametrização) conferidos fora do repositório: DRE mensal, DRE acumulada e Balanço batendo ao centavo |
 
-Fluxo do app: Importar → Conferir → Classificar → DRE. Vistas paralelas:
-Painel, Balanço, Horizontal, Comparativa, Histórico, Arquivos. Grupo
-CPC 51: Demonstração CPC 51 e Plano de ação.
+Fluxo do app: **Importar (balancete primeiro, razão em opções avançadas)**
+→ Conferir → Classificar → DRE. Vistas paralelas: Painel, Balanço,
+Horizontal, Comparativa, Histórico, Arquivos. Grupo CPC 51: Demonstração
+CPC 51 e Plano de ação.
 
 ## Registro
+
+### 20/08/2026 — balancete como fonte principal; mês × acumulado
+
+Sessão disparada por um pedido de "congelar o razão e trabalhar pelo
+balancete". Antes de mudar qualquer coisa, seis balancetes reais foram
+lidos com o parser do próprio repositório. O resultado mudou o plano.
+
+**O bloqueador.** Nenhum daqueles arquivos carregava no app.
+`importarExcelComoLinhas` escolhia "a primeira aba com dados", e o
+relatório do sistema contábil traz uma aba de parâmetros ANTES da aba de
+dados. O app lia os parâmetros, não achava conta nenhuma e dizia ao
+usuário que o arquivo não servia. A escolha da aba agora é por CONTEÚDO
+(um predicado que quem chama informa), não por posição nem por nome —
+o nome da aba também varia. Virou armadilha em `CLAUDE.md`.
+
+**A descoberta estrutural: um balancete mensal carrega duas DREs.**
+O movimento do período dá o resultado do mês; o saldo atual das contas de
+resultado dá o acumulado do exercício, porque elas chegam somadas desde
+janeiro. Medido nos cinco meses: a DRE acumulada reproduz `Ativo −
+Passivo` do mesmo arquivo ao centavo, e a diferença entre dois meses
+consecutivos do acumulado reproduz a DRE mensal — também ao centavo.
+Daí `contasAcumuladas()`, irmã de `contasDeMovimento()`.
+
+**Dois alarmes falsos que existiam e sumiram.** (1) A tela comparava o
+desequilíbrio do Balanço (acumulado) com a DRE do mês e acusava
+divergência todo mês sem erro nenhum existir; agora compara contra a DRE
+acumulada. (2) A conferência "cada sintética bate com suas filhas"
+acusava 2 divergências em todos os arquivos por causa da reconstrução da
+árvore por prefixo — trocada por conferência **por raiz** (soma das
+folhas de cada dígito contra o total da raiz), que não depende da árvore
+e passou 100% nos seis arquivos.
+
+**O que NÃO foi feito, de propósito.** Tentei trocar a regra de
+hierarquia por uma baseada em ordem (pilha de ancestrais mais curtos):
+ela conserta o caso do Custo Docentes e **quebra** o `1.3.40.0` que o
+`CLAUDE.md` já documentava. As duas regras erram casos diferentes e
+nenhuma serve sozinha; como nenhum total depende disso (o conjunto de
+folhas é idêntico nas duas), a árvore ficou como estava e o desencontro
+passou a ser reportado à parte, em `sinteticasAproximadas`, sem contar
+como erro. Mexer nisso sem um critério novo seria trocar um defeito
+cosmético por um defeito de valor.
+
+**Também entrou.** Leitura do período pela aba de parâmetros
+(`periodoDoBalancete`), com mês por extenso só quando o recorte é o mês
+fechado — recorte parcial sai como intervalo, para não mentir sobre o que
+o arquivo cobre. Histórico passou a se alimentar sozinho ao ler um
+balancete, com chave pelo período: reimportar o mesmo mês atualiza a
+linha em vez de duplicar, e reclassificar uma conta corrige o retrato já
+salvo. Aviso de cobertura parcial quando o balancete vem filtrado só nas
+contas patrimoniais (ou só nas de resultado), em vez de mostrar uma
+demonstração zerada.
+
+**Medido.** Vitest 198 → 212. Build ok, `xlsx` continua em chunk sob
+demanda. As seis planilhas passaram numa checagem ponta a ponta, e a DRE
+mensal dos cinco meses bate com a medição feita ANTES das mudanças —
+nenhuma regressão. `fixtures/validar.mjs` **não rodou**: a pasta só tem o
+script nesta máquina.
+
 
 ### 10/08/2026 — CPC 51: motor, telas, exportação e plano de ação
 
@@ -136,11 +196,25 @@ Ficou de fora, de propósito:
    o arquivo que mais cresce a cada funcionalidade.
 4. **Efeito tributário por item de MPDA**, com campo editável por ajuste
    — fecha a exigência da norma que hoje sai como lacuna.
-5. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
-   falta UI).
-6. **Agregar durante a importação**, em vez de guardar `linhas` cru em
-   memória — tira o teto de tamanho de arquivo.
-7. **Limpeza barata:** `historico.js` tem `lerSha` morto e uma expressão
+5. **Horizontal e Comparativa a partir de vários balancetes.** Hoje as
+   duas dependem de `dresPorCompetencia`, que só existe com razão
+   multi-mês. Ficou barato: cada balancete mensal já traz o movimento do
+   próprio mês, e a série dos cinco meses foi montada e conferida durante
+   a análise (a soma dos meses reproduz o acumulado). Falta o estado que
+   guarde N balancetes em vez de um, e a UI de carregar vários.
+6. **Seletor de aba do Excel.** `importarExcelAbas` agora devolve todas
+   as abas com o conteúdo, então a UI ficou mais fácil que antes. Menos
+   urgente desde que a escolha automática passou a ser por conteúdo.
+7. **Agregar durante a importação**, em vez de guardar `linhas` cru em
+   memória — tira o teto de tamanho de arquivo. Perde prioridade se o
+   razão deixar mesmo de ser o caminho principal.
+8. **Usar `Classe Conta` do plano de contas.** O arquivo de plano que o
+   sistema emite traz "Sintetica"/"Analitica" e "Devedora"/"Credora" por
+   conta — é a resposta autoritativa para quem é folha, que hoje é
+   inferida por prefixo. Pode resolver o desencontro de árvore
+   (`sinteticasAproximadas`) sem heurística nova. `parsearPlanoDeContas`
+   hoje só lê código e descrição.
+9. **Limpeza barata:** `historico.js` tem `lerSha` morto e uma expressão
    sem uso; são os dois únicos avisos de lint do projeto.
 
 ## Hipóteses ainda não confirmadas

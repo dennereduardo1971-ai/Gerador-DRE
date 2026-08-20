@@ -165,23 +165,57 @@ export function parsearBalancete(linhas) {
 
 /** Confere a integridade interna e mede o desequilíbrio patrimonial.
  *
- *  O desequilíbrio NÃO é erro: um balancete só das contas 1 e 2 fecha
- *  por Ativo − (Passivo + PL) = resultado do exercício, que vive nas
- *  contas 3 a 7 e ainda não foi transportado ao Patrimônio Líquido. É
- *  exatamente esse valor que a DRE do mesmo período deve reproduzir. */
+ *  O desequilíbrio NÃO é erro: um balancete das contas 1 e 2 fecha por
+ *  Ativo − (Passivo + PL) = resultado do exercício, que vive nas contas 3
+ *  a 7 e ainda não foi transportado ao Patrimônio Líquido.
+ *
+ *  ATENÇÃO AO PERÍODO. Esse resultado é o ACUMULADO do exercício, não o
+ *  do mês: as contas de resultado vêm acumuladas desde janeiro no campo
+ *  `atual`. Quem reproduz esse número é a DRE montada com
+ *  `contasAcumuladas`, NUNCA a montada com `contasDeMovimento` (que é o
+ *  resultado só do mês). Confundir os dois faz o app acusar divergência
+ *  todo mês sem que exista erro nenhum — foi medido contra cinco
+ *  balancetes reais: em todos, DRE acumulada = Ativo − Passivo até o
+ *  centavo, e DRE do mês = acumulado do mês − acumulado do mês anterior.
+ *
+ *  Duas conferências, e a diferença entre elas importa:
+ *
+ *  - `inconsistentes` — anterior + movimento = atual, linha a linha. É
+ *    aritmética do próprio arquivo, sempre confiável.
+ *  - `raizesErradas` — a soma das FOLHAS de cada dígito raiz bate com o
+ *    total da própria raiz. Também confiável, porque não depende da
+ *    árvore: quais contas são folhas se decide por prefixo, e o conjunto
+ *    de folhas é o mesmo em qualquer arranjo de pais.
+ *
+ *  `sinteticasAproximadas` é informativo e de propósito NÃO entra em
+ *  `integro`. A hierarquia é reconstruída pelo prefixo mais longo que
+ *  existe, e num plano real há conta-folha cujo pai verdadeiro não é seu
+ *  prefixo (ex.: a folha 4110110 pertence à sintética 411010, que não é
+ *  prefixo dela). Isso desloca a folha de galho sem mudar nenhum total —
+ *  tratar como erro seria acusar defeito onde só há ambiguidade de
+ *  numeração do plano de contas. */
 export function resumir(contas, porCodigo) {
   const raiz = (d) => contas.find((c) => c.codigo === d) || null;
   const ativo = raiz("1");
   const passivo = raiz("2");
 
   const folhas = contas.filter((c) => !c.filhos.length);
-  const totalAtivo = ativo ? ativo.atual : folhas.filter((c) => c.codigo[0] === "1").reduce((s, c) => s + c.atual, 0);
-  const totalPassivo = passivo ? passivo.atual : folhas.filter((c) => c.codigo[0] === "2").reduce((s, c) => s + c.atual, 0);
+  const somaFolhas = (d) => folhas.filter((c) => c.codigo[0] === d).reduce((s, c) => s + c.atual, 0);
+  const totalAtivo = ativo ? ativo.atual : somaFolhas("1");
+  const totalPassivo = passivo ? passivo.atual : somaFolhas("2");
 
   // Consistência: anterior + movimento = atual, em toda linha.
   const inconsistentes = contas.filter((c) => Math.abs(c.anterior + c.movimento - c.atual) > 0.01).length;
-  // Consistência: sintética = soma das filhas.
-  const sinteticasErradas = contas.filter((c) => {
+
+  // Consistência por raiz: independe da árvore, então não dá falso alarme.
+  const digitos = [...new Set(contas.map((c) => c.codigo[0]))];
+  const raizesErradas = digitos.filter((d) => {
+    const r = porCodigo.get(d);
+    return r && Math.abs(somaFolhas(d) - r.atual) > 0.01;
+  }).length;
+
+  // Informativo apenas — ver comentário acima.
+  const sinteticasAproximadas = contas.filter((c) => {
     if (!c.filhos.length) return false;
     const soma = c.filhos.reduce((s, f) => s + porCodigo.get(f).atual, 0);
     return Math.abs(soma - c.atual) > 0.01;
@@ -196,8 +230,9 @@ export function resumir(contas, porCodigo) {
     nContas: contas.length,
     nFolhas: folhas.length,
     inconsistentes,
-    sinteticasErradas,
-    integro: inconsistentes === 0 && sinteticasErradas === 0,
+    raizesErradas,
+    sinteticasAproximadas,
+    integro: inconsistentes === 0 && raizesErradas === 0,
   };
 }
 
@@ -246,6 +281,38 @@ export function contasDeMovimento(bal) {
   }));
 }
 
+/** A MESMA conversão, mas a partir do saldo ACUMULADO (`atual`) em vez do
+ *  movimento do período.
+ *
+ *  Um balancete mensal carrega duas demonstrações, não uma:
+ *
+ *  - `contasDeMovimento` → débito e crédito DO PERÍODO, que dão a DRE
+ *    daquele mês. É o que serve para comparar mês a mês.
+ *  - `contasAcumuladas`  → saldo atual das contas de resultado, que vêm
+ *    acumuladas desde o início do exercício. Dá a DRE do ano até aquela
+ *    data — e é ESTA que reproduz, ao centavo, o Ativo − Passivo do mesmo
+ *    arquivo.
+ *
+ *  Verificado contra cinco meses reais: para todo mês,
+ *  acumulada(mês) − acumulada(mês anterior) = mensal(mês).
+ *
+ *  O sinal segue a mesma convenção de `contasDeMovimento`: `agregarPorConta`
+ *  e `montarDRE` esperam natureza credora positiva, enquanto `atual` é
+ *  devedor positivo. Daí o `-c.atual`. Débito e crédito acumulados não
+ *  existem no arquivo (só o saldo), então são derivados do próprio saldo
+ *  para que `agruparPorDigito` continue somando algo coerente. */
+export function contasAcumuladas(bal) {
+  if (!bal) return [];
+  return bal.folhas.map((c) => ({
+    conta: c.codigo,
+    deb: Math.max(c.atual, 0),
+    cre: Math.max(-c.atual, 0),
+    saldo: -c.atual,
+    historico: c.descricao,
+    n: 0,
+  }));
+}
+
 /** Código → descrição de TODAS as contas do balancete, sintéticas
  *  inclusive.
  *
@@ -290,4 +357,65 @@ export function gruposDe(bal, digito) {
       ...g,
       itens: g.filhos.map((f) => bal.porCodigo.get(f)).sort((a, b) => a.codigo.localeCompare(b.codigo)),
     }));
+}
+
+/* ------------------------------------------------------------------ *
+ * O período que o balancete cobre.
+ *
+ * O relatório do sistema contábil grava numa aba à parte ("Parametros")
+ * as respostas usadas na extração — entre elas a data inicial e a final.
+ * Ler isso evita pedir ao usuário que digite um período que o arquivo já
+ * declara, e é o que permite rotular sozinho o retrato salvo no
+ * histórico.
+ *
+ * É best-effort de propósito: se a aba não vier, ou vier com outro texto,
+ * devolve null e o app segue sem rótulo automático — nunca inventa uma
+ * data, porque um período errado num arquivo entregue ao cliente é pior
+ * do que período nenhum.
+ * ------------------------------------------------------------------ */
+
+const MES_EXTENSO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+const ehData = (v) => /^\s*\d{2}\/\d{2}\/\d{4}\s*$/.test(String(v ?? ""));
+
+/** Procura "Data Inicial" e "Data Final" em qualquer aba, em qualquer
+ *  coluna: a resposta é a primeira célula com cara de data na mesma
+ *  linha do rótulo. */
+export function periodoDoBalancete(abas) {
+  if (!Array.isArray(abas)) return null;
+  let inicio = null, fim = null;
+
+  for (const aba of abas) {
+    for (const linha of aba?.linhas || []) {
+      if (!Array.isArray(linha)) continue;
+      const rotulo = norm(linha.find((c) => String(c ?? "").trim()) ?? "");
+      if (!rotulo.includes("data")) continue;
+      const data = linha.slice(1).find(ehData);
+      if (!data) continue;
+      if (rotulo.includes("datainicial") && !inicio) inicio = String(data).trim();
+      else if (rotulo.includes("datafinal") && !fim) fim = String(data).trim();
+    }
+  }
+
+  if (!inicio && !fim) return null;
+  return { inicio, fim, legivel: periodoLegivel(inicio, fim) };
+}
+
+/** "01/06/2026"–"30/06/2026" → "junho de 2026". Quando as datas não são o
+ *  mês inteiro, ou cruzam meses, escreve o intervalo em vez de forçar um
+ *  nome de mês que mentiria sobre o recorte. */
+export function periodoLegivel(inicio, fim) {
+  const partes = (d) => {
+    const m = String(d ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return m ? { dia: +m[1], mes: +m[2], ano: +m[3] } : null;
+  };
+  const a = partes(inicio), b = partes(fim);
+  if (!a || !b) return inicio || fim || "";
+  const mesmoMes = a.mes === b.mes && a.ano === b.ano;
+  const ultimoDia = new Date(b.ano, b.mes, 0).getDate();
+  if (mesmoMes && a.dia === 1 && b.dia === ultimoDia) {
+    return `${MES_EXTENSO[a.mes - 1]} de ${a.ano}`;
+  }
+  return `${inicio} a ${fim}`;
 }

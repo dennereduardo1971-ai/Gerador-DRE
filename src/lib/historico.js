@@ -33,13 +33,14 @@ export function listarHistorico() {
  *  totais de cada linha, não o razão inteiro, para não pesar o navegador
  *  e o repositório. Grava só localmente; use sincronizar() para mandar
  *  para o GitHub. */
-export function salvarNoHistorico({ empresa, cnpj, periodo, dre }) {
+export function salvarNoHistorico({ empresa, cnpj, periodo, dre, chave }) {
   const item = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     criadoEm: Date.now(),
     empresa: empresa || "",
     cnpj: cnpj || "",
     periodo: periodo || "",
+    chave: chave || "",
     totais: {
       receitaBruta: dre.receitaBruta,
       deducoes: dre.deducoes,
@@ -56,6 +57,62 @@ export function salvarNoHistorico({ empresa, cnpj, periodo, dre }) {
   const lista = [item, ...ler()].slice(0, LIMITE);
   gravar(lista);
   return item;
+}
+
+/** Salva um retrato identificado por `chave`, ATUALIZANDO o que já existir
+ *  com a mesma chave em vez de criar outro.
+ *
+ *  É o que permite o histórico se alimentar sozinho ao importar um
+ *  balancete. Duas garantias que o salvamento automático precisa dar para
+ *  não virar um problema:
+ *
+ *  1. Reimportar o mesmo mês não duplica a linha — a chave é o período do
+ *     próprio arquivo, não o instante do clique.
+ *  2. Reclassificar uma conta depois de importado corrige o retrato já
+ *     salvo, em vez de deixar no histórico um número que a tela não mostra
+ *     mais. Sem isso o salvamento automático congelaria justamente a
+ *     versão pré-correção, que é a errada.
+ *
+ *  A data de criação original é preservada na atualização: ela marca
+ *  quando aquele período entrou no histórico, não quando foi recalculado. */
+export function salvarOuAtualizar({ empresa, cnpj, periodo, dre, chave }) {
+  if (!chave) return null;
+  const lista = ler();
+  const anterior = lista.find((i) => i.chave === chave);
+  const novo = salvarNoHistoricoItem({ empresa, cnpj, periodo, dre, chave });
+  if (anterior) {
+    novo.id = anterior.id;
+    novo.criadoEm = anterior.criadoEm;
+    gravar(lista.map((i) => (i.chave === chave ? novo : i)));
+  } else {
+    gravar([novo, ...lista].slice(0, LIMITE));
+  }
+  return novo;
+}
+
+/** Monta o item sem gravar — usado por salvarOuAtualizar, que decide
+ *  sozinho se insere ou substitui. */
+function salvarNoHistoricoItem({ empresa, cnpj, periodo, dre, chave }) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    criadoEm: Date.now(),
+    empresa: empresa || "",
+    cnpj: cnpj || "",
+    periodo: periodo || "",
+    chave: chave || "",
+    totais: {
+      receitaBruta: dre.receitaBruta,
+      deducoes: dre.deducoes,
+      receitaLiq: dre.receitaLiq,
+      resultadoOperBruto: dre.resultadoOperBruto,
+      despOper: dre.despOper,
+      resultadoFin: dre.resultadoFin,
+      resultadoOper: dre.resultadoOper,
+      naoOper: dre.naoOper,
+      antesIR: dre.antesIR,
+      liquido: dre.liquido,
+    },
+  };
 }
 
 /** Remove um item do histórico local. Se a sincronização com o GitHub

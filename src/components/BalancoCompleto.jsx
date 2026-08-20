@@ -176,7 +176,7 @@ function Balancete({ bal }) {
 
 /* ---------- Tela ---------- */
 
-export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
+export function BalancoCompleto({ bal, arquivo, lucroLiquido, lucroLiquidoDoMes, onTrocar }) {
   const [visao, setVisao] = useState("estrutura");
   const r = bal.resumo;
 
@@ -184,9 +184,14 @@ export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
   const passivo = gruposDe(bal, "2");
   const base = r.totalAtivo || 1;
 
-  // A prova cruzada só existe se houver DRE do mesmo período na mão.
+  /* A prova cruzada só existe se houver DRE na mão — e ela tem que ser a
+     DRE ACUMULADA do exercício. O desequilíbrio do balancete (Ativo −
+     Passivo) é o resultado acumulado desde janeiro, porque as contas 3 a
+     7 chegam somadas no saldo atual. Confrontar esse número com a DRE do
+     MÊS acusa divergência todos os meses sem que exista erro nenhum. */
   const temDRE = typeof lucroLiquido === "number" && !eZero(lucroLiquido);
   const bateComDRE = temDRE && Math.abs(lucroLiquido - r.resultadoExercicio) < 0.01;
+  const temMes = typeof lucroLiquidoDoMes === "number" && !eZero(lucroLiquidoDoMes);
 
   return (
     <>
@@ -213,16 +218,19 @@ export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
           Patrimônio Líquido no encerramento do exercício.
           {temDRE ? (
             bateComDRE ? (
-              <> A DRE deste razão apurou <b>{brl(lucroLiquido)}</b> de lucro líquido: <b>bate</b> com
-                a diferença do balancete.</>
+              <> A DRE acumulada do exercício apurou <b>{brl(lucroLiquido)}</b>: <b>bate</b> com a
+                diferença do balancete.
+                {temMes && <> No período deste arquivo, isoladamente, o resultado foi{" "}
+                  <b>{brl(lucroLiquidoDoMes)}</b>.</>}
+              </>
             ) : (
-              <> A DRE deste razão apurou <b>{brl(lucroLiquido)}</b>, uma diferença de{" "}
+              <> A DRE acumulada apurou <b>{brl(lucroLiquido)}</b>, uma diferença de{" "}
                 <b>{brl(Math.abs(lucroLiquido - r.resultadoExercicio))}</b> em relação ao balancete —
-                os dois arquivos podem não cobrir o mesmo período.</>
+                vale conferir se alguma conta de resultado ficou fora da classificação.</>
             )
           ) : (
-            <> Importe o razão do mesmo período para o app conferir esse valor contra o Lucro
-              Líquido da DRE.</>
+            <> Carregue um balancete que inclua as contas de resultado, ou o razão do mesmo
+              período, para o app conferir esse valor.</>
           )}
         </p>
       </div>
@@ -243,8 +251,8 @@ export function BalancoCompleto({ bal, arquivo, lucroLiquido, onTrocar }) {
           <div className="v">{r.integro ? "Confere" : "Divergente"}</div>
           <div className="sub">
             {r.integro
-              ? "anterior + movimento = atual, e cada sintética bate com suas filhas"
-              : `${r.inconsistentes} linha(s) e ${r.sinteticasErradas} sintética(s) não fecham`}
+              ? "anterior + movimento = atual em cada linha, e as folhas somam o total de cada grupo raiz"
+              : `${r.inconsistentes} linha(s) não fecham e ${r.raizesErradas} grupo(s) raiz divergem das suas folhas`}
           </div>
         </div>
       </div>

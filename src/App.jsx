@@ -2,17 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 import { agregarPorConta, avisosDoMapeamento, competenciaLegivel, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
-import { importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
+import { importarAbasSimples, importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
 import { montarBalanco } from "./lib/balanco.js";
 import { parsearAbertura } from "./lib/abertura.js";
-import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalancete } from "./lib/balancete.js";
+import { coberturaBalancete, contasAcumuladas, contasDeMovimento, detectarColunas, nomesDoBalancete, parsearBalancete, periodoDoBalancete } from "./lib/balancete.js";
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
 import { useTema } from "./lib/useTema.js";
-import { salvarNoHistorico, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
+import { salvarNoHistorico, salvarOuAtualizar, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
 import { lerConfigGitHub } from "./lib/githubApi.js";
 import { lerSessao, limparSessao, salvarSessao } from "./lib/sessao.js";
 import { baixarPerfil, montarPerfil } from "./lib/perfil.js";
@@ -64,6 +64,47 @@ const VISTAS_CPC51 = [
   ["cpc51", "Demonstração CPC 51"],
   ["plano", "Plano de ação"],
 ];
+
+/* A mensagem que a tela mostra depois de ler um balancete.
+ *
+ * Ela responde três perguntas, nessa ordem, porque é a ordem em que elas
+ * derrubam o trabalho de quem confere: o arquivo é consistente consigo
+ * mesmo? ele cobre o que eu preciso? de que período ele é?
+ *
+ * A cobertura importa mais do que parece. O relatório de fechamento
+ * costuma sair filtrado só nas contas 1 e 2, e nesse caso ele monta o
+ * Balanço mas NÃO a DRE. Sem este aviso o app mostraria uma DRE zerada,
+ * que é pior do que não mostrar nada: parece resultado, não parece
+ * arquivo incompleto. */
+function avisoDoBalancete(bal, periodo) {
+  const r = bal.resumo;
+  const partes = [
+    `Balancete de verificação carregado: ${r.nContas} contas (${r.nFolhas} analíticas)` +
+      (periodo?.legivel ? `, período de ${periodo.legivel}` : "") + ".",
+  ];
+
+  partes.push(
+    r.integro
+      ? "Conferência interna: anterior + movimento = atual em todas as linhas, e as contas analíticas somam o total de cada grupo raiz."
+      : `Atenção: ${r.inconsistentes} linha(s) não fecham (anterior + movimento ≠ atual) e ` +
+        `${r.raizesErradas} grupo(s) raiz divergem da soma das suas analíticas.`
+  );
+
+  const cob = coberturaBalancete(bal);
+  if (!cob.resultado) {
+    partes.push(
+      "Este arquivo traz só as contas patrimoniais, então dá para montar o Balanço mas não a DRE. " +
+      "Para ter as duas, exporte o mesmo relatório sem filtrar por conta (da 1 até a 7)."
+    );
+  } else if (!cob.patrimonial) {
+    partes.push(
+      "Este arquivo traz só as contas de resultado, então dá para montar a DRE mas não o Balanço. " +
+      "Para ter as duas, exporte o mesmo relatório sem filtrar por conta (da 1 até a 7)."
+    );
+  }
+
+  return partes.join(" ");
+}
 
 export default function App() {
   const [aba, setAba] = useState("importar");
@@ -236,8 +277,15 @@ export default function App() {
 
   function importarAbertura(file) {
     if (!file) return;
-    importarLinhasSimples(file)
-      .then((linhasBrutas) => {
+    /* Lê TODAS as abas: a dos dados é a que tem cabeçalho de balancete
+       (não a primeira, porque o relatório vem com uma aba "Parametros" na
+       frente), e é justamente essa aba de parâmetros que declara o
+       período coberto pelo arquivo. */
+    importarAbasSimples(file)
+      .then((abas) => {
+        const daAba = abas.find((a) => detectarColunas(a.linhas)) || abas[0];
+        const linhasBrutas = daAba ? daAba.linhas : [];
+        const periodo = periodoDoBalancete(abas);
         /* Tenta primeiro o balancete completo (hierárquico, com saldo
            anterior/débito/crédito/atual). Se o arquivo for esse, ele traz
            o Balanço inteiro pronto e vira a fonte da tela. Só se não for é
@@ -249,11 +297,8 @@ export default function App() {
             saldos: completo.saldosAbertura,
             arquivo: file.name,
             balancete: completo,
-            aviso: `Balancete de verificação carregado: ${completo.resumo.nContas} contas ` +
-              `(${completo.resumo.nFolhas} analíticas).` +
-              (completo.resumo.integro
-                ? " Conferência interna do arquivo: anterior + movimento = atual em todas as linhas, e cada conta sintética bate com suas filhas."
-                : ` Atenção: ${completo.resumo.inconsistentes} linha(s) e ${completo.resumo.sinteticasErradas} sintética(s) não fecham dentro do próprio arquivo.`),
+            periodo,
+            aviso: avisoDoBalancete(completo, periodo),
           });
           return;
         }
@@ -331,6 +376,18 @@ export default function App() {
     [abertura.balancete]
   );
 
+  /* O MESMO balancete, lido pelo saldo acumulado em vez do movimento do
+     período. Não é uma segunda fonte: é a outra pergunta que o mesmo
+     arquivo responde — "quanto deu no ano até aqui", em vez de "quanto
+     deu neste mês". É esta leitura que reproduz o Ativo − Passivo do
+     balancete, e é contra ela que a prova cruzada do Balanço tem que ser
+     feita. Comparar o acumulado do Balanço com a DRE do mês acusava
+     divergência todo mês sem erro nenhum existir. */
+  const doBalanceteAcumulado = useMemo(
+    () => contasAcumuladas(abertura.balancete),
+    [abertura.balancete]
+  );
+
   const contas = fonteEfetiva === "balancete" ? doBalancete : doRazao.contas;
   const { tDeb, tCre, meses, ccs, nLinhas, competencias, contasPorCompetencia,
     debSemConta, creSemConta } = doRazao;
@@ -361,6 +418,37 @@ export default function App() {
     () => montarDRE(contasResultado, grupoDe),
     [contasResultado, classif, sugestao]
   );
+
+  /* DRE do exercício até a data do balancete, montada com a MESMA
+     classificação da DRE do período — mudar de leitura não pode mudar em
+     que linha cada conta cai. */
+  const dreAcumulada = useMemo(() => {
+    if (!abertura.balancete) return null;
+    const cs = doBalanceteAcumulado.filter((c) => digitosResultado.includes(c.conta[0]));
+    return cs.length ? montarDRE(cs, grupoDe) : null;
+  }, [abertura.balancete, doBalanceteAcumulado, digitosResultado, classif, sugestao]);
+
+  /* HISTÓRICO SE ALIMENTA SOZINHO AO LER UM BALANCETE.
+     O balancete declara o próprio período, então não há o que perguntar
+     ao usuário: assim que um arquivo com contas de resultado é lido e
+     classificado, o retrato daquele mês entra no histórico.
+
+     A chave é o período, não o clique. Reimportar o mesmo mês atualiza a
+     linha em vez de duplicar, e reclassificar uma conta depois corrige o
+     retrato — senão o histórico guardaria para sempre a versão anterior à
+     correção, que é justamente a errada.
+
+     Espera `sessaoCarregada` pelo mesmo motivo que a gravação da sessão
+     espera: antes disso o estado ainda é o vazio do primeiro render. */
+  useEffect(() => {
+    if (!sessaoCarregada || !abertura.balancete) return;
+    const periodo = abertura.periodo?.legivel;
+    if (!periodo || !contasResultado.length) return;
+    const chave = `balancete|${empresa || "sem-empresa"}|${periodo}`;
+    if (salvarOuAtualizar({ empresa, cnpj, periodo, dre, chave })) {
+      setHistorico(listarHistorico());
+    }
+  }, [sessaoCarregada, abertura.balancete, abertura.periodo, contasResultado, dre, empresa, cnpj]);
 
   /* ---------- CPC 51 ----------
      A categoria é um eixo PARALELO ao grupo: a mesma conta tem um grupo
@@ -604,7 +692,8 @@ export default function App() {
             {aba === "balanco" && (temDados || temBalancete) && (
               abertura.balancete
                 ? <BalancoCompleto bal={abertura.balancete} arquivo={abertura.arquivo}
-                    lucroLiquido={temDados ? dre.liquido : null}
+                    lucroLiquido={dreAcumulada ? dreAcumulada.liquido : (temDados ? dre.liquido : null)}
+                    lucroLiquidoDoMes={temDados ? dre.liquido : null}
                     onTrocar={() => setAbertura({ saldos: {}, arquivo: "", aviso: "", balancete: null })} />
                 : <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia}
                     abertura={abertura} onImportarAbertura={importarAbertura} />

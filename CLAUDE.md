@@ -98,7 +98,11 @@ src/
 Fluxo do app: Importar → Conferir → Classificar → DRE, com Balanço,
 Horizontal e Histórico como abas paralelas que dependem do mesmo
 estado agregado (`contas`, calculado uma vez em `App.jsx` via
-`agregarPorConta`). A trilha tem um terceiro grupo, "CPC 51 · 2027":
+`agregarPorConta`). **Na etapa Importar o balancete vem primeiro e o
+razão está atrás de "opções avançadas"**: o balancete já passou pelo
+fechamento e monta DRE e Balanço sozinho, enquanto o razão só é
+necessário para o que ele não carrega (competência mês a mês num arquivo
+só, centro de custo, lançamento individual). A trilha tem um terceiro grupo, "CPC 51 · 2027":
 a Demonstração CPC 51 lê as mesmas contas por outro eixo, e o Plano de
 ação não depende de arquivo nenhum.
 
@@ -301,6 +305,31 @@ seguro que reescrever a hierarquia de subtotais.
   processando arquivo que ele mesmo escolhe abrir. Documentado no
   README. Não troque de lib sem avisar, `exceljs` (a alternativa mais
   óbvia) não lê `.xls` legado.
+- **"A primeira aba com dados" é um palpite ruim para escolher aba de
+  Excel.** O balancete que o sistema contábil emite traz uma aba
+  `Parametros` (as respostas da extração) ANTES da aba de dados — e ela
+  conta como "com dados". Com a regra antiga, o app lia os parâmetros,
+  não achava conta nenhuma e dizia ao usuário que o arquivo não servia.
+  `importarExcelComoLinhas` aceita um predicado `preferir` para escolher
+  pelo CONTEÚDO; o balancete passa `detectarColunas`. Não volte a
+  escolher aba por posição — nem por nome, que também varia.
+- **O balancete mensal traz DUAS demonstrações, e confundi-las gera
+  alarme falso.** O movimento do período é o resultado DO MÊS; o saldo
+  atual das contas de resultado é o ACUMULADO do exercício, porque elas
+  chegam somadas desde janeiro. Quem reproduz o `Ativo − Passivo` do
+  arquivo é a DRE acumulada (`contasAcumuladas`), nunca a mensal
+  (`contasDeMovimento`). Comparar o acumulado do Balanço com a DRE do mês
+  fazia a tela acusar divergência todo mês sem erro nenhum existir.
+- **Não conferir a integridade do balancete sintética por sintética.** A
+  hierarquia é reconstruída pelo prefixo mais longo existente, e num
+  plano real há folha cujo pai verdadeiro não é seu prefixo (a folha
+  `4110110` pertence à sintética `411010`, que não é prefixo dela). Isso
+  desloca a folha de galho sem mudar total nenhum. Trocar a regra por uma
+  baseada em ordem foi tentado: conserta esse caso e **quebra** o
+  `1.3.40.0`. Por isso a conferência é POR RAIZ (soma das folhas de cada
+  dígito contra o total da raiz), que não depende da árvore, e o
+  desencontro é reportado à parte em `sinteticasAproximadas`, sem contar
+  como erro.
 - **Nunca commite os arquivos reais de razão/plano de contas do
   Denner** (números financeiros de instituição real) — ficam em
   `fixtures/`, que está no `.gitignore`.
@@ -332,7 +361,7 @@ valendo para quem quer conferir o build localmente antes:
 
 ```bash
 npm install
-npm test             # 198 testes (conferir em EVOLUCAO.md)
+npm test             # 212 testes (conferir em EVOLUCAO.md)
 npm run build        # gera dist/
 rm -rf docs && cp -r dist docs   # normalmente desnecessário: o CI faz
 ```
@@ -450,7 +479,14 @@ crédito, movimento e saldo atual, com a natureza indicada por "D"/"C" no
 fim do número. Quando esse formato é reconhecido, ele vira a FONTE do
 Balanço e o razão passa a ser a contraprova — não o contrário.
 
-Quatro armadilhas deste formato, todas cobertas por teste:
+O arquivo é lido em duas passadas: a aba de DADOS é a que tem cabeçalho
+de balancete (`detectarColunas`), e a aba de PARÂMETROS declara o período
+coberto (`periodoDoBalancete`) — que é o que rotula o retrato salvo no
+histórico sem perguntar nada ao usuário. Quando não há período declarado,
+devolve `null` e o app segue sem rótulo: período errado num arquivo
+entregue ao cliente é pior que período nenhum.
+
+Armadilhas deste formato, todas cobertas por teste:
 
 - **Os níveis não têm largura fixa** (1, 2, 3, 5 e 7 dígitos no plano do
   IESB) e **um nível pode ser pulado**: `1.3.40.0` pendura direto em
@@ -467,8 +503,14 @@ Quatro armadilhas deste formato, todas cobertas por teste:
   diferença entre Ativo e Passivo + PL é o resultado do exercício, que
   está nas contas 3 a 7. No arquivo real: 253.582.263,93 − 252.651.704,84
   = 930.559,09, idêntico a débitos − créditos do período. **Nunca trate
-  isso como erro de importação.** A tela escreve a identidade e, havendo
-  razão do mesmo período, confronta o valor com o Lucro Líquido da DRE.
+  isso como erro de importação.** A tela escreve a identidade e confronta
+  o valor com o Lucro Líquido da **DRE acumulada** — nunca com a do mês,
+  ver a armadilha das duas demonstrações.
+- **O saldo anterior das contas de resultado não é zero.** Elas acumulam
+  desde o início do exercício, então o `atual` de uma conta de resultado
+  é o acumulado do ano, não o do mês. É isso que faz o mesmo arquivo
+  responder duas perguntas — e é isso que confunde quem espera que
+  "movimento" e "saldo" digam a mesma coisa numa conta de resultado.
 
 ## Painel
 

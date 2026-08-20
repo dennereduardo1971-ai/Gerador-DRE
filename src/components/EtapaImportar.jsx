@@ -6,8 +6,23 @@ function formatarBytes(n) {
   return (n / (1024 * 1024)).toFixed(1) + " MB";
 }
 
+/* ORDEM DA TELA: o balancete vem primeiro, e o razão foi para trás de
+ * "opções avançadas".
+ *
+ * Não é preferência estética. O balancete de verificação já passou pelo
+ * fechamento da contabilidade e, sozinho, monta a DRE e o Balanço
+ * inteiros — traz saldo anterior, movimento e saldo atual de cada conta,
+ * e ainda entrega o plano de contas de graça. O razão exige mapear
+ * colunas, some com o saldo de abertura e obriga o app a somar lançamento
+ * a lançamento aquilo que o balancete já traz somado.
+ *
+ * O razão continua existindo porque responde o que o balancete não
+ * responde: competência mês a mês num único arquivo, centro de custo e
+ * lançamento individual. Quem precisa disso sabe que precisa; quem não
+ * precisa não deveria tropeçar nessa escolha logo na primeira tela. */
 export function EtapaImportar({ carregando, progresso, onImportar, onImportarBalancete, abertura }) {
   const [over, setOver] = useState(false);
+  const [avancado, setAvancado] = useState(false);
   const inputRef = useRef(null);
   const balRef = useRef(null);
 
@@ -17,96 +32,138 @@ export function EtapaImportar({ carregando, progresso, onImportar, onImportarBal
         className="drop"
         role="button"
         tabIndex={0}
-        aria-label="Escolher o arquivo do razão contábil"
+        aria-label="Escolher o arquivo do balancete de verificação"
         data-over={over ? "1" : "0"}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => balRef.current?.click()}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); }
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); balRef.current?.click(); }
         }}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); onImportar(e.dataTransfer.files[0]); }}
+        onDrop={(e) => { e.preventDefault(); setOver(false); onImportarBalancete(e.dataTransfer.files[0]); }}
       >
-        {carregando ? (
-          <>
-            <b>Lendo o arquivo…</b>
-            <div className="progresso">
-              <div className="progresso-barra" style={{ width: `${progresso?.pct ?? 0}%` }} />
-            </div>
-            <span>
-              {progresso?.linhas ? `${progresso.linhas.toLocaleString("pt-BR")} lançamentos lidos` : "começando…"}
-              {progresso?.pct != null ? ` · ${progresso.pct}%` : ""}
-              {progresso?.tamanho ? ` de ${formatarBytes(progresso.tamanho)}` : ""}
-            </span>
-          </>
-        ) : (
-          <>
-            <b>Solte o razão aqui</b>
-            <span>CSV ou Excel (.xlsx, .xls, .xlsm, .xlsb, .ods) · aceita acentuação ANSI</span>
-          </>
-        )}
+        <b>{abertura?.balancete ? "Trocar o balancete" : "Solte o balancete de verificação aqui"}</b>
+        <span>CSV ou Excel (.xlsx, .xls, .xlsm, .xlsb, .ods) · o app acha a aba certa sozinho</span>
         <input
-          ref={inputRef}
+          ref={balRef}
           type="file"
           accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb,.ods"
           style={{ display: "none" }}
-          onChange={(e) => onImportar(e.target.files[0])}
+          onChange={(e) => { onImportarBalancete(e.target.files[0]); e.target.value = ""; }}
         />
       </div>
-      {/* O balancete é opcional e independente do razão: ele sozinho já
-          desenha o Balanço inteiro, e há quem só queira olhar isso. Por
-          isso entra aqui, e não escondido dentro da aba Balanço — que
-          antes só existia depois de importar um razão. */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="bal-cab">
-          <div>
-            <h2>Balancete de verificação <span className="rotulo">opcional</span></h2>
-            <p className="hint" style={{ margin: 0 }}>
-              Traz o Balanço Patrimonial pronto, com saldo anterior, movimento e saldo atual de
-              cada conta. Pode ser carregado sozinho, sem razão nenhum — e, se houver razão do
-              mesmo período, o app confere o resultado do exercício contra o Lucro Líquido da DRE.
-            </p>
-          </div>
-          <button className="btn ghost" onClick={() => balRef.current?.click()}>
-            {abertura?.balancete ? "Trocar balancete" : "Carregar balancete"}
-          </button>
-        </div>
-        <input ref={balRef} type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb,.ods"
-          style={{ display: "none" }}
-          onChange={(e) => { onImportarBalancete(e.target.files[0]); e.target.value = ""; }} />
-        {abertura?.aviso && <p className="hint" style={{ marginTop: 12 }}>{abertura.aviso}</p>}
-      </div>
+      {abertura?.aviso && <p className="hint" style={{ marginTop: 12 }}>{abertura.aviso}</p>}
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h2>O que o arquivo precisa ter</h2>
+        <h2>Por que o balancete basta</h2>
         <p className="hint">
-          Uma linha por lançamento, com conta e valor de débito e de crédito em colunas
-          separadas — o formato padrão de exportação de razão. As colunas são reconhecidas
-          pelo nome; se o seu sistema usa outros títulos, dá para ajustar na etapa 2. Funciona
-          tanto com CSV quanto com planilhas Excel — se o Excel tiver mais de uma aba, o app usa
-          a primeira que tiver dados. Arquivos grandes (dezenas de milhares de linhas) são lidos
-          em partes, sem travar a página.
+          O balancete de verificação é o relatório que a contabilidade fecha todo mês. Ele traz,
+          para cada conta, o saldo anterior, o movimento do período e o saldo atual — que é tudo
+          o que a DRE e o Balanço precisam. Um arquivo só, sem mapear coluna nenhuma.
         </p>
         <table className="tabela-cartao">
           <thead>
-            <tr><th>Coluna</th><th>Serve para</th><th>Obrigatória</th></tr>
+            <tr><th>O que ele traz</th><th>Para que serve</th></tr>
           </thead>
           <tbody>
             {[
-              ["Cta. Debito / Cta. Credito", "Identificar a conta de cada lado", "Sim"],
-              ["Valor Debito / Valor Credito", "Somar o saldo da conta", "Sim"],
-              ["Historico", "Sugerir a classificação e nomear a conta", "Não"],
-              ["Dia/Mes + Ano", "Filtrar o período e montar a análise horizontal", "Não"],
-              ["C.Custo", "Filtrar por centro de custo", "Não"],
-            ].map(([coluna, serve, obrig]) => (
-              <tr key={coluna}>
-                <td className="code" data-rotulo="Coluna">{coluna}</td>
-                <td className="desc" data-rotulo="Serve para">{serve}</td>
-                <td data-rotulo="Obrigatória">{obrig}</td>
+              ["Saldo anterior", "Abertura do período — o Balanço deixa de ser só movimentação"],
+              ["Débito e crédito do período", "A DRE daquele mês"],
+              ["Saldo atual", "A DRE acumulada do exercício e o Balanço na data"],
+              ["Descrição de cada conta", "O plano de contas, sem precisar de arquivo separado"],
+              ["Aba de parâmetros", "O período coberto, lido sozinho pelo app"],
+            ].map(([traz, serve]) => (
+              <tr key={traz}>
+                <td className="desc" data-rotulo="O que ele traz">{traz}</td>
+                <td className="desc" data-rotulo="Para que serve">{serve}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <button
+          className="btn ghost"
+          aria-expanded={avancado}
+          onClick={() => setAvancado((v) => !v)}
+        >
+          {avancado ? "Ocultar opções avançadas" : "Opções avançadas — importar o razão"}
+        </button>
+
+        {avancado && (
+          <div style={{ marginTop: 16 }}>
+            <p className="hint">
+              O razão só é necessário para o que o balancete não carrega: <b>competência mês a mês
+              num único arquivo</b>, <b>centro de custo</b> e <b>lançamento individual</b>. É dele que
+              dependem as abas Comparativa e Horizontal e o filtro de centro de custo. Para
+              conferir a DRE e o Balanço de um período, o balancete basta e é mais confiável,
+              porque já passou pelo fechamento.
+            </p>
+
+            <div
+              className="drop"
+              role="button"
+              tabIndex={0}
+              aria-label="Escolher o arquivo do razão contábil"
+              data-over={over ? "1" : "0"}
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); }
+              }}
+              onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+              onDragLeave={() => setOver(false)}
+              onDrop={(e) => { e.preventDefault(); setOver(false); onImportar(e.dataTransfer.files[0]); }}
+            >
+              {carregando ? (
+                <>
+                  <b>Lendo o arquivo…</b>
+                  <div className="progresso">
+                    <div className="progresso-barra" style={{ width: `${progresso?.pct ?? 0}%` }} />
+                  </div>
+                  <span>
+                    {progresso?.linhas ? `${progresso.linhas.toLocaleString("pt-BR")} lançamentos lidos` : "começando…"}
+                    {progresso?.pct != null ? ` · ${progresso.pct}%` : ""}
+                    {progresso?.tamanho ? ` de ${formatarBytes(progresso.tamanho)}` : ""}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <b>Solte o razão aqui</b>
+                  <span>CSV ou Excel · aceita acentuação ANSI</span>
+                </>
+              )}
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb,.ods"
+                style={{ display: "none" }}
+                onChange={(e) => onImportar(e.target.files[0])}
+              />
+            </div>
+
+            <table className="tabela-cartao" style={{ marginTop: 16 }}>
+              <thead>
+                <tr><th>Coluna</th><th>Serve para</th><th>Obrigatória</th></tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Cta. Debito / Cta. Credito", "Identificar a conta de cada lado", "Sim"],
+                  ["Valor Debito / Valor Credito", "Somar o saldo da conta", "Sim"],
+                  ["Historico", "Sugerir a classificação e nomear a conta", "Não"],
+                  ["Dia/Mes + Ano", "Filtrar o período e montar a análise horizontal", "Não"],
+                  ["C.Custo", "Filtrar por centro de custo", "Não"],
+                ].map(([coluna, serve, obrig]) => (
+                  <tr key={coluna}>
+                    <td className="code" data-rotulo="Coluna">{coluna}</td>
+                    <td className="desc" data-rotulo="Serve para">{serve}</td>
+                    <td data-rotulo="Obrigatória">{obrig}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </>
   );
