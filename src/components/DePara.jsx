@@ -230,7 +230,10 @@ export function DePara({
       {/* 4. A conferência pelo outro lado: por destino, não por origem. */}
       <div className="card">
         <h2>Leitura por destino</h2>
-        <p className="hint">O mesmo mapeamento pelo lado da DRE. Clique num grupo para filtrar a tabela acima.</p>
+        <p className="hint">
+          O mesmo mapeamento pelo lado da DRE. Clique num grupo para filtrar a tabela acima —
+          no Excel exportado, esta tabela abre nas contas de cada grupo.
+        </p>
         <div className="scroll" style={{ maxHeight: "none" }}>
           <table>
             <thead>
@@ -262,7 +265,8 @@ export function DePara({
       <div className="card">
         <h2>O que este arquivo serve para</h2>
         <p className="hint">
-          Excel com filtro e resumo por grupo; CSV para carga no ERP.
+          Excel com filtro e resumo por grupo — cada grupo abre nas contas que o formam,
+          no <code>+</code> da margem esquerda; CSV para carga no ERP.
           {empresa || cnpj ? "" : " Preencha empresa e CNPJ na etapa Conferir para saírem no cabeçalho."}
         </p>
         <details className="explica">

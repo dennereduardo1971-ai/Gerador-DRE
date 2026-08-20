@@ -43,30 +43,223 @@ _Atualizado em 20/08/2026._
 
 | | |
 |---|---|
-| Testes | 234 (Vitest, 15 arquivos) |
+| Testes | 211 (Vitest, 12 arquivos) |
 | Lint | `npx oxlint src/` — zero avisos em `src/` (`fixtures/validar.mjs` tem 1 erro pré-existente, fora de `src/`) |
-| Bundle | app 422 kB (130 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
-| CSS | 41 kB (8,3 kB gzip) |
-| Código | ~9.000 linhas em `src/` (App.jsx + lib + components) |
-| Maiores arquivos | `App.jsx` (951), `cpc51.js` (455), `balancete.js` (475) |
+| Bundle | app 377 kB (117 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
+| CSS | 30 kB (6,4 kB gzip) — zero classe órfã (conferido por script) |
+| Código | ~7.700 linhas de JS/JSX em `src/` |
+| Maiores arquivos | `App.jsx` (945), `cpc51.js` (455), `balancete.js` (442) |
+| Abas | 10 (eram 14 até 20/08/2026) |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina) |
 | Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante de parametrização) conferidos fora do repositório: período, integridade, reconciliação de hierarquia e DRE batendo ao centavo nos 6 |
 | Skills versionadas | 6 (`manter-evolucao`, `testar-com-arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`, `nova-funcionalidade`, `otimizar-app`) |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) |
 
-A navegação tem **Início** solto no topo e cinco seções, definidas como
+A navegação tem **Início** solto no topo e quatro seções, definidas como
 dado em `SECOES` (`App.jsx`):
 
 | Seção | Abas |
 |---|---|
 | (sem seção) | Início |
 | Fluxo | Importar → Conferir → Classificar → DRE |
-| Análises | Painel, Balanço, Horizontal, Comparativa |
 | Parâmetros | De-Para |
-| Arquivo | Histórico, Arquivos |
+| Acompanhamento | Comparativa, Histórico |
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 20/08/2026 (4ª sessão) — o app fica só com a DRE e o CPC 51
+
+Pedido do Denner, textual: "preciso que o foco seja apenas a DRE e o
+CPC 51, afinal esse projeto é exclusivo pra essa transição". Antes de
+apagar qualquer coisa, levantei o custo em código exclusivo de cada aba
+fora desse eixo e **confirmei o corte com ele** — deletar 1.700 linhas de
+funcionalidade não é decisão para tomar sozinho, mesmo com o pedido
+escrito.
+
+**Saíram, com confirmação:**
+
+| Aba | O que foi apagado |
+|---|---|
+| Painel | `Painel`, `Graficos`, `TorresPatrimoniais`, `indicadores.js`, `imagemPainel.js` + 2 arquivos de teste |
+| Balanço | `EtapaBalanco`, `BalancoCompleto`, `balanco.js`, `abertura.js` + 1 arquivo de teste |
+| Arquivos | `Arquivos.jsx` e metade de `githubApi.js` (`listarPasta`/`enviarArquivo`/`excluirArquivo`) |
+| Horizontal | fundida na Comparativa, que agora responde em dois níveis de zoom |
+
+**As consequências que não eram óbvias, e por isso valem registro:**
+
+- **`abertura.js` foi junto com o Balanço.** O formato simples
+  `código;saldo` servia a uma coisa só: dar saldo de abertura ao Balanço.
+  Sem a tela, o app aceitaria esse arquivo e não produziria nada — pior
+  do que recusá-lo, porque o usuário acharia que carregou. A importação
+  agora só reconhece o balancete COMPLETO, e diz isso.
+- **`achatar` e `gruposDe` (em `balancete.js`) eram só do Balanço** —
+  saíram com seus testes. O resto do módulo fica: ele é fonte da DRE.
+- **`resultadoConfere` ia ficar órfão, e foi promovido.** Era a
+  conferência cruzada mostrada só na tela do Balanço: Δ(Ativo + Passivo)
+  do período tem que bater com o resultado apurado pelas contas 3 a 7,
+  por caminhos independentes. Em vez de deletar, passou para o aviso da
+  importação — é a validação mais forte que o arquivo permite, e agora
+  ela vale para a DRE, que é o que sobrou.
+- **Textos de tela mentiam depois do corte.** "É dele que dependem as
+  abas Comparativa e Horizontal", "monta DRE e Balanço de uma vez", "o
+  Balanço deixa de ser só movimentação" — sete trechos em quatro
+  componentes. Corrigidos; sobrou um `grep` limpo por "Balanço",
+  "Painel", "Horizontal" e "Arquivos" em `src/components`.
+- **CSS morto não some sozinho.** 59 classes ficaram órfãs (três seções
+  inteiras: Balanço, Painel, Galeria). Removidas por script + conferência:
+  hoje **zero classe do `App.css` sem uso no JSX**.
+
+**Medido, antes → depois:**
+
+| | Antes | Depois |
+|---|---|---|
+| Abas | 14 | 10 |
+| Seções do menu | 5 | 4 |
+| Bundle do app | 424 kB / 130 kB gzip | **377 kB / 117 kB gzip** |
+| CSS | 41 kB / 8,3 kB gzip | **30 kB / 6,4 kB gzip** |
+| Testes | 244 | 211 (os 33 a menos cobriam código apagado) |
+| Lint | zero avisos | zero avisos |
+
+**Como foi verificado além do Vitest.** Subi o app com `npm run dev` e
+percorri as dez abas num Chromium headless (Playwright), com o razão
+sintético importado: todas renderizam, **zero erro de runtime**, zero
+`pageerror`. O único recurso que falha é a folha do Google Fonts, barrada
+pela rede desta máquina. Uma captura de cada aba ficou fora do
+repositório.
+
+**O que NÃO mudou, de propósito:** o núcleo contábil inteiro —
+`classify.js`, `parse.js`, `montarDRE`, `cpc51.js`, `depara.js`, os
+perfis de plano e as exportações. Nenhum número da DRE foi tocado nesta
+sessão, e os testes que congelam esses invariantes continuam todos
+verdes. `fixtures/validar.mjs` não rodou (arquivos reais ausentes nesta
+máquina).
+
+**Doutrina nova em `CLAUDE.md`:** a seção "O que é" agora abre declarando
+o escopo e listando o que foi removido, com a pergunta que toda ideia
+nova tem que passar — "isto serve à DRE ou à transição?". Sem isso, a
+próxima sessão reconstrói o Painel achando que está ajudando.
+
+
+### 20/08/2026 (3ª sessão) — a DRE do CPC 51 exportada no layout do modelo do cliente
+
+O chefe do Denner mandou um modelo de DRE do CPC 51/IFRS 18 para
+instituição de ensino (um `.xlsx` de 30 linhas, sem valores) e pediu que
+ele fosse a base. Perguntei antes de mexer, porque havia duas leituras
+muito diferentes — e ele escolheu **base do layout**, não das linhas.
+
+**A fronteira que essa escolha desenha, e por que ela é a certa.** O
+modelo traz colunas (`Categoria CPC51 | Código | Descrição | 2025 | 2024
+| Notas`) E uma lista de linhas própria ("Receitas de Pós-Graduação",
+"Receitas de Extensão", "Custos Acadêmicos", "PCLD"). Trocar as COLUNAS
+não muda número nenhum. Trocar as LINHAS exigiria remapear conta a conta
+e jogaria fora a validação centavo a centavo contra a demonstração
+oficial — é a mesma armadilha que "criar grupos novos em `grupos.js`"
+representa, e vale registrar que o caminho seguro aqui foi perguntar, não
+adivinhar.
+
+**O que a aba "DRE CPC 51" ganhou:**
+
+- **Categoria em coluna própria.** A linha e o subtotal que fecham um
+  bloco levam o nome da categoria; os subtotais que atravessam
+  categorias saem como "Subtotal" e o resultado do período como "Final"
+  — exatamente como no modelo.
+- **Código de linha** (`1.1`, `2.3`), nascido em `montarLinhas51` para a
+  tela e o arquivo não poderem divergir. Primeiro dígito = posição fixa
+  da categoria na ordem da norma; segundo = posição na demonstração
+  daquele fechamento. Está documentado no próprio módulo que isso é
+  numeração de linha publicada, não código de conta — quem precisa de
+  chave para ERP usa o De-Para, que anda por código de conta.
+- **Coluna de notas, em branco.** A referência da nota explicativa é de
+  quem redige as demonstrações. Preencher seria inventar referência.
+- **Coluna comparativa**, preenchida só quando existe período anterior
+  DE VERDADE (competência filtrada e a anterior presente no arquivo).
+  Sem isso ela sai vazia com o motivo escrito acima da tabela. Comparar
+  "Jan a Jun" com "Mai" daria um número que parece comparativo e não é —
+  mesma regra da nota de MPDA, onde o que o app não sabe vira lacuna.
+
+**Não foi adotado do modelo:** ele apresenta receitas E despesas
+financeiras inteiras dentro de "Financiamento". A doutrina do projeto
+(e o próprio CPC 51) separa: rendimento de aplicação é investimento,
+juros de mora de aluno é operacional, tarifa bancária é operacional,
+juros de empréstimo é financiamento. O app continua marcando esses dois
+grupos para revisão, e o arquivo do chefe mostra que ele já decidiu 23
+contas exatamente aí — adotar a simplificação do modelo apagaria esse
+trabalho.
+
+**Seam novo:** `montarWorkbookCPC51`, separada de `baixarExcelCPC51`,
+pelo mesmo motivo de `montarWorkbookDePara` na sessão anterior — o teste
+afirma sobre o arquivo (colunas, código, comparativo cheio e vazio) sem
+precisar de DOM.
+
+**Sobre a aba Resumo do De-Para:** confirmado com o Denner que a
+expansão `+/-` entregue na sessão anterior é o que ele queria; nada
+mudou ali.
+
+**Medido:** 244 testes (de 237), lint zero avisos em `src/`, build ok —
+app 424 kB (130 kB gzip), +1 kB. Conferido também gerando o arquivo real
+(232 contas, com as 23 decisões de categoria do chefe) e relendo com
+openpyxl: as colunas saem no formato do modelo e o lucro líquido continua
+idêntico nas duas estruturas. `fixtures/validar.mjs` não rodou (arquivos
+reais ausentes nesta máquina).
+
+
+### 20/08/2026 (2ª sessão) — o Resumo do Excel De-Para vira tabela em dois níveis
+
+Pedido do Denner, com o arquivo do chefe em mãos: na planilha exportada,
+clicar num grupo do resumo ("Receita Bruta com Mensalidades, 29 contas")
+e ver as contas que formam aquele saldo logo abaixo — a conferência que
+a tela já permite, dentro do arquivo entregue.
+
+**O que mudou.** A aba "Resumo" do Excel do De-Para deixou de ser uma
+tabela de 4 colunas com uma linha por grupo e passou a ser uma tabela de
+8 colunas em dois níveis: a linha do grupo (nome, saldo, quantas contas,
+quantas a revisar) e, penduradas nela pelo agrupamento nativo do Excel,
+as contas que a compõem (conta, descrição, categoria do CPC 51,
+situação, saldo). As contas nascem recolhidas.
+
+Três decisões que valem a pena não desfazer:
+
+- **`summaryBelow: false`.** Sem isso o Excel desenha o botão `+` uma
+  linha DEPOIS do bloco de contas, e ninguém entende o que ele abre.
+- **A coluna Saldo é a mesma nos dois níveis.** O total do grupo fica
+  exatamente em cima das parcelas — abrir o grupo e conferir se fecha é
+  olhar uma coluna só. É o que faz a expansão servir para conferência, e
+  não só para "mostrar mais linhas".
+- **`porGrupo` passou a carregar `contas`**, as mesmas linhas que
+  somaram o total, na mesma ordem. Não há segunda seleção de contas em
+  lugar nenhum: quem abre o grupo vê literalmente o que gerou o número.
+
+**Seam novo para teste:** `montarWorkbookDePara` foi separada de
+`baixarExcelDePara`. A primeira devolve o workbook e não toca em DOM,
+então o Vitest consegue afirmar sobre o arquivo de verdade (nível de
+outline, linha recolhida, e o total de cada grupo batendo com a soma das
+contas debaixo dele) em vez de só sobre o array que o alimentou.
+
+**Medido:** 237 testes (de 234), lint zero avisos em `src/`, build ok —
+bundle do app 423 kB (130 kB gzip), sem mudança relevante: a expansão é
+metadado de linha, não código novo no caminho quente. Conferido também
+fora do Vitest, relendo o `.xlsx` gerado com **openpyxl** (biblioteca
+independente da que escreveu, como manda a doutrina): com os 232 registros
+do arquivo que o chefe devolveu, os 18 grupos fecham centavo a centavo
+com as contas recolhidas debaixo de cada um, todas com `hidden` e
+`outlineLevel=1`.
+
+**O que ficou de fora, e por quê:**
+
+- **O CSV não ganhou nada** — CSV não tem agrupamento. Quem quer a
+  conferência rápida usa o Excel; o CSV continua sendo o arquivo de
+  carga.
+- **A aba "De-Para" continua plana**, com o filtro automático. Ela é
+  ordenada por tamanho de saldo, não por grupo, e outline junto de
+  autoFilter briga na hora de filtrar.
+- **Nada foi importado do arquivo do chefe.** Conferido: ele é o próprio
+  export do app de 19/08 (`lastModifiedBy` vazio, `modified` igual a
+  `created`), sem edição feita no Excel — as 23 decisões manuais que ele
+  traz já são as da sessão do app. Se um dia o fluxo for "o chefe edita a
+  planilha e a gente carrega de volta", isso é funcionalidade nova
+  (leitura do De-Para preenchido), não está feito.
+
 
 ### 20/08/2026 — merge de dois trabalhos paralelos no balancete + remoção de valores reais
 
@@ -631,28 +824,44 @@ Ficou de fora, de propósito:
    despesa continua saindo como texto que o Excel não soma. Defeito real
    e barato de corrigir — separar célula de texto de célula de número,
    como o exportador novo faz, e cobrir com teste.
-3. **Comparativa na estrutura do CPC 51** (Fase 8, passo 36). A norma
-   exige 2027 contra 2026 reapresentado. Hoje `EtapaComparativo` monta
-   colunas por competência na estrutura antiga; falta a mesma coisa
-   lendo `montarLinhas51`. É o maior buraco funcional que sobrou.
-4. **Extrair `useCPC51`, `useDePara` e o casco de `App.jsx`.** O
-   componente passou de 766 para 875 linhas com o topo e o menu novos —
-   é o arquivo que mais cresce a cada funcionalidade, e cada módulo de
-   ERP vai empurrar mais. O corte mais óbvio agora é um `<Casco>` levando
-   topo + menu + `ItemMenu`, que é bloco fechado e não toca em estado
-   contábil nenhum.
+3. **Comparativa na estrutura do CPC 51 NA TELA** (Fase 8, passo 36).
+   O Excel exportado já traz uma coluna comparativa (a competência
+   anterior, quando existe no arquivo); `EtapaComparativo` continua
+   montando colunas só na estrutura antiga. O que falta é a tela lendo
+   `montarLinhas51` por competência — os dados já estão prontos em
+   `dres51PorCompetencia` (`App.jsx`).
+4. **Extrair `useCPC51`, `useDePara` e o casco de `App.jsx`.** Mesmo
+   depois do corte de abas ele tem 945 linhas — é o arquivo que mais
+   cresce a cada funcionalidade, e cada módulo de ERP vai empurrar mais.
+   O corte mais óbvio é um `<Casco>` levando topo + menu + `ItemMenu`,
+   que é bloco fechado e não toca em estado contábil nenhum.
 5. **Efeito tributário por item de MPDA**, com campo editável por ajuste
    — fecha a exigência da norma que hoje sai como lacuna.
 6. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
    falta UI).
 7. **Agregar durante a importação**, em vez de guardar `linhas` cru em
    memória — tira o teto de tamanho de arquivo.
-8. **Teste unitário para `periodoLegivel()`.** Corrigido na sessão de
+8. **Ler de volta o De-Para preenchido fora do app.** O arquivo que o
+   chefe do Denner devolveu nesta sessão era o próprio export, sem
+   edição — mas o fluxo "exporta, alguém preenche no Excel, carrega de
+   volta" é o próximo pedido natural, e hoje não existe. O formato de
+   saída já é estável e tem a coluna de origem da decisão; o que falta é
+   a leitura, decidir o que fazer quando o arquivo carregado discorda da
+   classificação atual, e não deixar isso apagar decisão manual em
+   silêncio. Cuidado: o caminho óbvio (aplicar tudo do arquivo) é
+   exatamente a classe de defeito que o projeto evita.
+9. **Teste unitário para `periodoLegivel()`.** Corrigido na sessão de
    17/08 (4ª) um bug real de período mostrando dias soltos fora de
    ordem em vez de "Jan/2026 a Jun/2026" — e não havia teste nenhum
    cobrindo esse texto, nem antes nem depois do fix. Cobrir os três
    ramos (competência filtrada, dia filtrado, intervalo de competências)
    é barato e fecha essa lacuna de cobertura.
+
+**Fora do escopo, e não por esquecimento:** indicadores, gráficos,
+Balanço Patrimonial e galeria de arquivos foram removidos em 20/08/2026
+por decisão do usuário. Não os proponha de volta sem ele pedir — a
+pergunta que toda ideia nova responde é "isto serve à DRE ou à
+transição para o CPC 51?".
 
 ## Rumo a ERP: como pensar os próximos módulos
 

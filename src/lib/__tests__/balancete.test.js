@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { achatar, coberturaBalancete, contasDeMovimento, gruposDe, nomesDoBalancete, parsearBalancete, periodoDoBalancete, periodoLegivel, valorDC } from "../balancete.js";
+import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalancete, periodoDoBalancete, periodoLegivel, valorDC } from "../balancete.js";
 
 /* Recorte fiel do balancete real (ctbr041.xlsx): mesma estrutura de
  * cabeçalho, mesma pontuação de código, mesma mistura de colunas
@@ -139,28 +139,6 @@ describe("resumo — o desequilíbrio é o resultado do exercício", () => {
       l[0] === "1.1.11.00.1" ? [...l.slice(0, 6), "      9.999,00 D"] : l
     );
     expect(parsearBalancete(quebrado).resumo.inconsistentes).toBeGreaterThan(0);
-  });
-});
-
-describe("achatar e gruposDe", () => {
-  const bal = parsearBalancete(BALANCETE);
-
-  it("um nó fechado esconde toda a subárvore", () => {
-    const soRaizes = achatar(bal, new Set());
-    expect(soRaizes.map((c) => c.codigo)).toEqual(["1", "2"]);
-  });
-
-  it("abrir um nó revela só o nível seguinte", () => {
-    const codigos = achatar(bal, new Set(["1"])).map((c) => c.codigo);
-    expect(codigos).toEqual(["1", "11", "13", "2"]);
-  });
-
-  it("gruposDe entrega o segundo nível com suas filhas, para o Balanço", () => {
-    const ativo = gruposDe(bal, "1");
-    expect(ativo.map((g) => g.descricao)).toEqual(["CIRCULANTE", "ATIVO NAO CIRCULANTE"]);
-    expect(ativo[1].itens.map((i) => i.descricao)).toEqual([
-      "INVESTIMENTOS", "(-)DEPRECIACAO SOCIETARIA",
-    ]);
   });
 });
 

@@ -50,9 +50,11 @@ npm run build && npx vite preview --port 4173
 
 ## 3. O que NÃO otimizar
 
-- **Não troque o `<canvas>` da imagem do painel por html2canvas**, nem as
-  torres 3D em CSS por three.js. Já foi decidido: a biblioteca custaria
-  mais que o app inteiro para desenhar caixas.
+- **Não corte código do núcleo contábil para ganhar bytes.**
+  `classify.js`, `parse.js`, `cpc51.js`, `balancete.js` e os perfis de
+  plano carregam decisões validadas contra arquivo real. Bundle se ganha
+  em import dinâmico e em tela que não precisa existir — não em regra de
+  classificação "que parece redundante".
 - **Não "simplifique" o sinal do saldo.** `agregarPorConta` usa
   `crédito − débito`; o balancete usa `débito − crédito`. Um é o negativo
   do outro, e unificar inverte a DRE inteira sem quebrar mais nada

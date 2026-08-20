@@ -10,7 +10,7 @@ function formatarBytes(n) {
  * "opções avançadas".
  *
  * Não é preferência estética. O balancete de verificação já passou pelo
- * fechamento da contabilidade e, sozinho, monta a DRE e o Balanço
+ * fechamento da contabilidade e, sozinho, monta a DRE
  * inteiros — traz saldo anterior, movimento e saldo atual de cada conta,
  * e ainda entrega o plano de contas de graça. O razão exige mapear
  * colunas e some com o saldo de abertura.
@@ -58,7 +58,7 @@ export function EtapaImportar({ carregando, progresso, onImportar, onImportarBal
         <p className="hint">
           O balancete de verificação é o relatório que a contabilidade fecha todo mês. Ele traz,
           para cada conta, o saldo anterior, o movimento do período e o saldo atual — que é tudo
-          o que a DRE e o Balanço precisam. Um arquivo só, sem mapear coluna nenhuma.
+          o que a DRE precisa. Um arquivo só, sem mapear coluna nenhuma.
         </p>
         <table className="tabela-cartao">
           <thead>
@@ -66,9 +66,9 @@ export function EtapaImportar({ carregando, progresso, onImportar, onImportarBal
           </thead>
           <tbody>
             {[
-              ["Saldo anterior", "Abertura do período — o Balanço deixa de ser só movimentação"],
+              ["Saldo anterior", "A posição de onde o período partiu"],
               ["Débito e crédito do período", "A DRE daquele mês"],
-              ["Saldo atual", "O resultado acumulado do exercício e o Balanço na data"],
+              ["Saldo atual", "O resultado acumulado do exercício"],
               ["Descrição de cada conta", "O plano de contas, sem precisar de arquivo separado"],
               ["Aba de parâmetros", "O período coberto, lido sozinho pelo app"],
             ].map(([traz, serve]) => (
@@ -95,9 +95,9 @@ export function EtapaImportar({ carregando, progresso, onImportar, onImportarBal
             <p className="hint">
               O razão só é necessário para o que o balancete não carrega: <b>competência mês a mês
               num único arquivo</b>, <b>centro de custo</b> e <b>lançamento individual</b>. É dele que
-              dependem as abas Comparativa e Horizontal e o filtro de centro de custo. Para
-              conferir a DRE e o Balanço de um período, o balancete basta e é mais confiável,
-              porque já passou pelo fechamento.
+              depende a aba Comparativa e o filtro de centro de custo. Para conferir a DRE
+              de um período, o balancete basta e é mais confiável, porque já passou pelo
+              fechamento.
             </p>
 
             <div

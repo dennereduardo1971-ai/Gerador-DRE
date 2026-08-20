@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { POLITICA_PADRAO, deParaCPC51 } from "../cpc51.js";
 import { filtrarDePara, montarDePara, porGrupo, resumoDePara } from "../depara.js";
-import { linhaCSV, situacaoDaLinha } from "../exportacaoDePara.js";
+import { linhaCSV, montarWorkbookDePara, situacaoDaLinha } from "../exportacaoDePara.js";
 
 const conta = (codigo, saldo, extra = {}) => ({
   conta: codigo,
@@ -173,5 +173,69 @@ describe("acordo com o De-Para do CPC 51", () => {
       expect(l.categoriaNome).toBe(porConta[l.conta].categoriaNome);
       expect(l.saldo).toBeCloseTo(porConta[l.conta].saldo, 2);
     });
+  });
+});
+
+
+/* A LEITURA POR DESTINO NO EXCEL É UMA TABELA EM DOIS NÍVEIS.
+   O grupo é a linha visível e as contas que o formam ficam recolhidas
+   logo abaixo — o mesmo "clique no grupo para ver as contas" da tela,
+   dentro do arquivo entregue. O que estes testes congelam é o que faz a
+   expansão VALER a pena: as contas debaixo de um grupo são exatamente as
+   que somam o total impresso nele, e estão na mesma coluna de saldo. Se
+   alguém um dia trocar a ordem de escrita e o bloco deixar de pertencer
+   ao grupo de cima, a planilha continuaria bonita e passaria a mentir. */
+describe("o resumo por grupo do Excel abre nas contas que o formam", () => {
+  const contasDoResumo = async () => {
+    const linhas = montar();
+    const grupos = porGrupo(linhas);
+    const wb = await montarWorkbookDePara(linhas, resumoDePara(linhas), grupos, {});
+    return { grupos, ws: wb.getWorksheet("Resumo") };
+  };
+
+  it("põe o botão de expandir na linha do grupo, e não depois do bloco", async () => {
+    const { ws } = await contasDoResumo();
+    expect(ws.properties.outlineProperties.summaryBelow).toBe(false);
+    expect(ws.properties.outlineLevelRow).toBe(1);
+  });
+
+  it("pendura cada conta no grupo de cima, recolhida", async () => {
+    const { grupos, ws } = await contasDoResumo();
+    const nomes = grupos.map((g) => g.nome);
+    let grupoAtual = null;
+    const vistas = {};
+    ws.eachRow((row) => {
+      const nivel = row.outlineLevel;
+      const primeira = row.getCell(1).value;
+      if (nivel === 0 && nomes.includes(primeira)) { grupoAtual = primeira; vistas[grupoAtual] = []; return; }
+      if (nivel !== 1) return;
+      expect(row.hidden).toBe(true);          // nasce recolhida
+      expect(primeira).toBe(null);            // a coluna do grupo fica vazia na conta
+      vistas[grupoAtual].push({ conta: row.getCell(2).value, saldo: row.getCell(6).value });
+    });
+
+    grupos.forEach((g) => {
+      expect(vistas[g.nome].map((c) => c.conta)).toEqual(g.contas.map((l) => l.conta));
+      expect(vistas[g.nome]).toHaveLength(g.n);
+    });
+  });
+
+  it("soma na mesma coluna: o total do grupo é o das contas debaixo dele", async () => {
+    const { grupos, ws } = await contasDoResumo();
+    const porNome = Object.fromEntries(grupos.map((g) => [g.nome, g]));
+    let atual = null;
+    let soma = 0;
+    const fechar = () => { if (atual) expect(soma).toBeCloseTo(porNome[atual].total, 2); };
+    ws.eachRow((row) => {
+      if (row.outlineLevel === 1) { soma += row.getCell(6).value; return; }
+      const nome = row.getCell(1).value;
+      if (!porNome[nome]) return;
+      fechar();
+      atual = nome;
+      soma = 0;
+      expect(row.getCell(6).value).toBeCloseTo(porNome[nome].total, 2);
+      expect(row.getCell(7).value).toBe(porNome[nome].n);
+    });
+    fechar();
   });
 });

@@ -7,12 +7,23 @@ invalida uma frase daqui, corrija a frase no mesmo commit.
 
 ## O que é
 
-App React (Vite) que importa um razão contábil (CSV ou Excel) e monta
-a Demonstração do Resultado do Exercício, Balanço Patrimonial
-simplificado, análise horizontal e histórico de DREs — peça de
-portfólio de Denner (contábil/fiscal, graduando em Ciências Contábeis).
-Roda 100% no navegador, sem backend. Site publicado via GitHub Pages
-a partir da pasta `/docs`.
+App React (Vite) que importa um razão contábil ou um balancete de
+verificação (CSV ou Excel) e monta a Demonstração do Resultado do
+Exercício — peça de portfólio de Denner (contábil/fiscal, graduando em
+Ciências Contábeis). Roda 100% no navegador, sem backend. Site publicado
+via GitHub Pages a partir da pasta `/docs`.
+
+**O ESCOPO É A DRE E A TRANSIÇÃO PARA O CPC 51, E SÓ ISSO.** Este app já
+teve Painel de indicadores com gráficos e torres 3D, Balanço Patrimonial,
+análise horizontal em aba própria e uma galeria de arquivos no GitHub.
+Tudo isso foi REMOVIDO de propósito, a pedido de quem usa: o projeto
+existe para levar uma instituição da DRE de hoje até a demonstração do
+CPC 51 em 2027, e cada tela fora desse caminho era uma tela a manter, a
+explicar e a conferir sem servir ao objetivo. Antes de acrescentar
+qualquer coisa, a pergunta é "isto serve à DRE ou à transição?" — se a
+resposta for "é legal ter", a resposta é não. O histórico dessas telas
+está no Git (ver `EVOLUCAO.md`, entrada de 20/08/2026, 4ª sessão) caso
+alguma precise voltar.
 
 Link do site: https://dennereduardo1971-ai.github.io/Gerador-DRE/
 Repositório: https://github.com/dennereduardo1971-ai/Gerador-DRE
@@ -44,7 +55,6 @@ src/
                               # import estático, ver "Armadilhas")
     classify.js               # GRUPOS da DRE + sugerirClassificacao()
                               # (o coração do projeto — ver seção própria)
-    balanco.js                 # Balanço Patrimonial simplificado (contas 1/2)
     historico.js                # histórico local de DREs (localStorage) +
                                  # sincronização com githubApi.js
     githubApi.js                 # lê/grava um arquivo JSON no repo via API do
@@ -56,13 +66,9 @@ src/
     planos/iesb.js                # o plano do IESB, como DADO
     linhasDRE.js                  # a estrutura da DRE (rótulos, sinais,
                                    #  cascata, soma por seção)
-    abertura.js                   # balancete simples (código;saldo)
-    indicadores.js                # margens, índices e séries do painel
-                                   #  (inclui cascataPassos, fonte única
-                                   #  compartilhada pelo SVG e pelo PNG)
-    imagemPainel.js                # gera o PNG do painel via <canvas>
     balancete.js                  # balancete de verificação hierárquico
-                                   #  (traz o Balanço inteiro pronto)
+                                   #  (monta a DRE sozinho, e traz o plano
+                                   #   de contas junto)
     cpc51.js                      # as cinco categorias do CPC 51, a
                                    #  política de julgamento e a
                                    #  conciliação com a estrutura atual
@@ -113,11 +119,11 @@ Fluxo do app: Importar → Conferir → Classificar → DRE. As demais abas
 são vistas paralelas sobre o mesmo estado agregado (`contas`, calculado
 uma vez em `App.jsx` via `agregarPorConta`). **Na etapa Importar o
 balancete vem primeiro e o razão está atrás de "opções avançadas"**: o
-balancete já passou pelo fechamento e monta DRE e Balanço sozinho,
-enquanto o razão só é necessário para o que ele não carrega (competência
-mês a mês num arquivo só, centro de custo, lançamento individual).
+balancete já passou pelo fechamento e monta a DRE sozinho, enquanto o
+razão só é necessário para o que ele não carrega (competência mês a mês
+num arquivo só, centro de custo, lançamento individual).
 
-**A navegação é dado, não JSX.** `SECOES` em `App.jsx` descreve cinco
+**A navegação é dado, não JSX.** `SECOES` em `App.jsx` descreve quatro
 seções, cada uma agrupando abas que respondem à mesma pergunta. **Início**
 fica solto acima delas, porque não pertence a nenhuma:
 
@@ -125,10 +131,14 @@ fica solto acima delas, porque não pertence a nenhuma:
 |---|---|---|
 | — | o que eu faço agora? | Início |
 | Fluxo | como eu chego na DRE? | Importar → Conferir → Classificar → DRE |
-| Análises | o que estes números dizem? | Painel, Balanço, Horizontal, Comparativa |
 | Parâmetros | para onde vai cada conta? | De-Para |
-| Arquivo | o que já foi fechado? | Histórico, Arquivos |
+| Acompanhamento | como ela se moveu, e o que já foi fechado? | Comparativa, Histórico |
 | CPC 51 · 2027 | como isso fica em 2027? | Demonstração, Plano de ação |
+
+São **dez abas no total**, e esse número é para ser defendido. Já foram
+quatorze; o corte de 20/08/2026 tirou Painel, Balanço e Arquivos e
+fundiu Horizontal na Comparativa. Aba nova precisa passar pela pergunta
+do escopo lá em cima.
 
 Quatro coisas a não desfazer aqui:
 
@@ -141,15 +151,14 @@ Quatro coisas a não desfazer aqui:
   `abaDisponivel()`. Ela governa o menu E o estado vazio do `<main>`;
   eram duas cópias antes, e aba nova aberta no menu caía em tela
   branca quando alguém esquecia da segunda.
-- **Parâmetros não é uma linha em Análises.** De-Para é cadastro, não
-  leitura de resultado — e cadastro que se procura em "Análises" é
-  cadastro que ninguém acha. É também a seção onde entram os módulos de
-  parametrização do caminho para ERP.
-- **Início não é o Painel.** Início responde "por onde começo e o que
-  está me esperando"; Painel responde "e daí?". Por isso Início não tem
-  gráfico nenhum — os três números do topo são isca para o Painel, não
-  leitura de resultado. Pôr cascata ou ranking ali faz as duas telas
-  virarem a mesma tela, e uma delas passa a sobrar.
+- **Parâmetros é seção própria, não um item no meio das outras.**
+  De-Para é cadastro, não leitura de resultado — e cadastro que se
+  procura junto de análise é cadastro que ninguém acha. É também a seção
+  onde entram os módulos de parametrização do caminho para ERP.
+- **Início não analisa.** Ele responde "por onde começo e o que está me
+  esperando": estado do arquivo, um único próximo passo, pendências e
+  atalhos. Os números do topo situam, não concluem. Pôr cascata, ranking
+  ou gráfico ali refaz o Painel que acabou de ser removido.
 
 O estado de cada aba (`estadoDaAba`) aparece como **selo** ao lado do
 nome: um número (`17` contas, `3` a resolver) ou `!`/`✓`. Selo em **âmbar**
@@ -203,11 +212,10 @@ não a explicação de por quê.** O texto que explica consequência, formato
 de arquivo ou fundamento contábil continua no app, fechado, atrás de um
 `<summary>` de três a cinco palavras.
 
-Duas exceções, e não são estilo: o aviso de repositório público em
-`Arquivos.jsx` e a instrução de token fine-grained em
-`SincronizacaoGitHub.jsx` ficam **abertos**. São avisos de consequência,
-lidos por quem está prestes a clicar — esconder um aviso desses é o
-oposto de "fácil de entender".
+Uma exceção, e não é estilo: a instrução de token fine-grained em
+`SincronizacaoGitHub.jsx` fica **aberta**. É aviso de consequência, lido
+por quem está prestes a clicar — esconder um aviso desses é o oposto de
+"fácil de entender".
 
 ### O canal (elemento de assinatura)
 
@@ -220,9 +228,10 @@ oposto de "fácil de entender".
   ele a mordida vermelha flutua no vazio). Subtotais desenham barra
   cheia do zero até o valor.
 - **`Balanca`** — o mesmo eixo espelhado, usado em Conferir (débito ×
-  crédito) e Balanço (Ativo × Passivo + PL). Os dois braços são índigo
-  neutro; **o único trecho vermelho é o excesso de um lado sobre o
-  outro**, ou seja, literalmente o que não fecha.
+  crédito). Os dois braços são índigo neutro; **o único trecho vermelho é
+  o excesso de um lado sobre o outro**, ou seja, literalmente o que não
+  fecha. Ela já serviu também ao Balanço (Ativo × Passivo + PL) e
+  continua genérica o bastante para qualquer par que precise fechar.
 
 Os números da cascata são calculados em `montarLinhas()` dentro de
 `EtapaDRE.jsx`, percorrendo a demonstração em ordem — e **cada subtotal
@@ -230,10 +239,11 @@ reancora no valor autoritativo vindo de `montarDRE`**, nunca numa soma
 própria. Isso é de propósito: o desenho não pode divergir do número
 impresso ao lado se algum grupo for exibido condicionalmente.
 
-Uma tentação a evitar: já existiu uma barrinha de variação divergente
-na Análise Horizontal e ela foi removida. Com uma variação atípica
-(+424% num mês) a escala compartilhada esmaga todas as outras e as
-barras viram slivers invisíveis — o número já dizia tudo.
+Uma tentação a evitar: já existiu uma barrinha de variação divergente ao
+lado da variação percentual mês a mês (hoje no bloco de cima da
+Comparativa) e ela foi removida. Com uma variação atípica (+424% num mês)
+a escala compartilhada esmaga todas as outras e as barras viram slivers
+invisíveis — o número já dizia tudo.
 
 ### Piso de qualidade
 
@@ -603,7 +613,7 @@ categoria do CPC 51. É a aba **Parâmetros → De-Para**, o entregável da
 Fase 2 do cronograma e a especificação de entrada da Fase 4
 (parametrização no ERP).
 
-Quatro decisões que não devem ser desfeitas:
+Cinco decisões que não devem ser desfeitas:
 
 1. **Ele não decide nada.** A resolução continua em `classify.js` (via
    `grupoDe`) e em `cpc51.js` (via `resolverCategoria`). `depara.js` só
@@ -620,7 +630,18 @@ Quatro decisões que não devem ser desfeitas:
    `depara.js` — a mesma classe de problema que fez `grupos.js` nascer.
    Em vez disso, `depara.test.js` prova que as duas tabelas concordam
    conta a conta sobre grupo e categoria.
-4. **A coluna "origem da decisão" é o que torna a planilha um documento
+4. **No Excel, o resumo por grupo é uma tabela em DOIS níveis.** A linha
+   do grupo abre nas contas que formam aquele saldo, pelo agrupamento
+   nativo do Excel (`summaryBelow: false`, contas recolhidas em
+   `outlineLevel 1`) — a mesma conferência que a tela permite, dentro do
+   arquivo entregue. Duas coisas sustentam isso: a coluna **Saldo é a
+   mesma nos dois níveis** (o total fica em cima das parcelas, então
+   conferir se fecha é olhar uma coluna só) e as contas vêm de
+   `porGrupo(...).contas`, a MESMA lista que somou o total — não há
+   segunda seleção que possa divergir dele. `montarWorkbookDePara` é
+   separada de `baixarExcelDePara` de propósito, para o teste afirmar
+   sobre o arquivo em si sem precisar de DOM.
+5. **A coluna "origem da decisão" é o que torna a planilha um documento
    de auditoria.** Sem ela, mapeamento herdado do padrão e mapeamento
    conferido conta a conta parecem a mesma coisa — e é justamente essa
    diferença que a auditoria pergunta. `completude` conta só a conta que
@@ -663,6 +684,10 @@ corrigido. **Não tente estilizar célula com `xlsx` de novo** — se um dia
 precisar de estilo em algo que só `xlsx` grava, é limite da biblioteca,
 não bug de uso.
 
+O agrupamento de linhas do Excel (o `+` da margem) também só existe do
+lado do `exceljs`, e é o que faz a aba "Resumo" do De-Para abrir cada
+grupo nas suas contas — ver a seção "De-Para".
+
 `exceljs` escreve estilo de verdade, mas pesa **~271 kB gzip**
 minificado — quase o dobro do `xlsx` (141 kB gzip). Só entra via
 `import()` dinâmico, no clique de "Baixar Excel", nunca no bundle
@@ -677,28 +702,16 @@ passar despercebido se a mesma lib relê o que ela mesma gravou errado.
 Leia de volta com uma biblioteca INDEPENDENTE (`openpyxl` em Python
 serviu bem) antes de considerar validado.
 
-## Balancete de abertura
-
-`abertura.js` resolve pela raiz a limitação do Balanço que antes só se
-podia avisar: o razão de um mês não carrega saldo inicial, então o
-Balanço era a variação do período. Com o balancete carregado,
-`montarBalanco` passa a calcular abertura + movimentação = saldo final, e
-`comAbertura` diz em qual dos dois modos o resultado está — a tela usa
-isso para não mostrar o aviso errado.
-
-Duas decisões que parecem detalhe e não são: código repetido **soma** (há
-sistemas que quebram a mesma conta por centro de custo, e sobrescrever
-perderia dinheiro calado), e conta que só existe no balancete **entra**
-no Balanço com movimento zero (se sumisse, o Balanço continuaria errado,
-que é o problema que o balancete veio corrigir).
-
 ## Balancete de verificação
 
 `balancete.js` lê o relatório que o sistema contábil emite de verdade
 (`ctbr041`): código pontuado em vários níveis, saldo anterior, débito,
 crédito, movimento e saldo atual, com a natureza indicada por "D"/"C" no
-fim do número. Quando esse formato é reconhecido, ele vira a FONTE do
-Balanço e o razão passa a ser a contraprova — não o contrário.
+fim do número. Quando esse formato é reconhecido, ele vira a FONTE da
+DRE e o razão passa a ser a contraprova — não o contrário. **Só esse
+formato entra**: o `código;saldo` simples existia para dar abertura ao
+Balanço Patrimonial, tela que o app não tem mais, e aceitá-lo agora
+seria aceitar um arquivo que não produz nada.
 
 O relatório sai do sistema com **duas abas**: `Parametros` (as perguntas
 do relatório — datas, faixa de contas) e só a segunda com o balancete.
@@ -735,7 +748,8 @@ Sete armadilhas deste formato, todas cobertas por teste:
   diferença entre Ativo e Passivo + PL é o resultado do exercício, que
   está nas contas 3 a 7. Em números de exemplo: Ativo 200.000.000,00 −
   Passivo 199.500.000,00 = 500.000,00. **Nunca trate isso como erro de
-  importação.**
+  importação.** Um arquivo assim, filtrado em 1 e 2, simplesmente não
+  monta a DRE — e a tela diz isso em vez de mostrar demonstração zerada.
 - **Resultado do PERÍODO não é resultado ACUMULADO — e confundir os dois
   gera alarme falso.** O saldo atual das contas de resultado é acumulado
   no exercício (o relatório pergunta a data do saldo anterior de
@@ -755,80 +769,9 @@ Sete armadilhas deste formato, todas cobertas por teste:
   Δ(Ativo + Passivo) do período = resultado do período — e quando o
   arquivo traz os dois lados, as contas patrimoniais e as de resultado
   apuram esse mesmo número por caminhos independentes (`resultadoConfere`).
-
-## Painel
-
-`Painel.jsx` responde "e daí?", enquanto as outras telas respondem "os
-números estão certos?". São públicos diferentes: quem confere abre a DRE
-e o balancete, quem decide abre o painel.
-
-Cada bloco depende de uma fonte e só aparece se ela existir — margens
-precisam do razão, índices patrimoniais precisam do balancete. **Nunca
-mostre zero no lugar de dado ausente**: `indicadores.js` devolve `null`
-quando o denominador é zero, porque uma liquidez corrente em 0,00 parece
-diagnóstico ("não cobre o curto prazo") quando na verdade é ausência de
-passivo circulante. Endividamento 0% é diferente: aí o zero é resposta.
-
-A classificação circulante × não circulante × PL é feita pelo **nome** do
-grupo, não pelo código: no plano do IESB, `1.2` e `1.3` são ambos Ativo
-Não Circulante, e outro plano usaria outra numeração.
-
-### Sobre o 3D
-
-As torres patrimoniais (`TorresPatrimoniais.jsx`) são o único lugar com
-três dimensões, e é deliberado. O Balanço É duas pilhas de mesma altura,
-então volume e perspectiva tornam a igualdade física — dá para ver que as
-torres terminam no mesmo nível antes de ler qualquer número.
-
-**Não estenda 3D aos outros gráficos.** Perspectiva distorce comparação:
-a barra mais próxima parece maior que outra de mesmo valor, e num painel
-financeiro isso deixa de ser estilo e vira erro de leitura. Cascata,
-evolução e ranking são 2D e precisos de propósito.
-
-Feito com transformações CSS, não com three.js: uma biblioteca 3D
-custaria mais de 600 kB num app cujo bundle tem 300, para desenhar
-caixas. Todo o painel — indicadores, três gráficos SVG e as torres —
-somou 15 kB.
-
-## Armazenamento de arquivos (imagens e outros)
-
-`githubApi.js` ganhou `listarPasta`/`enviarArquivo`/`excluirArquivo`,
-que usam a mesma API de Conteúdo do GitHub que já sincroniza o
-`historico.json` — mesmo token, mesmo repositório, sem serviço novo.
-Arquivos ficam em `data/arquivos/` e a interface é `Arquivos.jsx`.
-
-**O aviso de repositório público não é opcional e não é rodapé.** Se o
-repo for público (o normal de um projeto no GitHub Pages), todo arquivo
-enviado por aqui fica acessível a qualquer pessoa, sem login, e continua
-no histórico do Git mesmo depois de excluído pela interface. `Arquivos.jsx`
-mostra esse aviso ANTES de liberar qualquer envio, e o botão "Salvar no
-GitHub" do Painel pede confirmação explícita a cada uso — não é um "aceitar
-uma vez e esquecer". Isso importa mais aqui do que no `historico.json`
-porque a imagem do painel carrega valores financeiros reais legíveis
-direto na miniatura, não só um número dentro de um JSON.
-
-Limite de 1 MB por arquivo: é o teto prático da API de Conteúdo em
-base64 num único request. Arquivos maiores precisariam do fluxo de blobs
-da Git Data API, que não foi implementado por não ser necessário para o
-que o próprio app gera.
-
-## Imagem do painel
-
-`imagemPainel.js` desenha o PNG em `<canvas>`, não captura o DOM.
-Capturar exigiria uma biblioteca tipo html2canvas (~50 kB) e ainda assim
-tropeçaria nas variáveis CSS e nas transformações 3D das torres
-patrimoniais. Desenhar do zero usa os MESMOS dados computados que a tela
-(`indicadores.js`) — a cascata da imagem é `cascataPassos()`, a mesma
-função que desenha o SVG da tela, extraída de propósito para as duas
-técnicas de desenho não poderem divergir sobre o que a cascata representa.
-
-**As torres 3D não entram na imagem.** Um retrato estático da perspectiva
-exigiria reimplementar a projeção 3D em canvas só para uma imagem — não
-paga o esforço. A imagem cobre indicadores, cascata, evolução e ranking.
-
-A paleta usa cores concretas (`PALETAS.claro`/`escuro`), não variáveis
-CSS: um arquivo exportado precisa se bastar sozinho, sem depender de uma
-folha de estilos que não vai junto com o PNG.
+  **Essa é a validação mais forte que o arquivo permite**, e por isso ela
+  sai por escrito no aviso da importação: se os dois caminhos não batem, o
+  arquivo tem problema antes de qualquer classificação.
 
 ## As duas fontes (razão × balancete)
 
@@ -853,21 +796,21 @@ porque passou pelo fechamento; o razão só assume por escolha explícita.
 
 | | Balancete | Razão |
 |---|---|---|
-| DRE e Balanço | sim | DRE sim, Balanço parcial |
+| DRE | sim, e já fechada | sim, somada pelo app |
 | Plano de contas | vem junto | arquivo separado |
 | Competência mês a mês | não (retrato de um período) | sim |
 | Centro de custo | não | sim |
 | Lançamento individual | não | sim |
 | Confiabilidade | fechado pela contabilidade | somado pelo app |
 
-Por isso Comparativa, Horizontal e o filtro de centro de custo continuam
-dependendo do razão, e `FonteDados.jsx` diz isso na tela antes de alguém
-trocar de fonte sem entender o que perde.
+Por isso a Comparativa e o filtro de centro de custo continuam dependendo
+do razão, e `FonteDados.jsx` diz isso na tela antes de alguém trocar de
+fonte sem entender o que perde.
 
 **Balancete filtrado.** `coberturaBalancete()` detecta quais dígitos raiz
 o arquivo traz. O relatório típico de fechamento patrimonial vem filtrado
-só em 1 e 2 — aí ele monta o Balanço mas não a DRE, e a tela explica que
-basta exportar o mesmo relatório sem filtrar por conta.
+só em 1 e 2 — aí ele NÃO monta a DRE, e a tela explica que basta exportar
+o mesmo relatório sem filtrar por conta.
 
 **O balancete traz o plano de contas de graça.** `nomesDoBalancete()`
 devolve código → descrição de todas as contas, sintéticas inclusive. Como
@@ -903,11 +846,15 @@ contra 30 caracteres leva mais de 30 segundos e **congela a aba de vez**
 aninhado, maior que 120 caracteres ou inválido é recusado na leitura e a
 regra é descartada com aviso, em vez de derrubar o app.
 
-**Visibilidade do repositório é consultada, não presumida.** A tela de
-Arquivos pergunta à API se o repo é público ou privado e muda o texto do
-aviso. Presumir foi como o aviso ficou factualmente errado antes —
-dizendo "este repositório é público" para um repositório privado, o que
-tanto assusta à toa quanto ensina o usuário a ignorar avisos.
+**O que sai do navegador diminuiu, e é para continuar assim.** Com a
+remoção da aba Arquivos e da imagem do Painel, a ÚNICA coisa que este app
+manda para fora da máquina é o `historico.json` da sincronização — totais
+de DRE, sem conta e sem lançamento. Todo envio novo para o GitHub tem que
+justificar por que precisa sair, e a lição que ficou do que existia antes
+continua valendo: **visibilidade de repositório se consulta, não se
+presume** (o aviso já chegou a dizer "este repositório é público" para um
+repositório privado, o que tanto assusta à toa quanto ensina o usuário a
+ignorar avisos).
 
 **Riscos aceitos conscientemente** (documentados, não corrigidos):
 
@@ -943,7 +890,7 @@ subtotais obrigatórios** (resultado operacional; resultado antes do
 financiamento e dos tributos sobre o lucro). Some o "não operacional": o
 operacional vira a categoria RESIDUAL.
 
-Cinco coisas que não devem ser desfeitas por acidente:
+Seis coisas que não devem ser desfeitas por acidente:
 
 1. **A categoria é um eixo PARALELO ao grupo, não um grupo novo.** Cada
    conta tem um grupo (a linha da DRE atual) e uma categoria (o bloco do
@@ -966,7 +913,24 @@ Cinco coisas que não devem ser desfeitas por acidente:
    com juros de mora de aluno (operacional); `DESP_FIN` mistura juros de
    empréstimo (financiamento) com tarifa bancária (operacional). O padrão
    escolhe o caso mais comum e MARCA para revisão — não finge certeza.
-5. **A minuta da nota de MPDA deixa lacuna onde não sabe.** A norma exige
+5. **O layout da demonstração exportada segue o modelo do cliente; as
+   LINHAS, não.** A aba "DRE CPC 51" do Excel sai nas colunas do modelo
+   que o escritório usa como base — `Categoria CPC 51 | Código |
+   Descrição | período | comparativo | AV % | Notas`. Foi adotado o
+   layout, porque trocar colunas não muda número nenhum; adotar as
+   linhas do modelo ("Receitas de Pós-Graduação", "Custos Acadêmicos"…)
+   exigiria remapear conta a conta e perderia a validação centavo a
+   centavo. O **código da linha** (`1.1`, `2.3`) nasce em
+   `montarLinhas51`: primeiro dígito é a posição fixa da categoria na
+   ordem da norma, segundo é a posição na demonstração DAQUELE
+   fechamento — é numeração de linha publicada, não código de conta, e
+   não serve de chave para ERP. A coluna **Notas sai vazia** (a
+   referência é de quem redige) e a **coluna comparativa só é preenchida
+   quando existe período anterior de verdade** no arquivo (competência
+   filtrada e a anterior presente); fora disso fica em branco, com o
+   motivo escrito acima da tabela — comparar "Jan a Jun" com "Mai"
+   produziria um número que parece comparativo e não é.
+6. **A minuta da nota de MPDA deixa lacuna onde não sabe.** A norma exige
    efeito tributário e de não controladores por item de conciliação; o
    app não tem esses dados. Sai `[__________]`, nunca zero — zero é uma
    afirmação.
@@ -988,13 +952,18 @@ viva, com o que foi medido em cada sessão, está em `EVOLUCAO.md`:
    origem da decisão, gerar o arquivo a partir dessas decisões é um botão
    e uma serialização, e fecha o ciclo "atender cliente novo sem commit
    e sem build".
-2. **Comparativa na estrutura do CPC 51** — a norma exige 2027 contra
-   2026 reapresentado (Fase 8, passo 36). Hoje `EtapaComparativo` só
-   monta colunas na estrutura antiga.
-3. **Seletor de aba do Excel** — `importarExcel.js` escolhe a primeira
-   aba com dados; já devolve `abas`, falta UI.
-4. **Circulante × Não Circulante no Balanço** — agora que existe saldo de
-   abertura, o passo seguinte é classificar por hierarquia do plano de
-   contas e transportar o resultado do exercício para o PL.
+2. **Comparativa na estrutura do CPC 51 na tela** — a norma exige 2027
+   contra 2026 reapresentado (Fase 8, passo 36). O Excel exportado já traz
+   a coluna comparativa; `EtapaComparativo` ainda só monta colunas na
+   estrutura antiga.
+3. **Ler de volta o De-Para preenchido fora do app** — hoje o arquivo só
+   sai. O cuidado está registrado em `EVOLUCAO.md`: aplicar tudo do
+   arquivo apagaria decisão manual em silêncio.
+4. **Seletor de aba do Excel** — `importarExcel.js` escolhe sozinho a aba
+   com mais cara de conta; já devolve `abas`, falta UI para o caso em que
+   ele escolhe errado.
 5. **Agregar durante a importação** em vez de guardar `linhas` cru em
    memória — tiraria o teto de tamanho de arquivo.
+
+O que NÃO está no backlog, e não é esquecimento: indicadores, gráficos,
+Balanço Patrimonial, galeria de arquivos. Ver "O que é", no topo.

@@ -12,7 +12,8 @@ import {
   gruposParaRevisar,
   montarDRE51,
 } from "../cpc51.js";
-import { montarLinhas51 } from "../linhasCPC51.js";
+import { comparativo51, montarLinhas51 } from "../linhasCPC51.js";
+import { montarWorkbookCPC51 } from "../exportacaoCPC51.js";
 
 /* Razão sintético com uma conta em cada grupo que importa para o CPC 51,
  * incluindo os três casos difíceis: financeiro (que se parte entre
@@ -301,5 +302,113 @@ describe("De-Para e cobertura", () => {
 
   it("toda categoria tem definição escrita — é o texto da política contábil", () => {
     CATEGORIAS.forEach((c) => expect(c.descricao.length).toBeGreaterThan(40));
+  });
+});
+
+/* O LAYOUT DA DEMONSTRAÇÃO EXPORTADA SEGUE O MODELO USADO COMO BASE:
+   categoria, código da linha, descrição, período, comparativo, notas.
+   O que estes testes congelam é a fronteira dessa adoção — as COLUNAS
+   vieram do modelo, as LINHAS continuam sendo as da DRE validada. E a
+   coluna comparativa nunca inventa um período: ou traz o anterior de
+   verdade, ou fica vazia. */
+describe("o código da linha e a categoria de cada linha", () => {
+  it("numera dentro da categoria, com o primeiro dígito fixo pela ordem da norma", () => {
+    const { dre51 } = montar();
+    const { itens } = montarLinhas51(dre51);
+    const cods = Object.fromEntries(itens.filter((i) => i.cod).map((i) => [i.lbl, i.cod]));
+
+    // operacional é a 1ª categoria da norma; investimento a 2ª, e assim por diante
+    expect(cods["Receita Bruta com Mensalidades"]).toBe("1.1");
+    expect(cods["Receitas Financeiras"]).toBe("2.1");
+    expect(cods["Despesas Financeiras"]).toBe("3.1");
+    expect(cods["IRPJ e CSLL"]).toBe("4.1");
+    // dentro do bloco a numeração é contígua e na ordem da demonstração
+    const operacionais = itens.filter((i) => i.cod && i.cat === "OPERACIONAL").map((i) => i.cod);
+    expect(operacionais).toEqual(operacionais.map((_, i) => `1.${i + 1}`));
+  });
+
+  it("dá categoria à seção e ao subtotal que fecham um bloco, e não aos que atravessam", () => {
+    const { dre51 } = montar();
+    const { itens } = montarLinhas51(dre51);
+    const porRotulo = Object.fromEntries(itens.map((i) => [i.lbl, i]));
+    expect(porRotulo["( = ) Resultado Operacional"].cat).toBe("OPERACIONAL");
+    expect(porRotulo["( = ) Resultado antes do financiamento e dos tributos sobre o lucro"].cat).toBeUndefined();
+    expect(porRotulo["( = ) Resultado Líquido do Período"].cat).toBeUndefined();
+  });
+});
+
+describe("a coluna comparativa só traz período anterior de verdade", () => {
+  const serie = () => {
+    const { dre51 } = montar();
+    const menor = montar({ contas: CONTAS.map((c) => ({ ...c, saldo: c.saldo / 2 })) }).dre51;
+    return [{ competencia: "05/2026", dre51: menor }, { competencia: "06/2026", dre51 }];
+  };
+
+  it("fica vazia sem competência filtrada, ou quando a filtrada é a primeira", () => {
+    expect(comparativo51(serie(), "todas")).toBe(null);
+    expect(comparativo51(serie(), undefined)).toBe(null);
+    expect(comparativo51(serie(), "05/2026")).toBe(null);
+  });
+
+  it("traz a competência imediatamente anterior, casada por rótulo", () => {
+    const comp = comparativo51(serie(), "06/2026");
+    expect(comp.rotulo).toBe("Mai/2026");
+    const { dre51 } = montar();
+    expect(comp.valores["( = ) Resultado Líquido do Período"]).toBeCloseTo(dre51.liquido / 2, 2);
+  });
+});
+
+describe("a aba 'DRE CPC 51' do Excel sai no layout do modelo", () => {
+  const exportar = async (extra = {}) => {
+    const { dre, dre51, categoriaDe } = montar();
+    const wb = await montarWorkbookCPC51({
+      dre, dre51,
+      conciliacao: conciliar(dre, dre51, CONTAS, grupoDe, categoriaDe),
+      dePara: deParaCPC51(CONTAS, { grupoDe, categoriaPorConta: {}, politica: POLITICA_PADRAO, nomes: {} }),
+      medidas: [], politica: POLITICA_PADRAO, empresa: "Exemplo",
+      competencias: ["05/2026", "06/2026"], nomes: {}, ...extra,
+    });
+    const ws = wb.getWorksheet("DRE CPC 51");
+    const linhas = [];
+    ws.eachRow((row) => linhas.push([1, 2, 3, 4, 5, 6, 7].map((c) => row.getCell(c).value)));
+    return linhas;
+  };
+
+  it("escreve categoria, código, descrição e uma coluna de notas em branco", async () => {
+    const linhas = await exportar();
+    const cab = linhas.find((l) => l[0] === "Categoria CPC 51");
+    expect(cab.slice(0, 3)).toEqual(["Categoria CPC 51", "Código", "Descrição"]);
+    expect(cab[6]).toBe("Notas");
+
+    const mensalidades = linhas.find((l) => l[2] === "Receita Bruta com Mensalidades");
+    expect(mensalidades[0]).toBe("Operacional");
+    expect(mensalidades[1]).toBe("1.1");
+    expect(mensalidades[6]).toBe(null); // a nota é decisão de quem redige, não do app
+
+    // os subtotais que atravessam categorias são rotulados como no modelo
+    expect(linhas.find((l) => l[2] === "( = ) Resultado antes dos tributos sobre o lucro")[0]).toBe("Subtotal");
+    expect(linhas.find((l) => l[2] === "( = ) Resultado Líquido do Período")[0]).toBe("Final");
+  });
+
+  it("deixa a coluna comparativa vazia e diz por quê quando não há período anterior", async () => {
+    const linhas = await exportar();
+    expect(linhas.find((l) => l[0] === "Categoria CPC 51")[4]).toBe("Comparativo");
+    const comCodigo = linhas.filter((l) => /^\d+\.\d+$/.test(String(l[1] ?? "")));
+    expect(comCodigo.length).toBeGreaterThan(0);
+    expect(comCodigo.every((l) => l[4] === null)).toBe(true);
+    expect(linhas.some((l) => String(l[0] || "").includes("Coluna comparativa em branco"))).toBe(true);
+  });
+
+  it("preenche a coluna comparativa quando o período anterior existe", async () => {
+    const menor = montar({ contas: CONTAS.map((c) => ({ ...c, saldo: c.saldo / 2 })) }).dre51;
+    const { dre51 } = montar();
+    const comparativo = comparativo51(
+      [{ competencia: "05/2026", dre51: menor }, { competencia: "06/2026", dre51 }],
+      "06/2026"
+    );
+    const linhas = await exportar({ comparativo, filtroCompetencia: "06/2026" });
+    expect(linhas.find((l) => l[0] === "Categoria CPC 51").slice(3, 5)).toEqual(["Jun/2026", "Mai/2026"]);
+    const mensalidades = linhas.find((l) => l[2] === "Receita Bruta com Mensalidades");
+    expect(mensalidades[4]).toBeCloseTo(mensalidades[3] / 2, 2);
   });
 });

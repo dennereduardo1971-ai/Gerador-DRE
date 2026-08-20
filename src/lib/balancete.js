@@ -380,39 +380,6 @@ export function nomesDoBalancete(bal) {
   return Object.fromEntries(bal.contas.map((c) => [c.codigo, c.descricao]));
 }
 
-/** Achata a árvore em ordem de leitura, respeitando quem está aberto.
- *  `abertos` é um Set de códigos; um nó fechado esconde a subárvore. */
-export function achatar(bal, abertos, { ocultarSemMovimento = false } = {}) {
-  const saida = [];
-  const visitar = (codigo) => {
-    const c = bal.porCodigo.get(codigo);
-    if (!c) return;
-    const parado = Math.abs(c.debito) < 0.005 && Math.abs(c.credito) < 0.005;
-    if (ocultarSemMovimento && parado && Math.abs(c.atual) < 0.005) return;
-    saida.push(c);
-    if (!abertos.has(codigo)) return;
-    [...c.filhos]
-      .sort((a, b) => a.localeCompare(b))
-      .forEach(visitar);
-  };
-  [...bal.raizes].sort((a, b) => a.localeCompare(b)).forEach(visitar);
-  return saida;
-}
-
-/** Grupos de nível 2 de um lado do balanço (Circulante, Não Circulante,
- *  Patrimônio Líquido), que é como um Balanço se lê. */
-export function gruposDe(bal, digito) {
-  const raiz = bal.porCodigo.get(digito);
-  if (!raiz) return [];
-  return raiz.filhos
-    .map((f) => bal.porCodigo.get(f))
-    .sort((a, b) => a.codigo.localeCompare(b.codigo))
-    .map((g) => ({
-      ...g,
-      itens: g.filhos.map((f) => bal.porCodigo.get(f)).sort((a, b) => a.codigo.localeCompare(b.codigo)),
-    }));
-}
-
 /* ------------------------------------------------------------------ *
  * O período que o balancete cobre.
  *

@@ -18,7 +18,7 @@ núcleo pronto:
 |---|---|---|
 | `parse.js` / `importarArquivo.js` | CSV e Excel, número BR, competência | toda importação nova entra por aqui |
 | `agregarPorConta` | movimento por conta | formato-alvo de qualquer fonte nova |
-| `balancete.js` | plano de contas + Balanço prontos | dispensa cadastro manual de contas |
+| `balancete.js` | plano de contas + DRE prontos | dispensa cadastro manual de contas |
 | `classify.js` + `planoPerfil.js` | conta → grupo, por código e por texto | motor de qualquer classificação nova |
 | `depara.js` | origem → destino + **origem da decisão** + placar | formato de qualquer parametrização |
 | `perfil.js` | decisões salvas em arquivo, sem valores | como se atende cliente novo |

@@ -15,7 +15,7 @@
 import { baixar, cabecalho, dec, neutralizarFormula } from "./exportacao.js";
 import {
   aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
-  escreverTitulo, linhaEmBranco, baixarWorkbook, FORMATO_MOEDA,
+  escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook, FORMATO_MOEDA,
 } from "./excelEstilo.js";
 
 const COLUNAS = [
@@ -74,12 +74,64 @@ export function baixarCSVDeParaCompleto(linhas, ctx = {}) {
     nomeArquivo(ctx.empresa, "csv"), "text/csv;charset=utf-8");
 }
 
-/** O mesmo De-Para em Excel, com filtro automático ligado e uma aba de
- *  resumo por grupo. O filtro não é enfeite: é como se confere um
- *  mapeamento de 400 contas — filtra por grupo e lê as 14 linhas que
- *  caíram em Custos. Estilo em `excelEstilo.js`: mesmo cabeçalho de
- *  marca e rajado alternado das outras planilhas exportadas. */
-export async function baixarExcelDePara(linhas, resumo, grupos, ctx = {}) {
+/* AS COLUNAS DA ABA "RESUMO" SÃO UMA SÓ TABELA EM DOIS NÍVEIS.
+ *
+ * A linha do grupo ocupa a primeira coluna e as duas últimas (quantas
+ * contas, quantas a revisar); a linha de conta ocupa as do meio. As duas
+ * compartilham de propósito a coluna Saldo: o total do grupo fica na
+ * MESMA coluna das parcelas recolhidas debaixo dele, então abrir o grupo
+ * e conferir se a composição fecha é olhar uma coluna só, sem cruzar
+ * tabela nenhuma — que é para isso que a expansão existe. */
+const COLUNAS_RESUMO = [
+  "Grupo na DRE", "Conta", "Descrição", "Categoria CPC 51",
+  "Situação", "Saldo", "Contas", "A revisar",
+];
+
+const linhaGrupo = (g) => [g.nome, null, null, null, null, g.total, g.n, g.aRevisar];
+const linhaConta = (l) => [
+  null, l.conta, l.descricao, l.categoriaNome, situacaoDaLinha(l), l.saldo,
+];
+
+/** A tabela por destino com as contas de cada grupo penduradas embaixo,
+ *  recolhidas — o mesmo "clique no grupo para ver as contas" que a tela
+ *  De-Para já faz, agora dentro do arquivo entregue.
+ *
+ *  Três detalhes que fazem isto funcionar no Excel de verdade:
+ *
+ *  - `summaryBelow: false` põe o botão de expandir na linha do GRUPO, e
+ *    não na linha seguinte ao bloco. Sem isso o Excel desenha o `+` uma
+ *    linha depois das contas e ninguém entende o que ele abre.
+ *  - as contas nascem `hidden`, senão a planilha abriria com as
+ *    centenas de linhas já esparramadas e a leitura por destino, que é
+ *    um resumo, deixaria de ser resumo.
+ *  - o rajado alternado corre DENTRO de cada grupo, não pelo bloco
+ *    inteiro: com os grupos recolhidos, uma zebra contínua sairia
+ *    quebrada quando um grupo fosse aberto. */
+function escreverResumoPorGrupo(ws, grupos) {
+  ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
+  ws.properties.outlineLevelRow = 1;
+
+  escreverCabecalhoTabela(ws, COLUNAS_RESUMO, { congelar: false });
+  grupos.forEach((g) => {
+    const rowGrupo = ws.addRow(linhaGrupo(g));
+    rowGrupo.getCell(6).numFmt = FORMATO_MOEDA;
+    marcarSubtotal(ws, rowGrupo.number, COLUNAS_RESUMO.length);
+
+    const primeira = ws.rowCount + 1;
+    g.contas.forEach((l) => {
+      const row = ws.addRow(linhaConta(l));
+      row.getCell(6).numFmt = FORMATO_MOEDA;
+      row.outlineLevel = 1;
+      row.hidden = true;
+    });
+    aplicarZebra(ws, primeira, ws.rowCount, COLUNAS_RESUMO.length);
+  });
+}
+
+/** O De-Para inteiro como workbook — separado do download para poder ser
+ *  conferido em teste sem DOM nenhum. `baixarExcelDePara` é só ele mais
+ *  o clique. */
+export async function montarWorkbookDePara(linhas, resumo, grupos, ctx = {}) {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = "Gerador de DRE";
@@ -96,8 +148,8 @@ export async function baixarExcelDePara(linhas, resumo, grupos, ctx = {}) {
   ws.autoFilter = { from: { row: cabTabela.number, column: 1 }, to: { row: ws.rowCount, column: COLUNAS.length } };
 
   const wsRes = wb.addWorksheet("Resumo");
-  definirLarguras(wsRes, [36, 12, 18, 12]);
-  escreverTitulo(wsRes, "DE-PARA — RESUMO DA PARAMETRIZAÇÃO", 4);
+  definirLarguras(wsRes, [34, 14, 46, 20, 14, 18, 10, 10]);
+  escreverTitulo(wsRes, "DE-PARA — RESUMO DA PARAMETRIZAÇÃO", COLUNAS_RESUMO.length);
   escreverMeta(wsRes, [ctx.empresa || "Empresa"]);
   linhaEmBranco(wsRes);
   [
@@ -109,12 +161,18 @@ export async function baixarExcelDePara(linhas, resumo, grupos, ctx = {}) {
     ["Decisões manuais de categoria", resumo.manuaisCategoria],
   ].forEach((l) => escreverMeta(wsRes, l));
   linhaEmBranco(wsRes);
-  const cabGrupos = escreverCabecalhoTabela(wsRes, ["Grupo na DRE", "Contas", "Saldo", "A revisar"], { congelar: false });
-  grupos.forEach((g) => {
-    const row = wsRes.addRow([g.nome, g.n, g.total, g.aRevisar]);
-    row.getCell(3).numFmt = FORMATO_MOEDA;
-  });
-  aplicarZebra(wsRes, cabGrupos.number + 1, wsRes.rowCount, 4);
+  escreverMeta(wsRes, ["Clique no + à esquerda de cada grupo para abrir as contas que formam o saldo."]);
+  escreverResumoPorGrupo(wsRes, grupos);
 
+  return wb;
+}
+
+/** O mesmo De-Para em Excel, com filtro automático ligado e uma aba de
+ *  resumo por grupo. O filtro não é enfeite: é como se confere um
+ *  mapeamento de 400 contas — filtra por grupo e lê as 14 linhas que
+ *  caíram em Custos. Estilo em `excelEstilo.js`: mesmo cabeçalho de
+ *  marca e rajado alternado das outras planilhas exportadas. */
+export async function baixarExcelDePara(linhas, resumo, grupos, ctx = {}) {
+  const wb = await montarWorkbookDePara(linhas, resumo, grupos, ctx);
   await baixarWorkbook(wb, nomeArquivo(ctx.empresa, "xlsx"));
 }

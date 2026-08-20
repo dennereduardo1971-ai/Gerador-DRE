@@ -127,13 +127,21 @@ export function resumoDePara(linhas) {
 
 /** Quantas contas cada grupo carrega — a leitura por destino, que é como
  *  quem confere o mapeamento olha a tabela ("as 14 contas de Custos
- *  fazem sentido?"). Só grupos usados aparecem, na ordem da DRE. */
+ *  fazem sentido?"). Só grupos usados aparecem, na ordem da DRE.
+ *
+ *  `contas` leva junto as linhas que formaram o total, na mesma ordem em
+ *  que elas foram somadas. É o que permite abrir o grupo e conferir a
+ *  composição sem cruzar duas tabelas — na tela e, no Excel exportado,
+ *  como as linhas recolhidas debaixo do grupo. Como o total é acumulado
+ *  percorrendo essa mesma lista, "abrir o grupo" nunca pode mostrar uma
+ *  composição diferente da que gerou o número. */
 export function porGrupo(linhas) {
   const acc = {};
   linhas.forEach((l) => {
-    acc[l.grupo] = acc[l.grupo] || { id: l.grupo, nome: l.grupoNome, n: 0, total: 0, aRevisar: 0 };
+    acc[l.grupo] = acc[l.grupo] || { id: l.grupo, nome: l.grupoNome, n: 0, total: 0, aRevisar: 0, contas: [] };
     acc[l.grupo].n++;
     acc[l.grupo].total += l.saldo;
+    acc[l.grupo].contas.push(l);
     if (l.revisar) acc[l.grupo].aRevisar++;
   });
   return GRUPOS.filter((g) => acc[g.id]).map((g) => acc[g.id]);
