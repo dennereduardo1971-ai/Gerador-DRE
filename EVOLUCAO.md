@@ -59,6 +59,36 @@ CPC 51 e Plano de ação.
 
 ## Registro
 
+### 20/08/2026 — remoção de valores reais de comentário, teste e doutrina
+
+Auditoria pedida depois da sessão do balancete. O `.gitignore` já
+protegia as planilhas, mas havia um vazamento por outra porta: valores
+reais tinham sido copiados do arquivo do cliente para dentro de
+comentário de código, de teste e do próprio `CLAUDE.md`, "só para
+ilustrar o formato". Num repositório público, com a instituição
+identificada no resto do projeto, isso é demonstração financeira exposta.
+
+Substituídos por números fictícios que preservam o que cada trecho
+ensinava (a ambiguidade do ponto decimal, a identidade Ativo − Passivo =
+resultado). Nenhum teste mudou de propósito; 212 continuam passando.
+
+Entrou também uma armadilha nova em `CLAUDE.md`: **valor real nunca vai
+para comentário, teste ou documentação** — estrutura pode (código de
+conta, nome de conta-síntese, número de níveis), quantia não.
+
+**O que isso NÃO resolve, e precisa de decisão do dono do repositório:**
+os valores continuam no histórico do Git, no commit em que entraram.
+Remover de verdade exige reescrever o histórico e forçar o push, ou
+tornar o repositório privado. Enquanto isso não for feito, a limpeza vale
+para quem lê o código hoje, não para quem consulta o histórico.
+
+Pendente relacionado, não decidido nesta sessão: o nome da instituição
+aparece em `planos/iesb.js`, em testes e na doutrina. A estrutura do
+plano de contas não é confidencial (é o que `CLAUDE.md` já argumentava),
+mas a combinação nome + histórico com valores é o que agrava o caso
+acima.
+
+
 ### 20/08/2026 — balancete como fonte principal; mês × acumulado
 
 Sessão disparada por um pedido de "congelar o razão e trabalhar pelo

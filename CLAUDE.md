@@ -330,6 +330,15 @@ seguro que reescrever a hierarquia de subtotais.
   dígito contra o total da raiz), que não depende da árvore, e o
   desencontro é reportado à parte em `sinteticasAproximadas`, sem contar
   como erro.
+- **Nunca escreva VALOR real em comentário, teste ou documentação.**
+  Não basta manter as planilhas fora do Git: saldo, total de Ativo,
+  débito do período e resultado do exercício já vazaram uma vez por essa
+  porta — copiados do arquivo real para dentro de comentário de código e
+  do próprio `CLAUDE.md`, "só para ilustrar". Num repositório público,
+  isso é a demonstração financeira de uma instituição identificada. Para
+  ilustrar formato, use número fictício e diga que é exemplo. O que pode
+  ser citado é ESTRUTURA (código de conta, nome de conta-síntese,
+  quantidade de níveis), nunca quantia.
 - **Nunca commite os arquivos reais de razão/plano de contas do
   Denner** (números financeiros de instituição real) — ficam em
   `fixtures/`, que está no `.gitignore`.
@@ -495,15 +504,15 @@ Armadilhas deste formato, todas cobertas por teste:
 - **As sintéticas já vêm somadas.** Totalizar tudo dá o dobro; só as
   folhas entram em qualquer soma calculada aqui.
 - **O ponto é ambíguo dentro do mesmo arquivo**: colunas formatadas vêm
-  em pt-BR (`393.899.653,88`) e colunas numéricas cruas vêm com ponto
-  decimal (`393899653.88`). Quem desempata é a vírgula, igual a
+  em pt-BR (`123.456.789,01`) e colunas numéricas cruas vêm com ponto
+  decimal (`123456789.01`). Quem desempata é a vírgula, igual a
   `numeroBR`. Tratar ponto como milhar nos dois casos multiplicava o
   movimento do período por cem.
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença entre Ativo e Passivo + PL é o resultado do exercício, que
-  está nas contas 3 a 7. No arquivo real: 253.582.263,93 − 252.651.704,84
-  = 930.559,09, idêntico a débitos − créditos do período. **Nunca trate
-  isso como erro de importação.** A tela escreve a identidade e confronta
+  está nas contas 3 a 7. Em números de exemplo: Ativo 200.000.000,00 −
+  Passivo 199.500.000,00 = 500.000,00, idêntico a débitos − créditos do
+  período. **Nunca trate isso como erro de importação.** A tela escreve a identidade e confronta
   o valor com o Lucro Líquido da **DRE acumulada** — nunca com a do mês,
   ver a armadilha das duas demonstrações.
 - **O saldo anterior das contas de resultado não é zero.** Elas acumulam

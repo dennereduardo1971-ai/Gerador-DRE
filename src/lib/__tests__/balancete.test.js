@@ -33,16 +33,16 @@ describe("valorDC", () => {
   it("lê a natureza pelo sufixo D/C, não pelo sinal", () => {
     expect(valorDC("1.234,56 D")).toBeCloseTo(1234.56, 2);
     expect(valorDC("1.234,56 C")).toBeCloseTo(-1234.56, 2);
-    expect(valorDC("      255.099.955,67 D")).toBeCloseTo(255099955.67, 2);
+    expect(valorDC("      987.654.321,09 D")).toBeCloseTo(987654321.09, 2);
   });
 
   it("desempata o ponto pela vírgula, como numeroBR", () => {
     // As duas formas convivem no mesmo arquivo: colunas formatadas em
     // pt-BR e colunas numéricas cruas. Tratar o ponto como milhar nos
     // dois casos multiplicava o movimento do período por cem.
-    expect(valorDC("393.899.653,88")).toBeCloseTo(393899653.88, 2);
-    expect(valorDC("393899653.88")).toBeCloseTo(393899653.88, 2);
-    expect(valorDC(393899653.88)).toBeCloseTo(393899653.88, 2);
+    expect(valorDC("123.456.789,01")).toBeCloseTo(123456789.01, 2);
+    expect(valorDC("123456789.01")).toBeCloseTo(123456789.01, 2);
+    expect(valorDC(123456789.01)).toBeCloseTo(123456789.01, 2);
   });
 
   it("devolve 0 para vazio e lixo, nunca NaN", () => {
@@ -119,9 +119,9 @@ describe("resumo — o desequilíbrio é o resultado do exercício", () => {
     // Não é coincidência: é a identidade que prova que o balancete das
     // contas 1 e 2 só não fecha pelo resultado que está nas contas 3 a 7.
     // Vale quando o saldo ANTERIOR já estava equilibrado, isto é, quando
-    // o exercício anterior foi encerrado — que é o caso normal e o do
-    // arquivo real (débitos 478.342.682,57 − créditos 477.412.123,48 =
-    // 930.559,09 = Ativo − Passivo).
+    // o exercício anterior foi encerrado — que é o caso normal. Neste
+    // arquivo de teste: débitos 5.000 − créditos 4.900 = 100 = Ativo −
+    // Passivo.
     expect(r.debitoPeriodo - r.creditoPeriodo).toBeCloseTo(r.resultadoExercicio, 2);
   });
 

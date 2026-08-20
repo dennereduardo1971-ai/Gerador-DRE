@@ -31,8 +31,8 @@ const norm = (s) =>
  *  app (o ativo soma positivo, o passivo soma negativo).
  *
  *  O ponto é ambíguo e as duas formas convivem no MESMO arquivo: as
- *  colunas formatadas vêm em pt-BR ("393.899.653,88 D") e as colunas
- *  numéricas cruas vêm com ponto decimal ("393899653.88"). A regra que
+ *  colunas formatadas vêm em pt-BR ("123.456.789,01 D") e as colunas
+ *  numéricas cruas vêm com ponto decimal ("123456789.01"). A regra que
  *  desempata é a vírgula, igual à de `numeroBR`: se há vírgula, o ponto é
  *  separador de milhar; se não há, o ponto é decimal. Tratar o ponto como
  *  milhar nos dois casos multiplicava o movimento do período por cem. */
