@@ -1,23 +1,63 @@
 {
   "historico": [
     {
-      "id": "1787229256683-fh7ph4",
-      "criadoEm": 1787229256683,
+      "id": "1787232244213-3mud7i",
+      "criadoEm": 1787232244213,
       "empresa": "",
       "cnpj": "",
       "periodo": "",
       "chave": "",
       "totais": {
-        "receitaBruta": 22937134.509999998,
-        "deducoes": 14463230.120000001,
-        "receitaLiq": 8473904.389999997,
-        "resultadoOperBruto": 4116428.929999998,
-        "despOper": 4708164.880000001,
-        "resultadoFin": -79287.77999999997,
-        "resultadoOper": -671023.730000003,
-        "naoOper": 1224457.4,
-        "antesIR": 553433.6699999969,
-        "liquido": 512068.9999999969
+        "receitaBruta": 22835335.18,
+        "deducoes": 14244993.15,
+        "receitaLiq": 8590342.03,
+        "resultadoOperBruto": 4260962.88,
+        "despOper": 4826212.49,
+        "resultadoFin": -105715.46000000002,
+        "resultadoOper": -670965.0700000003,
+        "naoOper": 588050.4999999999,
+        "antesIR": -82914.57000000041,
+        "liquido": -82914.57000000041
+      }
+    },
+    {
+      "id": "1787232239561-8r1ucf",
+      "criadoEm": 1787232239561,
+      "empresa": "",
+      "cnpj": "",
+      "periodo": "",
+      "chave": "",
+      "totais": {
+        "receitaBruta": 22835335.18,
+        "deducoes": 14244993.15,
+        "receitaLiq": 8590342.03,
+        "resultadoOperBruto": 4260962.88,
+        "despOper": 4826212.49,
+        "resultadoFin": -105715.46000000002,
+        "resultadoOper": -670965.0700000003,
+        "naoOper": 588050.4999999999,
+        "antesIR": -82914.57000000041,
+        "liquido": -82914.57000000041
+      }
+    },
+    {
+      "id": "1787232160073-kblp53",
+      "criadoEm": 1787232160073,
+      "empresa": "",
+      "cnpj": "",
+      "periodo": "maio de 2026",
+      "chave": "balancete|sem-empresa|maio de 2026",
+      "totais": {
+        "receitaBruta": 22835335.18,
+        "deducoes": 14244993.15,
+        "receitaLiq": 8590342.03,
+        "resultadoOperBruto": 4260962.88,
+        "despOper": 4826212.49,
+        "resultadoFin": -105715.46000000002,
+        "resultadoOper": -670965.0700000003,
+        "naoOper": 588050.4999999999,
+        "antesIR": -82914.57000000041,
+        "liquido": -82914.57000000041
       }
     },
     {
@@ -41,5 +81,5 @@
       }
     }
   ],
-  "atualizadoEm": "2026-08-20T13:12:34.382Z"
+  "atualizadoEm": "2026-08-20T13:24:15.988Z"
 }
