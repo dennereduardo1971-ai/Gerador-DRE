@@ -603,7 +603,7 @@ categoria do CPC 51. É a aba **Parâmetros → De-Para**, o entregável da
 Fase 2 do cronograma e a especificação de entrada da Fase 4
 (parametrização no ERP).
 
-Quatro decisões que não devem ser desfeitas:
+Cinco decisões que não devem ser desfeitas:
 
 1. **Ele não decide nada.** A resolução continua em `classify.js` (via
    `grupoDe`) e em `cpc51.js` (via `resolverCategoria`). `depara.js` só
@@ -620,7 +620,18 @@ Quatro decisões que não devem ser desfeitas:
    `depara.js` — a mesma classe de problema que fez `grupos.js` nascer.
    Em vez disso, `depara.test.js` prova que as duas tabelas concordam
    conta a conta sobre grupo e categoria.
-4. **A coluna "origem da decisão" é o que torna a planilha um documento
+4. **No Excel, o resumo por grupo é uma tabela em DOIS níveis.** A linha
+   do grupo abre nas contas que formam aquele saldo, pelo agrupamento
+   nativo do Excel (`summaryBelow: false`, contas recolhidas em
+   `outlineLevel 1`) — a mesma conferência que a tela permite, dentro do
+   arquivo entregue. Duas coisas sustentam isso: a coluna **Saldo é a
+   mesma nos dois níveis** (o total fica em cima das parcelas, então
+   conferir se fecha é olhar uma coluna só) e as contas vêm de
+   `porGrupo(...).contas`, a MESMA lista que somou o total — não há
+   segunda seleção que possa divergir dele. `montarWorkbookDePara` é
+   separada de `baixarExcelDePara` de propósito, para o teste afirmar
+   sobre o arquivo em si sem precisar de DOM.
+5. **A coluna "origem da decisão" é o que torna a planilha um documento
    de auditoria.** Sem ela, mapeamento herdado do padrão e mapeamento
    conferido conta a conta parecem a mesma coisa — e é justamente essa
    diferença que a auditoria pergunta. `completude` conta só a conta que
@@ -662,6 +673,10 @@ esteve no código deste projeto como código morto até ser descoberto e
 corrigido. **Não tente estilizar célula com `xlsx` de novo** — se um dia
 precisar de estilo em algo que só `xlsx` grava, é limite da biblioteca,
 não bug de uso.
+
+O agrupamento de linhas do Excel (o `+` da margem) também só existe do
+lado do `exceljs`, e é o que faz a aba "Resumo" do De-Para abrir cada
+grupo nas suas contas — ver a seção "De-Para".
 
 `exceljs` escreve estilo de verdade, mas pesa **~271 kB gzip**
 minificado — quase o dobro do `xlsx` (141 kB gzip). Só entra via

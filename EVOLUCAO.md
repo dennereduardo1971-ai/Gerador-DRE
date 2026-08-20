@@ -43,7 +43,7 @@ _Atualizado em 20/08/2026._
 
 | | |
 |---|---|
-| Testes | 234 (Vitest, 15 arquivos) |
+| Testes | 237 (Vitest, 15 arquivos) |
 | Lint | `npx oxlint src/` — zero avisos em `src/` (`fixtures/validar.mjs` tem 1 erro pré-existente, fora de `src/`) |
 | Bundle | app 422 kB (130 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
 | CSS | 41 kB (8,3 kB gzip) |
@@ -67,6 +67,63 @@ dado em `SECOES` (`App.jsx`):
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 20/08/2026 (2ª sessão) — o Resumo do Excel De-Para vira tabela em dois níveis
+
+Pedido do Denner, com o arquivo do chefe em mãos: na planilha exportada,
+clicar num grupo do resumo ("Receita Bruta com Mensalidades, 29 contas")
+e ver as contas que formam aquele saldo logo abaixo — a conferência que
+a tela já permite, dentro do arquivo entregue.
+
+**O que mudou.** A aba "Resumo" do Excel do De-Para deixou de ser uma
+tabela de 4 colunas com uma linha por grupo e passou a ser uma tabela de
+8 colunas em dois níveis: a linha do grupo (nome, saldo, quantas contas,
+quantas a revisar) e, penduradas nela pelo agrupamento nativo do Excel,
+as contas que a compõem (conta, descrição, categoria do CPC 51,
+situação, saldo). As contas nascem recolhidas.
+
+Três decisões que valem a pena não desfazer:
+
+- **`summaryBelow: false`.** Sem isso o Excel desenha o botão `+` uma
+  linha DEPOIS do bloco de contas, e ninguém entende o que ele abre.
+- **A coluna Saldo é a mesma nos dois níveis.** O total do grupo fica
+  exatamente em cima das parcelas — abrir o grupo e conferir se fecha é
+  olhar uma coluna só. É o que faz a expansão servir para conferência, e
+  não só para "mostrar mais linhas".
+- **`porGrupo` passou a carregar `contas`**, as mesmas linhas que
+  somaram o total, na mesma ordem. Não há segunda seleção de contas em
+  lugar nenhum: quem abre o grupo vê literalmente o que gerou o número.
+
+**Seam novo para teste:** `montarWorkbookDePara` foi separada de
+`baixarExcelDePara`. A primeira devolve o workbook e não toca em DOM,
+então o Vitest consegue afirmar sobre o arquivo de verdade (nível de
+outline, linha recolhida, e o total de cada grupo batendo com a soma das
+contas debaixo dele) em vez de só sobre o array que o alimentou.
+
+**Medido:** 237 testes (de 234), lint zero avisos em `src/`, build ok —
+bundle do app 423 kB (130 kB gzip), sem mudança relevante: a expansão é
+metadado de linha, não código novo no caminho quente. Conferido também
+fora do Vitest, relendo o `.xlsx` gerado com **openpyxl** (biblioteca
+independente da que escreveu, como manda a doutrina): com os 232 registros
+do arquivo que o chefe devolveu, os 18 grupos fecham centavo a centavo
+com as contas recolhidas debaixo de cada um, todas com `hidden` e
+`outlineLevel=1`.
+
+**O que ficou de fora, e por quê:**
+
+- **O CSV não ganhou nada** — CSV não tem agrupamento. Quem quer a
+  conferência rápida usa o Excel; o CSV continua sendo o arquivo de
+  carga.
+- **A aba "De-Para" continua plana**, com o filtro automático. Ela é
+  ordenada por tamanho de saldo, não por grupo, e outline junto de
+  autoFilter briga na hora de filtrar.
+- **Nada foi importado do arquivo do chefe.** Conferido: ele é o próprio
+  export do app de 19/08 (`lastModifiedBy` vazio, `modified` igual a
+  `created`), sem edição feita no Excel — as 23 decisões manuais que ele
+  traz já são as da sessão do app. Se um dia o fluxo for "o chefe edita a
+  planilha e a gente carrega de volta", isso é funcionalidade nova
+  (leitura do De-Para preenchido), não está feito.
+
 
 ### 20/08/2026 — merge de dois trabalhos paralelos no balancete + remoção de valores reais
 
@@ -647,7 +704,16 @@ Ficou de fora, de propósito:
    falta UI).
 7. **Agregar durante a importação**, em vez de guardar `linhas` cru em
    memória — tira o teto de tamanho de arquivo.
-8. **Teste unitário para `periodoLegivel()`.** Corrigido na sessão de
+8. **Ler de volta o De-Para preenchido fora do app.** O arquivo que o
+   chefe do Denner devolveu nesta sessão era o próprio export, sem
+   edição — mas o fluxo "exporta, alguém preenche no Excel, carrega de
+   volta" é o próximo pedido natural, e hoje não existe. O formato de
+   saída já é estável e tem a coluna de origem da decisão; o que falta é
+   a leitura, decidir o que fazer quando o arquivo carregado discorda da
+   classificação atual, e não deixar isso apagar decisão manual em
+   silêncio. Cuidado: o caminho óbvio (aplicar tudo do arquivo) é
+   exatamente a classe de defeito que o projeto evita.
+9. **Teste unitário para `periodoLegivel()`.** Corrigido na sessão de
    17/08 (4ª) um bug real de período mostrando dias soltos fora de
    ordem em vez de "Jan/2026 a Jun/2026" — e não havia teste nenhum
    cobrindo esse texto, nem antes nem depois do fix. Cobrir os três
