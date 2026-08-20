@@ -958,7 +958,7 @@ subtotais obrigatórios** (resultado operacional; resultado antes do
 financiamento e dos tributos sobre o lucro). Some o "não operacional": o
 operacional vira a categoria RESIDUAL.
 
-Cinco coisas que não devem ser desfeitas por acidente:
+Seis coisas que não devem ser desfeitas por acidente:
 
 1. **A categoria é um eixo PARALELO ao grupo, não um grupo novo.** Cada
    conta tem um grupo (a linha da DRE atual) e uma categoria (o bloco do
@@ -981,7 +981,24 @@ Cinco coisas que não devem ser desfeitas por acidente:
    com juros de mora de aluno (operacional); `DESP_FIN` mistura juros de
    empréstimo (financiamento) com tarifa bancária (operacional). O padrão
    escolhe o caso mais comum e MARCA para revisão — não finge certeza.
-5. **A minuta da nota de MPDA deixa lacuna onde não sabe.** A norma exige
+5. **O layout da demonstração exportada segue o modelo do cliente; as
+   LINHAS, não.** A aba "DRE CPC 51" do Excel sai nas colunas do modelo
+   que o escritório usa como base — `Categoria CPC 51 | Código |
+   Descrição | período | comparativo | AV % | Notas`. Foi adotado o
+   layout, porque trocar colunas não muda número nenhum; adotar as
+   linhas do modelo ("Receitas de Pós-Graduação", "Custos Acadêmicos"…)
+   exigiria remapear conta a conta e perderia a validação centavo a
+   centavo. O **código da linha** (`1.1`, `2.3`) nasce em
+   `montarLinhas51`: primeiro dígito é a posição fixa da categoria na
+   ordem da norma, segundo é a posição na demonstração DAQUELE
+   fechamento — é numeração de linha publicada, não código de conta, e
+   não serve de chave para ERP. A coluna **Notas sai vazia** (a
+   referência é de quem redige) e a **coluna comparativa só é preenchida
+   quando existe período anterior de verdade** no arquivo (competência
+   filtrada e a anterior presente); fora disso fica em branco, com o
+   motivo escrito acima da tabela — comparar "Jan a Jun" com "Mai"
+   produziria um número que parece comparativo e não é.
+6. **A minuta da nota de MPDA deixa lacuna onde não sabe.** A norma exige
    efeito tributário e de não controladores por item de conciliação; o
    app não tem esses dados. Sai `[__________]`, nunca zero — zero é uma
    afirmação.

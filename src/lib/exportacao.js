@@ -85,6 +85,12 @@ export function matrizLinhas(itens, base) {
     val: it.val,
     av: it.val == null ? null : it.val / b,
     t: it.t,
+    /* `cat` e `cod` só existem na demonstração do CPC 51 (a estrutura
+       atual não tem categoria nem código de linha). Viajam aqui em vez
+       de a exportação ir buscá-los por fora: a matriz é o que o Excel
+       escreve, e o que ela não carrega o Excel não tem de onde tirar. */
+    cat: it.cat ?? null,
+    cod: it.cod ?? null,
   }));
 }
 

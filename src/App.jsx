@@ -10,6 +10,7 @@ import { coberturaBalancete, contasDeMovimento, detectarColunas, nomesDoBalancet
 import { baixarCSV, baixarExcel, periodoLegivel } from "./lib/exportacao.js";
 import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
+import { comparativo51 } from "./lib/linhasCPC51.js";
 import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
 import { baixarCSVDeParaCompleto, baixarExcelDePara } from "./lib/exportacaoDePara.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
@@ -571,10 +572,23 @@ export default function App() {
     [contasResultado, classif, sugestao, categoriaConta, politica51, nomesEfetivos]
   );
 
+  /* A demonstração do CPC 51 de cada competência, para a coluna
+     comparativa do Excel exportado — o mesmo desenho de
+     `dresPorCompetencia`, um andar acima. `comparativo51` decide sozinho
+     se existe período anterior de verdade; quando não existe, a coluna
+     sai em branco em vez de comparar coisas diferentes. */
+  const dres51PorCompetencia = useMemo(() => {
+    return competencias.map((comp) => {
+      const cs = (contasPorCompetencia[comp] || []).filter((c) => digitosResultado.includes(c.conta[0]));
+      return { competencia: comp, dre51: montarDRE51(cs, grupoDe, categoriaDe) };
+    });
+  }, [competencias, contasPorCompetencia, digitosResultado, classif, sugestao, categoriaDe]);
+
   const ctxExport51 = {
     dre, dre51, conciliacao: conciliacao51, dePara: dePara51, medidas: medidas51,
     politica: politica51, empresa, cnpj, filtroMes, filtroCompetencia,
     competencias: competenciasDisponiveis, nomes: nomesEfetivos,
+    comparativo: comparativo51(dres51PorCompetencia, filtroCompetencia),
   };
 
   /* ---------- De-Para ----------

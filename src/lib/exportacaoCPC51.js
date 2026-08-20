@@ -30,6 +30,16 @@ const nomeArquivo = (empresa, sufixo, ext) =>
 
 const FORMATO_VALOR = FORMATO_MOEDA;
 
+/** A primeira coluna da demonstração do CPC 51, no formato do modelo
+ *  usado como base: a linha e o subtotal que fecham um bloco levam o
+ *  nome da categoria; os subtotais que atravessam categorias (resultado
+ *  antes do financiamento, antes dos tributos, das operações
+ *  continuadas) são "Subtotal", e o resultado do período é "Final". */
+function rotuloCategoria(l) {
+  if (l.cat) return NOME_CATEGORIA[l.cat] || l.cat;
+  return l.t === "final" ? "Final" : "Subtotal";
+}
+
 /** A minuta da nota de MPDA como arquivo de texto.
  *
  *  Texto puro de propósito: a nota vai ser colada dentro do documento das
@@ -60,28 +70,62 @@ export function baixarCSVDePara(dePara, ctx = {}) {
   baixar("﻿" + csv, nomeArquivo(ctx.empresa, "DePara_CPC51", "csv"), "text/csv;charset=utf-8");
 }
 
-export async function baixarExcelCPC51(ctx) {
+/** O Excel de seis abas como workbook — separado do download pelo mesmo
+ *  motivo que em `exportacaoDePara.js`: assim o teste afirma sobre o
+ *  arquivo em si (colunas, código de linha, coluna comparativa) sem
+ *  precisar de DOM. */
+export async function montarWorkbookCPC51(ctx) {
   const ExcelJS = (await import("exceljs")).default;
-  const { dre, dre51, conciliacao, dePara, medidas = [], politica, empresa, nomes = {} } = ctx;
+  const { dre, dre51, conciliacao, dePara, medidas = [], politica, empresa, nomes = {}, comparativo = null } = ctx;
   const wb = new ExcelJS.Workbook();
   wb.creator = "Gerador de DRE";
   wb.created = new Date();
   const base = dre?.receitaLiq || 1;
 
   // --- Aba 1: a demonstração na estrutura do CPC 51 ---
+  /* O LAYOUT DESTA ABA SEGUE O MODELO DE DRE DO CPC 51 QUE O CLIENTE USA
+     COMO BASE: categoria, código da linha, descrição, o período, o
+     comparativo e uma coluna de notas.
+
+     O que foi adotado dele é o LAYOUT — as colunas e a ordem em que se
+     lê a demonstração. As LINHAS continuam sendo as da DRE deste app,
+     que saem dos grupos validados centavo a centavo contra a
+     demonstração oficial. Trocar as linhas pelas do modelo seria
+     remapear conta a conta e perder essa validação; trocar as colunas
+     não muda número nenhum.
+
+     A coluna de notas sai VAZIA de propósito: a referência da nota
+     explicativa é decisão de quem redige as demonstrações, e preencher
+     por conta própria seria inventar uma referência que não existe. */
   const linhas51 = matrizLinhas(montarLinhas51(dre51).itens, base);
+  const rotuloPeriodo = periodoLegivel(ctx) || "Período";
+  const COLS_DRE51 = [
+    "Categoria CPC 51", "Código", "Descrição", rotuloPeriodo,
+    comparativo ? comparativo.rotulo : "Comparativo", "AV %", "Notas",
+  ];
   const ws = wb.addWorksheet("DRE CPC 51");
-  definirLarguras(ws, [62, 18, 9]);
-  escreverTitulo(ws, "DEMONSTRAÇÃO DO RESULTADO — CPC 51", 3);
+  definirLarguras(ws, [24, 10, 58, 18, 18, 9, 24]);
+  escreverTitulo(ws, "DEMONSTRAÇÃO DO RESULTADO — CPC 51", COLS_DRE51.length);
   cabecalho(ctx).slice(1).forEach((l) => { if (l.length) escreverMeta(ws, l); else linhaEmBranco(ws); });
-  const cab1 = escreverCabecalhoTabela(ws, ["Linha", "Valor", "AV %"]);
+  if (!comparativo) {
+    escreverMeta(ws, [
+      "Coluna comparativa em branco: o arquivo importado não traz o período anterior. " +
+      "O CPC 51 exige 2027 com 2026 reapresentado — preencha ao consolidar os dois exercícios.",
+    ]);
+    linhaEmBranco(ws);
+  }
+  const cab1 = escreverCabecalhoTabela(ws, COLS_DRE51);
   linhas51.forEach((l) => {
-    const row = ws.addRow([l.lbl, l.val ?? null, l.av ?? null]);
-    row.getCell(2).numFmt = FORMATO_VALOR;
-    row.getCell(3).numFmt = FORMATO_PCT;
-    if (l.t === "secao" || l.t === "sub" || l.t === "final") marcarSubtotal(ws, row.number, 3);
+    const row = ws.addRow([
+      rotuloCategoria(l), l.cod ?? null, l.lbl, l.val ?? null,
+      comparativo ? comparativo.valores[l.lbl] ?? null : null, l.av ?? null, null,
+    ]);
+    row.getCell(4).numFmt = FORMATO_VALOR;
+    row.getCell(5).numFmt = FORMATO_VALOR;
+    row.getCell(6).numFmt = FORMATO_PCT;
+    if (l.t === "secao" || l.t === "sub" || l.t === "final") marcarSubtotal(ws, row.number, COLS_DRE51.length);
   });
-  aplicarZebra(ws, cab1.number + 1, ws.rowCount, 3);
+  aplicarZebra(ws, cab1.number + 1, ws.rowCount, COLS_DRE51.length);
 
   // --- Aba 2: as duas estruturas lado a lado ---
   /* Não é uma tabela de-para linha a linha, e não deveria ser: as duas
@@ -205,5 +249,10 @@ export async function baixarExcelCPC51(ctx) {
   gruposParaRevisar(politica).forEach((g) => wsPol.addRow([g.nome, NOME_CATEGORIA[g.categoria] || "", g.motivo]));
   aplicarZebra(wsPol, cabRev.number + 1, wsPol.rowCount, 3);
 
-  await baixarWorkbook(wb, nomeArquivo(empresa, "CPC51", "xlsx"));
+  return wb;
+}
+
+export async function baixarExcelCPC51(ctx) {
+  const wb = await montarWorkbookCPC51(ctx);
+  await baixarWorkbook(wb, nomeArquivo(ctx.empresa, "CPC51", "xlsx"));
 }

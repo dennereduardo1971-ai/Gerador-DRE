@@ -43,7 +43,7 @@ _Atualizado em 20/08/2026._
 
 | | |
 |---|---|
-| Testes | 237 (Vitest, 15 arquivos) |
+| Testes | 244 (Vitest, 15 arquivos) |
 | Lint | `npx oxlint src/` — zero avisos em `src/` (`fixtures/validar.mjs` tem 1 erro pré-existente, fora de `src/`) |
 | Bundle | app 422 kB (130 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
 | CSS | 41 kB (8,3 kB gzip) |
@@ -67,6 +67,69 @@ dado em `SECOES` (`App.jsx`):
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 20/08/2026 (3ª sessão) — a DRE do CPC 51 exportada no layout do modelo do cliente
+
+O chefe do Denner mandou um modelo de DRE do CPC 51/IFRS 18 para
+instituição de ensino (um `.xlsx` de 30 linhas, sem valores) e pediu que
+ele fosse a base. Perguntei antes de mexer, porque havia duas leituras
+muito diferentes — e ele escolheu **base do layout**, não das linhas.
+
+**A fronteira que essa escolha desenha, e por que ela é a certa.** O
+modelo traz colunas (`Categoria CPC51 | Código | Descrição | 2025 | 2024
+| Notas`) E uma lista de linhas própria ("Receitas de Pós-Graduação",
+"Receitas de Extensão", "Custos Acadêmicos", "PCLD"). Trocar as COLUNAS
+não muda número nenhum. Trocar as LINHAS exigiria remapear conta a conta
+e jogaria fora a validação centavo a centavo contra a demonstração
+oficial — é a mesma armadilha que "criar grupos novos em `grupos.js`"
+representa, e vale registrar que o caminho seguro aqui foi perguntar, não
+adivinhar.
+
+**O que a aba "DRE CPC 51" ganhou:**
+
+- **Categoria em coluna própria.** A linha e o subtotal que fecham um
+  bloco levam o nome da categoria; os subtotais que atravessam
+  categorias saem como "Subtotal" e o resultado do período como "Final"
+  — exatamente como no modelo.
+- **Código de linha** (`1.1`, `2.3`), nascido em `montarLinhas51` para a
+  tela e o arquivo não poderem divergir. Primeiro dígito = posição fixa
+  da categoria na ordem da norma; segundo = posição na demonstração
+  daquele fechamento. Está documentado no próprio módulo que isso é
+  numeração de linha publicada, não código de conta — quem precisa de
+  chave para ERP usa o De-Para, que anda por código de conta.
+- **Coluna de notas, em branco.** A referência da nota explicativa é de
+  quem redige as demonstrações. Preencher seria inventar referência.
+- **Coluna comparativa**, preenchida só quando existe período anterior
+  DE VERDADE (competência filtrada e a anterior presente no arquivo).
+  Sem isso ela sai vazia com o motivo escrito acima da tabela. Comparar
+  "Jan a Jun" com "Mai" daria um número que parece comparativo e não é —
+  mesma regra da nota de MPDA, onde o que o app não sabe vira lacuna.
+
+**Não foi adotado do modelo:** ele apresenta receitas E despesas
+financeiras inteiras dentro de "Financiamento". A doutrina do projeto
+(e o próprio CPC 51) separa: rendimento de aplicação é investimento,
+juros de mora de aluno é operacional, tarifa bancária é operacional,
+juros de empréstimo é financiamento. O app continua marcando esses dois
+grupos para revisão, e o arquivo do chefe mostra que ele já decidiu 23
+contas exatamente aí — adotar a simplificação do modelo apagaria esse
+trabalho.
+
+**Seam novo:** `montarWorkbookCPC51`, separada de `baixarExcelCPC51`,
+pelo mesmo motivo de `montarWorkbookDePara` na sessão anterior — o teste
+afirma sobre o arquivo (colunas, código, comparativo cheio e vazio) sem
+precisar de DOM.
+
+**Sobre a aba Resumo do De-Para:** confirmado com o Denner que a
+expansão `+/-` entregue na sessão anterior é o que ele queria; nada
+mudou ali.
+
+**Medido:** 244 testes (de 237), lint zero avisos em `src/`, build ok —
+app 424 kB (130 kB gzip), +1 kB. Conferido também gerando o arquivo real
+(232 contas, com as 23 decisões de categoria do chefe) e relendo com
+openpyxl: as colunas saem no formato do modelo e o lucro líquido continua
+idêntico nas duas estruturas. `fixtures/validar.mjs` não rodou (arquivos
+reais ausentes nesta máquina).
+
 
 ### 20/08/2026 (2ª sessão) — o Resumo do Excel De-Para vira tabela em dois níveis
 
@@ -688,10 +751,12 @@ Ficou de fora, de propósito:
    despesa continua saindo como texto que o Excel não soma. Defeito real
    e barato de corrigir — separar célula de texto de célula de número,
    como o exportador novo faz, e cobrir com teste.
-3. **Comparativa na estrutura do CPC 51** (Fase 8, passo 36). A norma
-   exige 2027 contra 2026 reapresentado. Hoje `EtapaComparativo` monta
-   colunas por competência na estrutura antiga; falta a mesma coisa
-   lendo `montarLinhas51`. É o maior buraco funcional que sobrou.
+3. **Comparativa na estrutura do CPC 51 NA TELA** (Fase 8, passo 36).
+   O Excel exportado já traz uma coluna comparativa (a competência
+   anterior, quando existe no arquivo); `EtapaComparativo` continua
+   montando colunas só na estrutura antiga. O que falta é a tela lendo
+   `montarLinhas51` por competência — os dados já estão prontos em
+   `dres51PorCompetencia` (`App.jsx`).
 4. **Extrair `useCPC51`, `useDePara` e o casco de `App.jsx`.** O
    componente passou de 766 para 875 linhas com o topo e o menu novos —
    é o arquivo que mais cresce a cada funcionalidade, e cada módulo de
