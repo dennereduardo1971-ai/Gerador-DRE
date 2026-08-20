@@ -21,26 +21,6 @@
       }
     },
     {
-      "id": "1787232239561-8r1ucf",
-      "criadoEm": 1787232239561,
-      "empresa": "",
-      "cnpj": "",
-      "periodo": "",
-      "chave": "",
-      "totais": {
-        "receitaBruta": 22835335.18,
-        "deducoes": 14244993.15,
-        "receitaLiq": 8590342.03,
-        "resultadoOperBruto": 4260962.88,
-        "despOper": 4826212.49,
-        "resultadoFin": -105715.46000000002,
-        "resultadoOper": -670965.0700000003,
-        "naoOper": 588050.4999999999,
-        "antesIR": -82914.57000000041,
-        "liquido": -82914.57000000041
-      }
-    },
-    {
       "id": "1787232160073-kblp53",
       "criadoEm": 1787232160073,
       "empresa": "",
@@ -81,5 +61,5 @@
       }
     }
   ],
-  "atualizadoEm": "2026-08-20T13:24:15.988Z"
+  "atualizadoEm": "2026-08-20T13:24:21.049Z"
 }
