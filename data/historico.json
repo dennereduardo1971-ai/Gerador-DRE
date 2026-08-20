@@ -1,6 +1,26 @@
 {
   "historico": [
     {
+      "id": "1787229256683-fh7ph4",
+      "criadoEm": 1787229256683,
+      "empresa": "",
+      "cnpj": "",
+      "periodo": "",
+      "chave": "",
+      "totais": {
+        "receitaBruta": 22937134.509999998,
+        "deducoes": 14463230.120000001,
+        "receitaLiq": 8473904.389999997,
+        "resultadoOperBruto": 4116428.929999998,
+        "despOper": 4708164.880000001,
+        "resultadoFin": -79287.77999999997,
+        "resultadoOper": -671023.730000003,
+        "naoOper": 1224457.4,
+        "antesIR": 553433.6699999969,
+        "liquido": 512068.9999999969
+      }
+    },
+    {
       "id": "1787222113171-3syqsk",
       "criadoEm": 1787222113171,
       "empresa": "",
@@ -21,5 +41,5 @@
       }
     }
   ],
-  "atualizadoEm": "2026-08-20T12:33:10.277Z"
+  "atualizadoEm": "2026-08-20T12:36:08.552Z"
 }
