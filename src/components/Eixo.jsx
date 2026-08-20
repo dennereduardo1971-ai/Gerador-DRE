@@ -2,7 +2,7 @@
  *
  *  Só apresentação: nada aqui calcula contabilidade, tudo recebe
  *  número pronto de quem chama. O eixo é o mesmo nas quatro telas
- *  que o usam (DRE, Conferir, Balanço, Horizontal) — é isso que
+ *  que o usam (DRE, Conferir, CPC 51) — é isso que
  *  faz o app parecer um produto só, e não quatro relatórios.
  */
 

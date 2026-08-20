@@ -4,8 +4,6 @@ import "./App.css";
 import { agregarPorConta, avisosDoMapeamento, listarCompetencias, mapearColunas, parsearPlanoDeContas } from "./lib/parse.js";
 import { importarAbasSimples, importarArquivo, importarLinhasSimples } from "./lib/importarArquivo.js";
 import { agruparPorDigito, montarDRE, provaIntegridade, sugerirClassificacao } from "./lib/classify.js";
-import { montarBalanco } from "./lib/balanco.js";
-import { parsearAbertura } from "./lib/abertura.js";
 import { coberturaBalancete, contasDeMovimento, detectarColunas, nomesDoBalancete, parsearBalancete, periodoDoBalancete } from "./lib/balancete.js";
 import { baixarCSV, baixarExcel, periodoLegivel } from "./lib/exportacao.js";
 import { POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51, fazerCategoriaDe, montarDRE51 } from "./lib/cpc51.js";
@@ -26,12 +24,7 @@ import { EtapaImportar } from "./components/EtapaImportar.jsx";
 import { EtapaConferir } from "./components/EtapaConferir.jsx";
 import { EtapaClassificar } from "./components/EtapaClassificar.jsx";
 import { EtapaDRE } from "./components/EtapaDRE.jsx";
-import { EtapaBalanco } from "./components/EtapaBalanco.jsx";
-import { BalancoCompleto } from "./components/BalancoCompleto.jsx";
-import { Painel } from "./components/Painel.jsx";
-import { Arquivos } from "./components/Arquivos.jsx";
 import { FonteDados } from "./components/FonteDados.jsx";
-import { EtapaHorizontal } from "./components/EtapaHorizontal.jsx";
 import { EtapaComparativo } from "./components/EtapaComparativo.jsx";
 import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
 import { EtapaCPC51 } from "./components/EtapaCPC51.jsx";
@@ -76,26 +69,20 @@ const SECOES = [
     ],
   },
   {
-    id: "analises",
-    rotulo: "Análises",
-    abas: [
-      ["painel", "Painel", "painel"],
-      ["balanco", "Balanço", "balanco"],
-      ["horizontal", "Horizontal", "horizontal"],
-      ["comparativo", "Comparativa", "comparativo"],
-    ],
-  },
-  {
     id: "parametros",
     rotulo: "Parâmetros",
     abas: [["depara", "De-Para", "depara"]],
   },
   {
-    id: "arquivo",
-    rotulo: "Arquivo",
+    /* Comparativa e Histórico respondem à mesma pergunta em dois tempos:
+       como a DRE se moveu nos meses do arquivo aberto, e o que já foi
+       fechado antes dele. Eram duas seções de um item cada depois do
+       corte — uma seção inteira para uma linha é chrome, não navegação. */
+    id: "acompanhamento",
+    rotulo: "Acompanhamento",
     abas: [
+      ["comparativo", "Comparativa", "comparativo"],
       ["historico", "Histórico", "historico"],
-      ["arquivos", "Arquivos", "arquivos"],
     ],
   },
   {
@@ -108,18 +95,15 @@ const SECOES = [
   },
 ];
 
-/* Abas que não dependem de arquivo nenhum: abrem sempre. Histórico e
-   Arquivos leem o que já foi salvo; o plano de ação é do escritório, não
-   do razão aberto; Início mostra justamente o estado de "ainda vazio". */
-const SEMPRE_ABERTAS = ["inicio", "importar", "historico", "arquivos", "plano"];
+/* Abas que não dependem de arquivo nenhum: abrem sempre. O Histórico lê
+   o que já foi salvo; o plano de ação é do escritório, não do razão
+   aberto; Início mostra justamente o estado de "ainda vazio". */
+const SEMPRE_ABERTAS = ["inicio", "importar", "historico", "plano"];
 
 /* O menu recolhido é preferência de quem usa, não estado do arquivo:
    sobrevive ao F5 e à troca de razão, e não entra na sessão em
    IndexedDB, que é só para dado do cliente. */
 const CHAVE_MENU = "dre.menu.recolhido";
-/* O balancete completo desenha estas duas sozinho, sem razão. */
-const BASTA_BALANCETE = ["balanco", "painel"];
-
 /* A mensagem que a tela mostra depois de ler um balancete.
  *
  * Ela responde três perguntas, nessa ordem, porque é a ordem em que elas
@@ -127,10 +111,9 @@ const BASTA_BALANCETE = ["balanco", "painel"];
  * mesmo? ele cobre o que eu preciso? de que período ele é?
  *
  * A cobertura importa mais do que parece. O relatório de fechamento
- * costuma sair filtrado só nas contas 1 e 2, e nesse caso ele monta o
- * Balanço mas NÃO a DRE. Sem este aviso o app mostraria uma DRE zerada,
- * que é pior do que não mostrar nada: parece resultado, não parece
- * arquivo incompleto. */
+ * costuma sair filtrado só nas contas 1 e 2, e nesse caso ele NÃO monta a
+ * DRE. Sem este aviso o app mostraria uma DRE zerada, que é pior do que
+ * não mostrar nada: parece resultado, não parece arquivo incompleto. */
 function avisoDoBalancete(bal, periodo) {
   const r = bal.resumo;
   const partes = [
@@ -154,16 +137,35 @@ function avisoDoBalancete(bal, periodo) {
     );
   }
 
+  /* A CONFERÊNCIA CRUZADA — a validação mais forte que este arquivo
+     permite, e que só existe quando ele traz os dois lados.
+     Δ(Ativo + Passivo) do período TEM que ser o resultado do período
+     apurado pelas contas 3 a 7. São dois caminhos independentes para o
+     mesmo número: se batem, a DRE que sai daqui está apoiada no
+     patrimônio; se não batem, o arquivo tem problema antes de qualquer
+     classificação. */
+  if (r.resultadoConfere === true) {
+    partes.push(
+      "Conferência cruzada: o resultado do período apurado pelas contas de resultado bate com " +
+      "a variação do patrimônio no mesmo período."
+    );
+  } else if (r.resultadoConfere === false) {
+    partes.push(
+      "Atenção: o resultado do período apurado pelas contas de resultado NÃO bate com a variação " +
+      "do patrimônio no mesmo período. Confira o arquivo antes de usar esta DRE."
+    );
+  }
+
+  /* A cobertura importa por um motivo só: a DRE precisa das contas de
+     resultado. O relatório de fechamento costuma sair filtrado em 1 e 2,
+     e nesse caso o app mostraria uma DRE zerada — que é pior do que não
+     mostrar nada, porque parece resultado e não parece arquivo
+     incompleto. */
   const cob = coberturaBalancete(bal);
   if (!cob.resultado) {
     partes.push(
-      "Este arquivo traz só as contas patrimoniais, então dá para montar o Balanço mas não a DRE. " +
-      "Para ter as duas, exporte o mesmo relatório sem filtrar por conta (da 1 até a 7)."
-    );
-  } else if (!cob.patrimonial) {
-    partes.push(
-      "Este arquivo traz só as contas de resultado, então dá para montar a DRE mas não o Balanço. " +
-      "Para ter as duas, exporte o mesmo relatório sem filtrar por conta (da 1 até a 7)."
+      "Este arquivo traz só as contas patrimoniais (1 e 2), então não dá para montar a DRE com ele. " +
+      "Exporte o mesmo relatório sem filtrar por conta, ou importe o razão."
     );
   }
 
@@ -383,33 +385,29 @@ export default function App() {
         const daAba = abas.find((a) => detectarColunas(a.linhas)) || abas[0];
         const linhasBrutas = daAba ? daAba.linhas : [];
         const periodo = periodoDoBalancete(abas);
-        /* Tenta primeiro o balancete completo (hierárquico, com saldo
-           anterior/débito/crédito/atual). Se o arquivo for esse, ele traz
-           o Balanço inteiro pronto e vira a fonte da tela. Só se não for é
-           que cai no formato simples código;saldo. O usuário não precisa
-           saber qual dos dois tem em mãos. */
+        /* SÓ O BALANCETE COMPLETO ENTRA (o hierárquico, com saldo
+           anterior, débito, crédito e saldo atual). Existia aqui um
+           segundo caminho para o formato simples `código;saldo`, e ele
+           servia a uma coisa só: dar saldo de abertura ao Balanço
+           Patrimonial, tela que este app não tem mais. Um arquivo desse
+           formato seria aceito e não produziria nada — pior que
+           recusá-lo, porque o usuário acharia que carregou. */
         const completo = parsearBalancete(linhasBrutas);
-        if (completo) {
+        if (!completo) {
           setAbertura({
-            saldos: completo.saldosAbertura,
-            arquivo: file.name,
-            balancete: completo,
-            periodo,
-            aviso: avisoDoBalancete(completo, periodo),
+            saldos: {}, arquivo: "", balancete: null,
+            aviso: "Não reconheci um balancete de verificação nesse arquivo. Ele precisa " +
+              "trazer, por conta, o saldo anterior, o débito e o crédito do período e o saldo " +
+              "atual — é o relatório que o sistema contábil emite para o fechamento.",
           });
           return;
         }
-        const r = parsearAbertura(linhasBrutas);
-        if (!r.lidas) {
-          setAbertura({ saldos: {}, arquivo: "", aviso: "Não achei nenhuma conta nesse arquivo. O balancete precisa ter o código da conta na primeira coluna e o saldo na segunda (ou débito e crédito na segunda e terceira)." });
-          return;
-        }
         setAbertura({
-          saldos: r.saldos,
+          saldos: completo.saldosAbertura,
           arquivo: file.name,
-          balancete: null,
-          aviso: `Balancete de abertura carregado: ${r.lidas} contas.` +
-            (r.ignoradas ? ` ${r.ignoradas} linha(s) sem código numérico foram ignoradas (cabeçalho e títulos).` : ""),
+          balancete: completo,
+          periodo,
+          aviso: avisoDoBalancete(completo, periodo),
         });
       })
       .catch(() => setAbertura({ saldos: {}, arquivo: "", aviso: "Não consegui ler esse arquivo de balancete." }));
@@ -627,8 +625,6 @@ export default function App() {
     );
   }
 
-  const balanco = useMemo(() => montarBalanco(contas, abertura.saldos), [contas, abertura]);
-
   const dresPorCompetencia = useMemo(() => {
     return competencias.map((comp) => {
       const cs = contasPorCompetencia[comp] || [];
@@ -640,19 +636,21 @@ export default function App() {
 
   const dif = tDeb - tCre;
   const temDados = contas.length > 0;
-  // O balancete completo desenha o Balanço sozinho, sem razão — então a
-  // vista Balanço não pode depender de ter havido importação de razão.
+  // O balancete completo monta a DRE sozinho, sem razão — então a
+  // demonstração não pode depender de ter havido importação de razão.
   const temBalancete = !!abertura.balancete;
   const prova = useMemo(() => provaIntegridade(contasResultado, grupoDe), [contasResultado, grupoDe]);
 
   /** Uma aba abre quando a fonte de que ela depende existe. Escrito uma
-   *  vez, em vez de três expressões booleanas espalhadas pela trilha —
-   *  era assim que "Balanço abre só com balancete" ficava impossível de
-   *  conferir sem ler os três blocos e comparar de cabeça. */
+   *  vez, e não como expressão booleana repetida em cada ramo do
+   *  `<main>` e do menu: eram duas cópias, e aba nova aberta no menu caía
+   *  em tela branca quando alguém esquecia da segunda. */
   function abaDisponivel(id) {
     if (SEMPRE_ABERTAS.includes(id)) return true;
-    if (BASTA_BALANCETE.includes(id)) return temDados || temBalancete;
-    return temDados;
+    /* A DRE e tudo que descende dela abrem com QUALQUER uma das duas
+       fontes: o razão importado ou o balancete completo, que monta a
+       demonstração sozinho. */
+    return temDados || temBalancete;
   }
 
   /* O estado de cada aba, no próprio menu — agora como SELO, não frase.
@@ -680,7 +678,7 @@ export default function App() {
   }, [temDados, linhas.length, dif, contasResultado.length, placarDePara, conciliacao51.fecha]);
 
   /* O período, escrito uma vez: ele aparece na faixa de contexto do topo,
-     no Início, no cabeçalho do Painel, na DRE, no CPC 51 e em todo
+     no Início, na DRE, no CPC 51 e em todo
      arquivo exportado. Eram seis expressões — cinco delas com o mesmo
      defeito: usavam `meses` (a lista de DIAS do arquivo, um Set sem
      ordem cronológica — apesar do nome) como se fosse o período do
@@ -874,21 +872,6 @@ export default function App() {
               />
             )}
 
-            {aba === "painel" && (temDados || temBalancete) && (
-              <Painel dre={dre} temDados={temDados} balancete={abertura.balancete}
-                dresPorCompetencia={dresPorCompetencia} empresa={empresa}
-                periodo={periodo} />
-            )}
-
-            {aba === "balanco" && (temDados || temBalancete) && (
-              abertura.balancete
-                ? <BalancoCompleto bal={abertura.balancete} arquivo={abertura.arquivo}
-                    lucroLiquido={temDados ? dre.liquido : null}
-                    onTrocar={() => setAbertura({ saldos: {}, arquivo: "", aviso: "", balancete: null })} />
-                : <EtapaBalanco balanco={balanco} filtroCompetencia={filtroCompetencia}
-                    abertura={abertura} onImportarAbertura={importarAbertura} />
-            )}
-
             {aba === "depara" && temDados && (
               <DePara
                 linhas={deParaLinhas} empresa={empresa} cnpj={cnpj}
@@ -902,8 +885,6 @@ export default function App() {
                 onBaixarExcel={() => baixarExcelDePara(deParaLinhas, placarDePara, porGrupo(deParaLinhas), ctxDePara)}
               />
             )}
-
-            {aba === "horizontal" && temDados && <EtapaHorizontal dresPorCompetencia={dresPorCompetencia} />}
 
             {aba === "comparativo" && temDados && <EtapaComparativo dresPorCompetencia={dresPorCompetencia} />}
 
@@ -939,7 +920,6 @@ export default function App() {
               />
             )}
 
-            {aba === "arquivos" && <Arquivos />}
 
             {aba === "historico" && (
               <EtapaHistorico

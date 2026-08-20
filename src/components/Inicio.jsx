@@ -1,14 +1,10 @@
 /* Início — a tela que responde "o que eu faço agora?".
  *
- * Ela não concorre com o Painel. São perguntas diferentes:
- *
- *   Início  → "por onde eu começo e o que está me esperando?"
- *   Painel  → "e daí? o que estes números dizem?"
- *
- * Por isso aqui não há gráfico nem análise: há estado do arquivo, um
- * único próximo passo em destaque, a lista do que está pendente e os
- * atalhos. Os três números do topo são isca para o Painel, não leitura
- * de resultado — e só aparecem quando existem de verdade.
+ * Não é leitura de resultado: aqui há estado do arquivo, um único
+ * próximo passo em destaque, a lista do que está pendente e os atalhos.
+ * Os números do topo situam ("é este arquivo, é este período"), não
+ * analisam — quem quer o resultado abre a DRE, e quem quer saber como
+ * ele fica em 2027 abre o CPC 51.
  *
  * Regra de escrita desta tela: nenhum texto passa de uma linha. Quem
  * abre um ERP quer saber onde clicar, não ler um manual. O que precisa
@@ -16,9 +12,7 @@
  * padrão, dentro da tela que executa a tarefa.
  */
 
-import { useMemo } from "react";
 import { brl, pct } from "../lib/parse.js";
-import { margens } from "../lib/indicadores.js";
 import { Icone } from "./Icones.jsx";
 
 /* Um passo por vez. A ordem é a do fluxo real, e a primeira condição que
@@ -37,10 +31,7 @@ function proximoPasso({ temDados, temBalancete, dif, temRazao, placar, nContasRe
   if (placar?.aRevisar) {
     return { aba: "depara", ico: "depara", titulo: "Revisar o De-Para", sub: `${placar.aRevisar} categoria(s) do CPC 51 a confirmar`, cta: "Abrir De-Para", alerta: true };
   }
-  if (temDados) {
-    return { aba: "dre", ico: "dre", titulo: "A DRE está pronta", sub: "Confira, exporte ou salve no histórico", cta: "Ver a DRE" };
-  }
-  return { aba: "balanco", ico: "balanco", titulo: "O Balanço está pronto", sub: "Montado a partir do balancete", cta: "Ver o Balanço" };
+  return { aba: "dre", ico: "dre", titulo: "A DRE está pronta", sub: "Confira, exporte ou salve no histórico", cta: "Ver a DRE" };
 }
 
 function Atalho({ ico, nome, valor, alerta, onClick, disabled }) {
@@ -60,7 +51,6 @@ export function Inicio({
   arquivo, empresa, periodo, temDados, temBalancete, temRazao, arquivoBalancete,
   nLinhas, nContas, nContasResultado, dif, placar, concilia, dre, onIr, disponivel,
 }) {
-  const m = useMemo(() => (temDados && dre ? margens(dre) : null), [temDados, dre]);
   const passo = proximoPasso({ temDados, temBalancete, dif, temRazao, placar, nContasResultado });
 
   /* Só entra na lista o que pede AÇÃO. Um "tudo certo" para cada
@@ -95,7 +85,7 @@ export function Inicio({
             {periodo && <span>{periodo}</span>}
           </div>
         </div>
-        {m && (
+        {temDados && (
           <div className="inicio-nums">
             <div className="mini">
               <div className="mini-k">Receita líquida</div>
@@ -107,7 +97,10 @@ export function Inicio({
             </div>
             <div className="mini">
               <div className="mini-k">Margem líquida</div>
-              <div className="mini-v">{m.margemLiquida == null ? "—" : pct(m.margemLiquida)}</div>
+              {/* Sem receita líquida não há margem — e "0,0%" ali pareceria
+                  diagnóstico ("a empresa não ganha nada") quando na verdade
+                  é ausência de denominador. */}
+              <div className="mini-v">{dre.receitaLiq ? pct(dre.liquido / dre.receitaLiq) : "—"}</div>
             </div>
           </div>
         )}
@@ -143,8 +136,7 @@ export function Inicio({
       <div className="rotulo secao-rot">Ir para</div>
       <div className="atalhos">
         <Atalho ico="dre" nome="DRE" valor={temDados ? brl(dre.liquido) : ""} disabled={!disponivel("dre")} onClick={() => onIr("dre")} />
-        <Atalho ico="painel" nome="Painel" valor={m ? pct(m.margemLiquida) : ""} disabled={!disponivel("painel")} onClick={() => onIr("painel")} />
-        <Atalho ico="balanco" nome="Balanço" valor={temBalancete ? "balancete" : ""} disabled={!disponivel("balanco")} onClick={() => onIr("balanco")} />
+        <Atalho ico="comparativo" nome="Comparativa" disabled={!disponivel("comparativo")} onClick={() => onIr("comparativo")} />
         <Atalho ico="depara" nome="De-Para" valor={placar?.total ? pct(placar.completude) : ""} alerta={!!placar?.pendente} disabled={!disponivel("depara")} onClick={() => onIr("depara")} />
         <Atalho ico="cpc51" nome="CPC 51" valor={temDados ? (concilia ? "concilia" : "conferir") : ""} alerta={temDados && !concilia} disabled={!disponivel("cpc51")} onClick={() => onIr("cpc51")} />
         <Atalho ico="historico" nome="Histórico" onClick={() => onIr("historico")} />

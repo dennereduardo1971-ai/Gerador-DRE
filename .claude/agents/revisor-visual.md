@@ -24,11 +24,11 @@ erro, não como estilo.
    adianta.
 3. **Cor definida só dentro de `:root[data-tema="dark"]`** é bug: o tema
    escuro sobrescreve as MESMAS variáveis declaradas no claro.
-4. **Nada de 3D fora das torres patrimoniais.** Perspectiva distorce
-   comparação: a barra mais próxima parece maior que outra de mesmo
-   valor. Cascata, evolução e ranking são 2D de propósito.
-5. **Nunca zero no lugar de dado ausente.** Liquidez em 0,00 parece
-   diagnóstico; ausência de passivo circulante é outra coisa.
+4. **Nada de 3D, e nada de gráfico decorativo.** Perspectiva distorce
+   comparação — a barra mais próxima parece maior que outra de mesmo
+   valor. O app é numérico de propósito desde que o Painel saiu.
+5. **Nunca zero no lugar de dado ausente.** Margem em 0,0% parece
+   diagnóstico; ausência de receita é outra coisa. Use "—".
 
 ## O piso de qualidade, que é checável
 
@@ -56,10 +56,10 @@ npm run build && npx vite preview --port 4173
 
 ## Duas tentações a barrar
 
-- **Barra de variação na Análise Horizontal.** Já existiu e foi removida:
-  com uma variação atípica (+424% num mês) a escala compartilhada esmaga
-  todas as outras e as barras viram slivers invisíveis. O número já
-  dizia tudo.
+- **Barra de variação ao lado do percentual mês a mês** (bloco de cima
+  da Comparativa). Já existiu e foi removida: com uma variação atípica
+  (+424% num mês) a escala compartilhada esmaga todas as outras e as
+  barras viram slivers invisíveis. O número já dizia tudo.
 - **Semáforo de quatro cores.** Colorir todos os estados não destaca
   nenhum. Cor é para o que pede ação; o resto é neutro.
 

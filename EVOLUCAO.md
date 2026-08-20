@@ -43,30 +43,103 @@ _Atualizado em 20/08/2026._
 
 | | |
 |---|---|
-| Testes | 244 (Vitest, 15 arquivos) |
+| Testes | 211 (Vitest, 12 arquivos) |
 | Lint | `npx oxlint src/` — zero avisos em `src/` (`fixtures/validar.mjs` tem 1 erro pré-existente, fora de `src/`) |
-| Bundle | app 422 kB (130 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
-| CSS | 41 kB (8,3 kB gzip) |
-| Código | ~9.000 linhas em `src/` (App.jsx + lib + components) |
-| Maiores arquivos | `App.jsx` (951), `cpc51.js` (455), `balancete.js` (475) |
+| Bundle | app 377 kB (117 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
+| CSS | 30 kB (6,4 kB gzip) — zero classe órfã (conferido por script) |
+| Código | ~7.700 linhas de JS/JSX em `src/` |
+| Maiores arquivos | `App.jsx` (945), `cpc51.js` (455), `balancete.js` (442) |
+| Abas | 10 (eram 14 até 20/08/2026) |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina) |
 | Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante de parametrização) conferidos fora do repositório: período, integridade, reconciliação de hierarquia e DRE batendo ao centavo nos 6 |
 | Skills versionadas | 6 (`manter-evolucao`, `testar-com-arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`, `nova-funcionalidade`, `otimizar-app`) |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) |
 
-A navegação tem **Início** solto no topo e cinco seções, definidas como
+A navegação tem **Início** solto no topo e quatro seções, definidas como
 dado em `SECOES` (`App.jsx`):
 
 | Seção | Abas |
 |---|---|
 | (sem seção) | Início |
 | Fluxo | Importar → Conferir → Classificar → DRE |
-| Análises | Painel, Balanço, Horizontal, Comparativa |
 | Parâmetros | De-Para |
-| Arquivo | Histórico, Arquivos |
+| Acompanhamento | Comparativa, Histórico |
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
 ## Registro
+
+### 20/08/2026 (4ª sessão) — o app fica só com a DRE e o CPC 51
+
+Pedido do Denner, textual: "preciso que o foco seja apenas a DRE e o
+CPC 51, afinal esse projeto é exclusivo pra essa transição". Antes de
+apagar qualquer coisa, levantei o custo em código exclusivo de cada aba
+fora desse eixo e **confirmei o corte com ele** — deletar 1.700 linhas de
+funcionalidade não é decisão para tomar sozinho, mesmo com o pedido
+escrito.
+
+**Saíram, com confirmação:**
+
+| Aba | O que foi apagado |
+|---|---|
+| Painel | `Painel`, `Graficos`, `TorresPatrimoniais`, `indicadores.js`, `imagemPainel.js` + 2 arquivos de teste |
+| Balanço | `EtapaBalanco`, `BalancoCompleto`, `balanco.js`, `abertura.js` + 1 arquivo de teste |
+| Arquivos | `Arquivos.jsx` e metade de `githubApi.js` (`listarPasta`/`enviarArquivo`/`excluirArquivo`) |
+| Horizontal | fundida na Comparativa, que agora responde em dois níveis de zoom |
+
+**As consequências que não eram óbvias, e por isso valem registro:**
+
+- **`abertura.js` foi junto com o Balanço.** O formato simples
+  `código;saldo` servia a uma coisa só: dar saldo de abertura ao Balanço.
+  Sem a tela, o app aceitaria esse arquivo e não produziria nada — pior
+  do que recusá-lo, porque o usuário acharia que carregou. A importação
+  agora só reconhece o balancete COMPLETO, e diz isso.
+- **`achatar` e `gruposDe` (em `balancete.js`) eram só do Balanço** —
+  saíram com seus testes. O resto do módulo fica: ele é fonte da DRE.
+- **`resultadoConfere` ia ficar órfão, e foi promovido.** Era a
+  conferência cruzada mostrada só na tela do Balanço: Δ(Ativo + Passivo)
+  do período tem que bater com o resultado apurado pelas contas 3 a 7,
+  por caminhos independentes. Em vez de deletar, passou para o aviso da
+  importação — é a validação mais forte que o arquivo permite, e agora
+  ela vale para a DRE, que é o que sobrou.
+- **Textos de tela mentiam depois do corte.** "É dele que dependem as
+  abas Comparativa e Horizontal", "monta DRE e Balanço de uma vez", "o
+  Balanço deixa de ser só movimentação" — sete trechos em quatro
+  componentes. Corrigidos; sobrou um `grep` limpo por "Balanço",
+  "Painel", "Horizontal" e "Arquivos" em `src/components`.
+- **CSS morto não some sozinho.** 59 classes ficaram órfãs (três seções
+  inteiras: Balanço, Painel, Galeria). Removidas por script + conferência:
+  hoje **zero classe do `App.css` sem uso no JSX**.
+
+**Medido, antes → depois:**
+
+| | Antes | Depois |
+|---|---|---|
+| Abas | 14 | 10 |
+| Seções do menu | 5 | 4 |
+| Bundle do app | 424 kB / 130 kB gzip | **377 kB / 117 kB gzip** |
+| CSS | 41 kB / 8,3 kB gzip | **30 kB / 6,4 kB gzip** |
+| Testes | 244 | 211 (os 33 a menos cobriam código apagado) |
+| Lint | zero avisos | zero avisos |
+
+**Como foi verificado além do Vitest.** Subi o app com `npm run dev` e
+percorri as dez abas num Chromium headless (Playwright), com o razão
+sintético importado: todas renderizam, **zero erro de runtime**, zero
+`pageerror`. O único recurso que falha é a folha do Google Fonts, barrada
+pela rede desta máquina. Uma captura de cada aba ficou fora do
+repositório.
+
+**O que NÃO mudou, de propósito:** o núcleo contábil inteiro —
+`classify.js`, `parse.js`, `montarDRE`, `cpc51.js`, `depara.js`, os
+perfis de plano e as exportações. Nenhum número da DRE foi tocado nesta
+sessão, e os testes que congelam esses invariantes continuam todos
+verdes. `fixtures/validar.mjs` não rodou (arquivos reais ausentes nesta
+máquina).
+
+**Doutrina nova em `CLAUDE.md`:** a seção "O que é" agora abre declarando
+o escopo e listando o que foi removido, com a pergunta que toda ideia
+nova tem que passar — "isto serve à DRE ou à transição?". Sem isso, a
+próxima sessão reconstrói o Painel achando que está ajudando.
+
 
 ### 20/08/2026 (3ª sessão) — a DRE do CPC 51 exportada no layout do modelo do cliente
 
@@ -757,12 +830,11 @@ Ficou de fora, de propósito:
    montando colunas só na estrutura antiga. O que falta é a tela lendo
    `montarLinhas51` por competência — os dados já estão prontos em
    `dres51PorCompetencia` (`App.jsx`).
-4. **Extrair `useCPC51`, `useDePara` e o casco de `App.jsx`.** O
-   componente passou de 766 para 875 linhas com o topo e o menu novos —
-   é o arquivo que mais cresce a cada funcionalidade, e cada módulo de
-   ERP vai empurrar mais. O corte mais óbvio agora é um `<Casco>` levando
-   topo + menu + `ItemMenu`, que é bloco fechado e não toca em estado
-   contábil nenhum.
+4. **Extrair `useCPC51`, `useDePara` e o casco de `App.jsx`.** Mesmo
+   depois do corte de abas ele tem 945 linhas — é o arquivo que mais
+   cresce a cada funcionalidade, e cada módulo de ERP vai empurrar mais.
+   O corte mais óbvio é um `<Casco>` levando topo + menu + `ItemMenu`,
+   que é bloco fechado e não toca em estado contábil nenhum.
 5. **Efeito tributário por item de MPDA**, com campo editável por ajuste
    — fecha a exigência da norma que hoje sai como lacuna.
 6. **Seletor de aba do Excel** (`importarExcel.js` já devolve `abas`,
@@ -784,6 +856,12 @@ Ficou de fora, de propósito:
    cobrindo esse texto, nem antes nem depois do fix. Cobrir os três
    ramos (competência filtrada, dia filtrado, intervalo de competências)
    é barato e fecha essa lacuna de cobertura.
+
+**Fora do escopo, e não por esquecimento:** indicadores, gráficos,
+Balanço Patrimonial e galeria de arquivos foram removidos em 20/08/2026
+por decisão do usuário. Não os proponha de volta sem ele pedir — a
+pergunta que toda ideia nova responde é "isto serve à DRE ou à
+transição para o CPC 51?".
 
 ## Rumo a ERP: como pensar os próximos módulos
 

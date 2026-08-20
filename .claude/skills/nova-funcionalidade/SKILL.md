@@ -44,9 +44,13 @@ Regras que não se afrouxam:
   leem `montarLinhas`/`montarLinhas51`. Nunca redigite rótulos de linha
   num exportador; foi assim que o arquivo entregue ao cliente já
   divergiu da tela conferida.
-- **Nunca mostre zero no lugar de dado ausente.** `indicadores.js`
-  devolve `null` quando o denominador é zero: uma liquidez em 0,00
-  parece diagnóstico quando é ausência de dado.
+- **Nunca mostre zero no lugar de dado ausente.** Devolva `null` e
+  mostre "—" quando o denominador é zero: uma margem em 0,0% parece
+  diagnóstico quando é ausência de receita. Vale igual para lacuna de
+  nota explicativa, que sai como `[__________]`, nunca como zero.
+- **A pergunta do escopo vem antes do código.** Este app é a DRE e a
+  transição para o CPC 51. Tela que não serve a isso já foi removida uma
+  vez (20/08/2026); se a resposta for "é legal ter", a resposta é não.
 - **Import pesado é dinâmico.** `xlsx` custa ~424 kB e entra por
   `await import("xlsx")`, nunca estático.
 

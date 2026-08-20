@@ -1,11 +1,16 @@
 # Gerador de DRE
 
-Importa um razão contábil (CSV) e monta a Demonstração do Resultado do
-Exercício — conferência de partidas dobradas, classificação de contas de
-resultado (com sugestão automática) e a demonstração final com análise
-vertical, detalhe por conta e exportação em CSV. Também monta um Balanço
-Patrimonial simplificado, uma análise horizontal (variação % entre meses)
-e mantém um histórico local de DREs geradas para comparação.
+Importa um razão contábil ou um balancete de verificação e monta a
+Demonstração do Resultado do Exercício — conferência de partidas
+dobradas, classificação de contas de resultado (com sugestão automática)
+e a demonstração final com análise vertical, detalhe por conta e
+exportação em Excel e CSV.
+
+**O app é dedicado a uma coisa: a DRE e a transição para o CPC 51**, a
+norma que entra em vigor em 1º de janeiro de 2027. Tudo que ele faz
+serve a esse caminho — montar a demonstração de hoje, parametrizar para
+onde vai cada conta nas duas estruturas, e produzir a demonstração no
+formato novo com a prova de que o resultado não mudou.
 
 A estrutura da demonstração (receita bruta com mensalidades e taxas,
 deduções detalhadas, custos, despesas operacionais, financeiro, não
@@ -18,25 +23,34 @@ conta e valor de débito/crédito em colunas separadas.
 1. **Importar** — CSV ou Excel (.xlsx, .xls, .xlsm, .xlsb, .ods) do
    razão, lido em partes (sem travar a página mesmo com dezenas de
    milhares de linhas), com barra de progresso real. Se o Excel tiver
-   mais de uma aba, usa automaticamente a primeira que tiver dados.
+   mais de uma aba, usa a que tiver mais linhas com cara de conta — não a
+   primeira, porque o relatório do sistema contábil costuma vir com uma
+   aba de parâmetros na frente.
 2. **Conferir** — totais, teste de partidas dobradas, filtro por
-   **competência** (mês/ano — isola a DRE e o Balanço num mês só) e por
-   dia específico ou centro de custo, mapeamento manual de colunas.
+   **competência** (mês/ano — isola a DRE num mês só) e por dia
+   específico ou centro de custo, mapeamento manual de colunas.
 3. **Classificar** — sugestão automática de grupo por conta, ajustável.
    As classificações feitas à mão podem ser salvas num **perfil** (arquivo
    JSON) e recarregadas no mês seguinte, em vez de refazer tudo.
 4. **DRE** — demonstração final, com opção de salvar no histórico local.
-5. **Balanço** — contas 1 (ativo) e 2 (passivo/PL), com aviso claro de que
-   reflete a movimentação do arquivo, não necessariamente o saldo
-   patrimonial acumulado (depende do razão trazer o saldo de abertura).
-6. **Horizontal** — variação % de cada linha da DRE entre competências
-   (mês/ano), quando o arquivo cobre mais de um mês.
-7. **Histórico** — DREs salvas no navegador (localStorage), com
-   comparação lado a lado entre duas, e sincronização opcional com um
-   arquivo JSON dentro de um repositório do GitHub (ver seção abaixo).
-8. **CPC 51** — a mesma DRE na estrutura que passa a valer em 2027, com a
-   prova de que o lucro líquido não muda, e um plano de ação com o
-   cronograma de implementação (ver seção abaixo).
+
+E, em paralelo ao fluxo:
+
+- **De-Para** — uma linha por conta de resultado dizendo para onde ela
+  vai nos DOIS eixos ao mesmo tempo (o grupo da DRE atual e a categoria
+  do CPC 51), com a **origem de cada decisão** registrada ao lado. É o
+  entregável que a auditoria pede e a especificação que a TI carrega no
+  ERP. Sai em Excel, com o resumo por grupo abrindo nas contas que o
+  formam.
+- **Comparativa** — a DRE no tempo, em dois níveis: a variação % das
+  linhas de topo mês a mês e a demonstração inteira, uma coluna por
+  competência.
+- **Histórico** — DREs salvas no navegador (localStorage), com
+  comparação lado a lado entre duas, e sincronização opcional com um
+  arquivo JSON dentro de um repositório do GitHub (ver seção abaixo).
+- **CPC 51** — a mesma DRE na estrutura que passa a valer em 2027, com a
+  prova de que o lucro líquido não muda, e um plano de ação com o
+  cronograma de implementação (ver seção abaixo).
 
 ## CPC 51 — a DRE que entra em 2027
 
@@ -140,10 +154,12 @@ silenciosamente errada.
 
 ## DRE comparativa
 
-A aba **Comparativa** mostra a demonstração inteira com uma coluna por
-mês, com a análise vertical de cada mês embaixo de cada valor — dá para
-comparar a estrutura do resultado, e não só o tamanho. Precisa de um
-razão que cubra pelo menos dois meses.
+A aba **Comparativa** responde "como a DRE se moveu?" em dois níveis de
+zoom, numa tela só. Em cima, a **variação mês a mês** das seis linhas de
+topo — o panorama, para achar o mês que destoou. Embaixo, a
+**demonstração inteira** com uma coluna por mês e a análise vertical de
+cada mês embaixo de cada valor, para comparar a estrutura do resultado e
+não só o tamanho. Precisa de um razão que cubra pelo menos dois meses.
 
 Cada título de seção (Receita Operacional Bruta, Deduções, Despesas
 Operacionais, Financeiras, Não Operacionais) traz o total das contas
@@ -170,25 +186,6 @@ Na tela da DRE:
 - **Imprimir / PDF** — abre a impressão do navegador; em "Destino",
   escolha "Salvar como PDF".
 
-## Painel
-
-A aba **Painel** é a leitura rápida do período:
-
-- **Indicadores** — receita líquida, lucro, margens, EBITDA aproximado e,
-  com balancete carregado, liquidez corrente e geral, endividamento,
-  capital circulante líquido e imobilização do patrimônio líquido.
-- **Estrutura patrimonial em 3D** — Ativo e Passivo + PL como duas torres
-  empilhadas que terminam na mesma altura, com o resultado do exercício
-  visível do lado direito. Arraste para girar; há um botão "ver de
-  frente" e quem usa redução de movimento já recebe a versão plana.
-- **Cascata do resultado** — da receita bruta ao lucro líquido, mostrando
-  o que cada linha retirou.
-- **Evolução mensal** — receita, despesas e lucro por competência.
-- **Composição das despesas** — para onde foi o dinheiro, ranqueado.
-
-O painel funciona com só uma das duas fontes e diz qual falta para
-completar.
-
 ## Duas fontes: balancete e razão
 
 O app aceita as duas, e elas descrevem o mesmo fato de formas
@@ -197,68 +194,33 @@ movimento somado pela contabilidade. A DRE sai igual pelos dois
 caminhos.
 
 **O balancete é a fonte principal** quando traz as contas de resultado
-(3 a 7): ele passou pelo fechamento, monta DRE e Balanço de uma vez e
-ainda traz o plano de contas junto, dispensando o arquivo separado.
+(3 a 7): ele passou pelo fechamento e ainda traz o plano de contas
+junto, dispensando o arquivo separado.
 
 **O razão continua valendo** para o que só ele tem: análise mês a mês
-(Comparativa e Horizontal), filtro por centro de custo e detalhe de cada
+(aba Comparativa), filtro por centro de custo e detalhe de cada
 lançamento. Com os dois carregados, há um seletor de fonte nas etapas
 Conferir, Classificar e DRE.
 
-Se o seu balancete vier filtrado apenas nas contas 1 e 2, ele monta o
-Balanço mas não a DRE — exporte o mesmo relatório sem filtrar por conta
-para o balancete fazer tudo sozinho.
+Se o seu balancete vier filtrado apenas nas contas 1 e 2, ele não monta
+a DRE — exporte o mesmo relatório sem filtrar por conta, ou importe o
+razão.
 
 ## Balancete de verificação
 
 Se o arquivo carregado for um **balancete de verificação completo** (o
 relatório com código hierárquico, saldo anterior, débito, crédito e saldo
-atual), o app reconhece sozinho e monta o Balanço Patrimonial inteiro a
-partir dele — inclusive sem razão nenhum importado.
+atual), o app reconhece sozinho e monta a DRE inteira a partir dele —
+sem razão nenhum importado e sem mapear coluna alguma.
 
-A tela tem duas visões:
+Ele confere o arquivo contra si mesmo antes de usar: anterior + movimento
+= atual em cada linha, e cada conta sintética batendo com as filhas.
+Quando a numeração das contas é ambígua e um ramo precisa ser remontado
+pelos próprios totais, o app diz que remontou — não é silencioso.
 
-- **Estrutura** — Ativo de um lado, Passivo + Patrimônio Líquido do
-  outro, com Circulante e Não Circulante, para leitura.
-- **Balancete completo** — a árvore inteira, expansível, com os cinco
-  valores de cada conta, busca e opção de ocultar contas paradas.
-
-No topo, a equação patrimonial: *Ativo = Passivo + PL + Resultado do
-exercício*. Um balancete só das contas 1 e 2 não fecha, e não deve
-fechar — a diferença entre os dois lados é o resultado do período, que
-mora nas contas 3 a 7. Se houver um razão do mesmo período importado, o
-app confere esse valor contra o Lucro Líquido da DRE.
-
-## Balancete de abertura
-
-Na aba Balanço dá para carregar um **balancete de abertura**: os saldos
-de cada conta no início do período, que o razão sozinho não traz. Sem
-ele, o Balanço mostra a movimentação do período; com ele, mostra
-abertura + movimentação = saldo final, que é o Balanço de verdade.
-
-Formato: código da conta na primeira coluna e saldo na segunda (devedor
-positivo, credor negativo), ou débito e crédito em duas colunas. Aceita
-CSV, TXT e Excel.
-
-## Imagem do painel
-
-No Painel, **"Baixar imagem"** gera um PNG com os indicadores, a cascata
-do resultado, a evolução mensal e o ranking de despesas — pronto para
-anexar num relatório ou compartilhar. **"Salvar no GitHub"** manda a
-mesma imagem para o repositório (ver "Arquivos" abaixo), com um aviso de
-confirmação a cada uso porque a imagem traz valores financeiros reais.
-
-## Arquivos
-
-A aba **Arquivos** guarda imagens e outros documentos do projeto dentro
-do próprio repositório, usando a mesma sincronização com o GitHub já
-configurada na aba Histórico — mesmo token, sem serviço novo.
-
-**Importante:** se o repositório for público (o normal de um projeto
-publicado no GitHub Pages), todo arquivo enviado aqui fica acessível a
-qualquer pessoa, sem login, e continua no histórico do Git mesmo depois
-de excluído. A tela avisa isso antes de qualquer envio. Limite de 1 MB
-por arquivo.
+Só o balancete **completo** entra. O formato simples `código;saldo`
+existia para dar saldo de abertura ao Balanço Patrimonial; sem essa tela,
+aceitá-lo seria aceitar um arquivo que não produz nada.
 
 ## Testes
 
@@ -267,7 +229,7 @@ npm test
 ```
 
 Testes de `src/lib` com Vitest, usando um razão sintético — rodam em
-qualquer máquina, sem precisar de arquivo real. São 198 hoje, e entre
+qualquer máquina, sem precisar de arquivo real. São 214 hoje, e entre
 eles está a garantia de que a DRE na estrutura do CPC 51 e a DRE atual
 fecham no mesmo lucro líquido.
 
@@ -302,18 +264,17 @@ src/
     classify.js        # sugestão automática de classificação e montagem da DRE
     grupos.js          # os grupos da DRE e o sinal de cada um
     linhasDRE.js       # a estrutura da DRE como dados (rótulos, sinais, cascata)
-    balanco.js         # Balanço Patrimonial simplificado (contas 1 e 2)
-    balancete.js       # balancete de verificação hierárquico: traz o Balanço pronto
-    abertura.js        # balancete de abertura no formato simples (código;saldo)
-    indicadores.js     # margens, índices e séries do painel
-    imagemPainel.js    # gera o PNG do painel via <canvas>
+    balancete.js       # balancete de verificação hierárquico: monta a DRE sozinho
     cpc51.js           # as cinco categorias do CPC 51, a política de julgamento e a conciliação
     linhasCPC51.js     # a demonstração do CPC 51 como dados (mesma forma de linhasDRE.js)
     mpda.js            # medidas de desempenho definidas pela administração + minuta da nota
     cronograma51.js    # o cronograma de implementação (10 fases, 49 passos) como dado
     planoAcao.js       # andamento do plano de ação (localStorage)
+    depara.js          # a tabela de parametrização: conta → grupo da DRE + categoria do CPC 51
     exportacao.js      # exportação da DRE em CSV e Excel
+    exportacaoDePara.js# o De-Para completo em CSV e Excel (resumo por grupo expansível)
     exportacaoCPC51.js # Excel de seis abas, De-Para em CSV e a nota de MPDA em texto
+    excelEstilo.js     # o visual dos Excel exportados, definido uma vez (exceljs)
     perfil.js          # perfil de classificação (conta → grupo e categoria) em arquivo
     planoPerfil.js     # motor de perfis de plano de contas (código → grupo)
     planos/iesb.js     # o plano de contas do IESB, como dado

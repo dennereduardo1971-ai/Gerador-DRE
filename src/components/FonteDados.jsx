@@ -8,11 +8,11 @@
  * troque de fonte sem entender o que perde.
  *
  * BALANCETE: mais confiável (passou pelo fechamento), traz o plano de
- * contas junto e monta DRE e Balanço de uma vez. Mas é um retrato de UM
+ * contas junto e monta a DRE de uma vez. Mas é um retrato de UM
  * período agregado: não tem competência mês a mês, centro de custo nem
  * lançamento individual.
  *
- * RAZÃO: tem tudo isso, e é o que alimenta Comparativa, Horizontal e o
+ * RAZÃO: tem tudo isso, e é o que alimenta a Comparativa e o
  * filtro por centro de custo. Em compensação, a soma é feita pelo app.
  */
 
@@ -31,7 +31,7 @@ export function FonteDados({
           <span className="rotulo">Fonte dos dados</span>
         </div>
         <p className="fonte-txt">
-          DRE pelo <b>razão</b> · Balanço pelo balancete. O arquivo só traz as contas{" "}
+          DRE pelo <b>razão</b>. O balancete carregado só traz as contas{" "}
           <b>{cobertura.digitos.join(" e ")}</b>.
         </p>
         <details className="explica">
@@ -39,7 +39,7 @@ export function FonteDados({
           <p>
             A DRE precisa das contas de resultado (3 a 7), que não estão em{" "}
             <b>{arquivoBalancete}</b>. Exporte o <b>mesmo relatório sem filtrar por conta</b> e o
-            balancete passa a montar DRE e Balanço de uma vez — o razão fica reservado ao que só
+            balancete passa a montar a DRE de uma vez — o razão fica reservado ao que só
             ele faz: análise mês a mês, centro de custo e detalhe de lançamento.
           </p>
         </details>
@@ -69,9 +69,9 @@ export function FonteDados({
 
       <p className="fonte-txt">
         {noBalancete ? (
-          <>DRE e Balanço vindos de <b>{arquivoBalancete}</b>, já fechado pela contabilidade.</>
+          <>DRE vinda de <b>{arquivoBalancete}</b>, já fechado pela contabilidade.</>
         ) : (
-          <>DRE somada do <b>razão</b>, lançamento a lançamento. Balanço por <b>{arquivoBalancete}</b>.</>
+          <>DRE somada do <b>razão</b>, lançamento a lançamento. Balancete carregado: <b>{arquivoBalancete}</b>.</>
         )}
       </p>
 
@@ -87,7 +87,7 @@ export function FonteDados({
           lançamento individual.
         </p>
         <p>
-          O <b>razão</b> tem tudo isso — é ele que alimenta Comparativa, Horizontal e o filtro
+          O <b>razão</b> tem tudo isso — é ele que alimenta a Comparativa e o filtro
           por centro de custo. Em compensação, a soma é feita pelo app.
           {!temRazao && " Nenhum razão foi importado ainda."}
         </p>
