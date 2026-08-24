@@ -39,23 +39,27 @@ Duas regras que não se afrouxam:
 
 ## Estado atual
 
-_Atualizado em 20/08/2026._
+_Atualizado em 24/08/2026._
 
 | | |
 |---|---|
-| Testes | 211 (Vitest, 12 arquivos) |
-| Lint | `npx oxlint src/` — zero avisos em `src/` (`fixtures/validar.mjs` tem 1 erro pré-existente, fora de `src/`) |
-| Bundle | app 377 kB (117 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita do Excel exportado) — os dois em chunk sob demanda |
-| CSS | 30 kB (6,4 kB gzip) — zero classe órfã (conferido por script) |
-| Código | ~7.700 linhas de JS/JSX em `src/` |
-| Maiores arquivos | `App.jsx` (945), `cpc51.js` (455), `balancete.js` (442) |
-| Abas | 10 (eram 14 até 20/08/2026) |
-| Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina) |
-| Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante de parametrização) conferidos fora do repositório: período, integridade, reconciliação de hierarquia e DRE batendo ao centavo nos 6 |
-| Skills versionadas | 6 (`manter-evolucao`, `testar-com-arquivo-real`, `ajustar-classificacao-dre`, `build-e-publicar`, `nova-funcionalidade`, `otimizar-app`) |
-| Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) |
+| Testes | 251 (Vitest, 13 arquivos) |
+| Lint | `npx oxlint src/ fixtures/` — **zero avisos em tudo** (o ruído de `process` em `validar.mjs`, documentado desde agosto, saiu com um `overrides` no `.oxlintrc.json`) |
+| Bundle | app 397 kB (123 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
+| CSS | 31,3 kB (6,6 kB gzip) — zero classe órfã (conferido por script) |
+| Código | ~8.700 linhas de JS/JSX em `src/` |
+| Maiores arquivos | `App.jsx` (557), `balancete.js` (517), `cpc51.js` (455), `fiscal.js` (434) |
+| Contexto por sessão | `CLAUDE.md` 402 linhas / 22 kB (era 969 / 55 kB); `EVOLUCAO.md` 346 (era 890) |
+| Abas | 11 (eram 10; a Apuração entrou em 24/08/2026) |
+| Fonte de dados | **só o balancete de verificação** — o razão contábil saiu em 24/08/2026 |
+| Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina). O script foi REESCRITO contra os balancetes e não foi executado por ninguém ainda. |
+| Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante) conferidos em 20/08/2026, antes desta sessão |
+| Excel conferido por lib independente | sim — `openpyxl` releu o De-Para e a Apuração gerados por `exceljs` |
+| App rodado no navegador | sim — 8 abas renderizam sem erro, sem rolagem horizontal a 390px, sem interativo sem nome acessível |
+| Skills versionadas | 6 |
+| Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) — **nenhum rodou nesta sessão** |
 
-A navegação tem **Início** solto no topo e quatro seções, definidas como
+A navegação tem **Início** solto no topo e cinco seções, definidas como
 dado em `SECOES` (`App.jsx`):
 
 | Seção | Abas |
@@ -63,10 +67,77 @@ dado em `SECOES` (`App.jsx`):
 | (sem seção) | Início |
 | Fluxo | Importar → Conferir → Classificar → DRE |
 | Parâmetros | De-Para |
+| Fiscal | Apuração |
 | Acompanhamento | Comparativa, Histórico |
 | CPC 51 · 2027 | Demonstração, Plano de ação |
 
+A doutrina agora é **núcleo + `.claude/docs/`**: `CLAUDE.md` traz escopo,
+arquitetura, armadilhas e um índice "quero mudar X → leia Y"; o detalhe
+de cada assunto mora num arquivo lido sob demanda.
+
 ## Registro
+
+### 24/08/2026 — o razão sai, as zeradas entram, o fiscal nasce
+
+Quatro frentes num pedido só do Denner: "garantir a máxima eficiência e
+economia de tokens", cancelar o razão, ler as contas sem movimento e um
+bloco para LALUR e PIS/COFINS. Perguntei 16 questões em quatro rodadas
+antes de escrever qualquer linha — as decisões estão na tabela do plano e
+nos commits.
+
+**Um commit por frente, nesta ordem:** doutrina → razão → zeradas →
+fiscal. Inverti a ordem planejada entre "extrair hooks" e "remover o
+razão": apagar o razão primeiro encolheu o `App.jsx` em ~300 linhas, e a
+extração de hooks foi feita uma vez em vez de duas.
+
+**O que foi medido**
+
+| | Antes | Depois |
+|---|---|---|
+| `CLAUDE.md` (lido toda sessão) | 969 linhas / 55,5 kB | 402 / 22,3 kB |
+| `EVOLUCAO.md` | 890 linhas | 346 (o resto em `EVOLUCAO-ARQUIVO.md`) |
+| `App.jsx` | 945 linhas | 557 |
+| Testes | 211 | 251 |
+| Bundle (app) | 377 kB | 397 kB |
+| Abas | 10 | 11 |
+
+O bundle cresceu 20 kB porque o bloco fiscal é código novo; o `App.jsx`
+caiu 41% e a doutrina fixa por sessão caiu 60%.
+
+**Três defeitos reais achados no caminho, todos silenciosos:**
+
+1. **`saldo > 0 ? receita : despesa`** (`classify.js`, `planoPerfil.js`).
+   Movimento zero cai no `else`. Com o balancete emitido COM as contas
+   zeradas — que é o que o pedido 3 queria —, toda conta de receita sem
+   movimento seria classificada como despesa sem nenhum sinal na tela.
+   Virou `ehCredora()`, que desempata pela natureza do saldo e devolve
+   `null` quando não há o que deduzir. `null` não é "despesa".
+2. **O fallback por maioria afrouxava com as zeradas.** `contagem/n >=
+   0.5`: contas sem movimento aumentam `n` sem aumentar `contagem`, e a
+   classificação de contas COM movimento mudava sozinha. Só contas com
+   movimento votam agora, e há teste provando que a decisão é idêntica
+   com e sem vinte zeradas na lista.
+3. **Formato de moeda cravado na coluna 8** do Excel do De-Para. A coluna
+   nova empurrou o Saldo para a 9, o formato caía sobre a célula de texto
+   ao lado e o saldo saía sem moeda. Ancorado em `COLUNAS.length`.
+
+E um quarto, de tela: o selo do Confronto fiscal dizia "Diverge" e o
+subtexto "batem nos dois tributos", porque o subtexto só olhava as
+pendências.
+
+**O que ficou de fora, e por quê**
+
+- **`fixtures/validar.mjs` não foi executado.** Ele foi reescrito contra
+  os balancetes (não crava nome de arquivo: varre `fixtures/` e reconhece
+  o que é balancete e o que é a DRE oficial pelo conteúdo), mas os
+  arquivos reais estão no `.gitignore` e não estão nesta máquina. **Rodar
+  antes de publicar.** É a validação mais forte que o projeto tem, e
+  nenhuma das mudanças em `classify.js` desta sessão passou por ela.
+- **Créditos de PIS/COFINS no não cumulativo** e **LALUR Parte B** não
+  entraram — estão no backlog, e a tela diz que não calcula os créditos.
+- **Nenhum agente rodou** (`auditor-contabil`, `revisor-visual`). Confiro
+  isso com o usuário antes: o `auditor-contabil` é o que faria a pergunta
+  certa sobre os três defeitos acima.
 
 ### 20/08/2026 (4ª sessão) — o app fica só com a DRE e o CPC 51
 
@@ -268,6 +339,11 @@ com as contas recolhidas debaixo de cada um, todas com `hidden` e
 
 ## Próximos passos, na ordem que eu priorizaria
 
+0. **RODAR `node fixtures/validar.mjs`** numa máquina com os arquivos
+   reais, antes de publicar. Ele foi reescrito nesta sessão e nunca
+   executado, e as mudanças em `classify.js` (natureza de conta zerada,
+   maioria por prefixo) mexem exatamente no que ele valida centavo a
+   centavo. Se ele acusar diferença, é regressão até prova em contrário.
 1. **Editor de perfil de plano a partir do De-Para.** Agora que a tela
    mostra origem → destino → origem da decisão conta a conta, gerar o
    arquivo de perfil de plano a partir dessas decisões é um botão e uma

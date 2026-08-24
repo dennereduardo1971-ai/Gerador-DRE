@@ -1534,35 +1534,6 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
 }
 
 /* ============================================================
-   SELETOR DE FONTE
-   ============================================================ */
-
-.fonte {
-  border: 1px solid var(--regua-forte);
-  border-left: 3px solid var(--marca);
-  border-radius: 8px;
-  background: var(--superficie);
-  padding: 14px 16px;
-  margin-bottom: 16px;
-}
-.fonte-cab {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-.fonte-txt {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: var(--tinta-2);
-}
-.fonte-txt + .fonte-txt { margin-top: 9px; }
-.segmentado button:disabled { opacity: .45; cursor: not-allowed; }
-
-/* ============================================================
    CPC 51 — a DRE em cinco categorias, e o plano de virada
    ------------------------------------------------------------
    Nenhum elemento visual novo aqui: a demonstração do CPC 51 usa a

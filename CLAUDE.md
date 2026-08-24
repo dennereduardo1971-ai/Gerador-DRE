@@ -317,7 +317,11 @@ Duas camadas, e as duas importam:
    arquivos em `fixtures/`, que estão no `.gitignore` — **se você está numa
    máquina sem eles, diga isso ao usuário em vez de fingir que validou.**
 
-Também: `npx oxlint src/` (zero avisos em `src/`) e `npm run build`.
+Também: `npx oxlint src/ fixtures/` (zero avisos) e `npm run build`.
+
+Antes de publicar qualquer mudança que toque em número, **os dois têm que
+ter rodado**. Vitest verde com `validar.mjs` não executado não é
+validação — é só a garantia de que nada mudou de comportamento.
 
 ## Build e publicação
 
