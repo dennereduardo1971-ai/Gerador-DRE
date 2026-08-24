@@ -67,7 +67,7 @@ function Confronto({ titulo, devido, contabilizado, confiavel, aviso }) {
 }
 
 export function EtapaFiscal({
-  params, onParams, prejuizo, onPrejuizo,
+  params, onParams, prejuizo, onPrejuizo, baseInformada, onBaseInformada,
   linhasTributo, onTributo,
   ajustes, onAjuste, onAcrescentarAjuste, onRemoverAjuste,
   pisCofins, lalur, resumo, empresa, periodo, onBaixarExcel,
@@ -102,6 +102,7 @@ export function EtapaFiscal({
             {[
               resumo.divergePis ? "PIS/COFINS diverge" : null,
               resumo.divergeLalur ? "IRPJ/CSLL diverge" : null,
+              pisCofins.informada ? null : "base de PIS/COFINS a informar",
               resumo.pendencias > 0 ? `${resumo.pendencias} julgamento(s) a confirmar` : null,
             ].filter(Boolean).join(" · ") || "Recalculado e contabilizado batem nos dois tributos."}
           </div>
@@ -212,6 +213,35 @@ export function EtapaFiscal({
       <div className="card">
         <h2>Memória de cálculo — PIS e COFINS</h2>
         <p className="hint">Cada linha diz de onde o número veio.</p>
+
+        {/* A base é CAMPO, não conclusão. A estimativa da DRE existe para
+            dar um ponto de partida e para ser comparada — não para virar
+            o número que o app confronta como se soubesse. */}
+        <div className="filters">
+          <div>
+            <label htmlFor="fisc-base">Base de PIS/COFINS apurada (R$)</label>
+            <input id="fisc-base" type="number" min="0" step="0.01"
+              value={baseInformada ?? ""}
+              placeholder={pisCofins.baseEstimada.toFixed(2)}
+              onChange={(e) => onBaseInformada(e.target.value === "" ? null : Number(e.target.value) || 0)} />
+          </div>
+          <div className="linha-check">
+            <button className="btn ghost" type="button"
+              onClick={() => onBaseInformada(pisCofins.baseEstimada)}>
+              Usar a estimativa da DRE
+            </button>
+          </div>
+        </div>
+        {!pisCofins.informada && (
+          <div className="warn">
+            <b>A base ainda não foi informada.</b> Abaixo está a estimativa da DRE — receita bruta
+            menos devoluções e descontos. Ela não conhece regime de caixa, isenção de entidade
+            beneficente nem exclusão específica de receita, então o app mostra a conta mas{" "}
+            <b>não chama a diferença de divergência</b>. Digite a base da apuração para o
+            confronto valer.
+          </div>
+        )}
+
         <div className="fisc-mem">
           {pisCofins.memoria.map((l, i) => <LinhaMemoria key={i} l={l} />)}
         </div>
@@ -273,7 +303,9 @@ export function EtapaFiscal({
         titulo="PIS e COFINS — recalculado x contabilizado"
         devido={pisCofins.devido} contabilizado={pisCofins.contabilizado}
         confiavel={pisCofins.confiavel}
-        aviso={`${brl(pisCofins.indefinido)} em contas de tributo ainda sem classificar. Enquanto houver conta "a confirmar" acima, o confronto não vale: esse valor pode ser PIS, COFINS ou ISS, e cada hipótese dá uma divergência diferente.`}
+        aviso={pisCofins.indefinido >= 0.005
+          ? `${brl(pisCofins.indefinido)} em contas de tributo ainda sem classificar. Enquanto houver conta "a confirmar" acima, o confronto não vale: esse valor pode ser PIS, COFINS ou ISS, e cada hipótese dá uma divergência diferente.`
+          : "A base de PIS/COFINS ainda não foi informada. O recalculado abaixo sai da estimativa da DRE, que não é a base da apuração — informe a base para o confronto valer."}
       />
 
       {/* 3. LALUR — depende do resultado inteiro. */}

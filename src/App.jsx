@@ -484,6 +484,7 @@ export default function App() {
               <EtapaFiscal
                 params={fisc.params} onParams={fisc.setParams}
                 prejuizo={fisc.prejuizo} onPrejuizo={fisc.setPrejuizo}
+                baseInformada={fisc.basePisCofins} onBaseInformada={fisc.setBasePisCofins}
                 linhasTributo={fisc.linhasTributo} onTributo={fisc.definirTributo}
                 ajustes={fisc.ajustes} onAjuste={fisc.alterarAjuste}
                 onAcrescentarAjuste={fisc.acrescentarAjuste} onRemoverAjuste={fisc.removerAjuste}

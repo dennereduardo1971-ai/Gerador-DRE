@@ -104,8 +104,13 @@ export async function montarWorkbookFiscal({
   escreverMeta(wsRes, ["O ISS lançado fica fora do confronto de PIS/COFINS.", pisCofins.iss]);
 
   linhaEmBranco(wsRes);
-  if (!pisCofins.confiavel) {
+  /* O motivo tem que acompanhar o aviso: a planilha circula sozinha, e
+     "o confronto não vale" sem dizer por quê manda quem recebe adivinhar. */
+  if (pisCofins.indefinido >= 0.005) {
     escreverMeta(wsRes, ["ATENÇÃO: há conta de tributo sem classificar — o confronto de PIS/COFINS não vale."]);
+  }
+  if (!pisCofins.informada) {
+    escreverMeta(wsRes, ["ATENÇÃO: a base de PIS/COFINS não foi informada. O recalculado saiu da ESTIMATIVA da DRE (receita bruta menos devoluções e descontos), que não conhece regime de caixa nem isenção de receita — a diferença abaixo NÃO é uma divergência apurada."]);
   }
   if (!lalur.confiavel) {
     escreverMeta(wsRes, [`ATENÇÃO: ${lalur.ajustesPendentes.length} ajuste(s) do LALUR ainda não confirmados.`]);

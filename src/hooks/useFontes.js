@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { importarAbasSimples, importarLinhasSimples } from "../lib/importarArquivo.js";
 import { parsearPlanoDeContas } from "../lib/formato.js";
 import {
@@ -80,6 +80,16 @@ const RECUSA =
 export function useFontes() {
   const [balancetes, setBalancetes] = useState([]);
   const [ativo, setAtivo] = useState("");
+  /* A `ordem` (AAAAMMDD) do período em foco.
+     Soltar cinco meses de uma vez dispara CINCO importações assíncronas em
+     paralelo — `EtapaImportar` faz `forEach(f => onImportar(f))`. Quem
+     terminar de ler por último ganhava o foco, e a tela abria num mês
+     qualquer do meio, diferente a cada carga, sem nada na interface
+     explicando por quê. Comparar a ordem torna o resultado o mesmo
+     independentemente de quem resolve primeiro: o mês mais novo fica em
+     foco. Um ref, e não estado, porque o valor precisa valer JÁ na
+     importação seguinte, sem esperar o próximo render. */
+  const foco = useRef("");
   const [aviso, setAviso] = useState("");
   // Nomes de conta importados à mão continuam existindo: o balancete
   // resolve o caso comum, mas quem tem o plano num arquivo à parte não
@@ -112,7 +122,13 @@ export function useFontes() {
       // Reimportar o mesmo período SUBSTITUI em vez de duplicar: é a
       // correção de um mês, não um mês novo.
       setBalancetes((ps) => ordenarBalancetes([...ps.filter((p) => p.chave !== chave), entrada]));
-      setAtivo(chave);
+      /* Reimportar a correção de um mês antigo não rouba o foco do mês
+         novo: o arquivo é substituído do mesmo jeito, mas a tela fica
+         onde estava. */
+      if (String(entrada.ordem) >= foco.current) {
+        foco.current = String(entrada.ordem);
+        setAtivo(chave);
+      }
       setAviso(avisoDoBalancete(bal, periodo));
     } catch {
       setAviso("Não consegui ler esse arquivo de balancete.");
@@ -122,7 +138,12 @@ export function useFontes() {
   function remover(chave) {
     setBalancetes((ps) => {
       const resto = ps.filter((p) => p.chave !== chave);
-      setAtivo((a) => (a === chave ? (resto[resto.length - 1]?.chave || "") : a));
+      setAtivo((a) => {
+        if (a !== chave) return a;
+        const proximo = resto[resto.length - 1];
+        foco.current = String(proximo?.ordem || "");
+        return proximo?.chave || "";
+      });
       if (!resto.length) setAviso("");
       return resto;
     });
@@ -143,6 +164,13 @@ export function useFontes() {
         setAvisoPlano(`Plano de contas importado: ${quantos} contas nomeadas.`);
       })
       .catch(() => setAvisoPlano("Não consegui ler esse arquivo de plano de contas."));
+  }
+
+  /** Trocar o mês em foco pela tela. Mantém `foco` em dia para que a
+   *  próxima importação compare com o que está de fato na tela. */
+  function escolher(chave) {
+    foco.current = String(balancetes.find((b) => b.chave === chave)?.ordem || "");
+    setAtivo(chave);
   }
 
   const emFoco = useMemo(
@@ -182,12 +210,19 @@ export function useFontes() {
     dados: { balancetes, ativo, aviso, nomes },
     vazio: balancetes.length === 0,
     restaurar: (s) => {
-      setBalancetes(ordenarBalancetes(s.balancetes || []));
+      const lista = ordenarBalancetes(s.balancetes || []);
+      setBalancetes(lista);
       setAtivo(s.ativo || "");
+      // Sessão restaurada também acerta o marcador: sem isso, o primeiro
+      // balancete importado depois de reabrir o app roubaria o foco.
+      foco.current = String(lista.find((b) => b.chave === s.ativo)?.ordem || "");
       setAviso(s.aviso || "");
       setNomes(s.nomes || {});
     },
-    limpar: () => { setBalancetes([]); setAtivo(""); setAviso(""); setNomes({}); setAvisoPlano(""); },
+    limpar: () => {
+      setBalancetes([]); setAtivo(""); foco.current = "";
+      setAviso(""); setNomes({}); setAvisoPlano("");
+    },
   };
 
   return {
@@ -198,6 +233,6 @@ export function useFontes() {
     cobertura: emFoco?.cobertura || { patrimonial: false, resultado: false, digitos: [] },
     periodo: emFoco?.rotulo || "",
     temDados: contas.length > 0,
-    importar, remover, setAtivo, importarPlano, sessao,
+    importar, remover, setAtivo: escolher, importarPlano, sessao,
   };
 }

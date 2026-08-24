@@ -43,11 +43,11 @@ _Atualizado em 24/08/2026._
 
 | | |
 |---|---|
-| Testes | 251 (Vitest, 13 arquivos) |
+| Testes | 256 (Vitest, 13 arquivos) |
 | Lint | `npx oxlint src/ fixtures/` — **zero avisos em tudo** (o ruído de `process` em `validar.mjs`, documentado desde agosto, saiu com um `overrides` no `.oxlintrc.json`) |
 | Bundle | app 397 kB (123 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
 | CSS | 31,3 kB (6,6 kB gzip) — zero classe órfã (conferido por script) |
-| Código | ~8.700 linhas de JS/JSX em `src/` |
+| Código | ~8.800 linhas de JS/JSX em `src/` |
 | Maiores arquivos | `App.jsx` (557), `balancete.js` (517), `cpc51.js` (455), `fiscal.js` (434) |
 | Contexto por sessão | `CLAUDE.md` 402 linhas / 22 kB (era 969 / 55 kB); `EVOLUCAO.md` 346 (era 890) |
 | Abas | 11 (eram 10; a Apuração entrou em 24/08/2026) |
@@ -76,6 +76,61 @@ arquitetura, armadilhas e um índice "quero mudar X → leia Y"; o detalhe
 de cada assunto mora num arquivo lido sob demanda.
 
 ## Registro
+
+### 24/08/2026 (2ª sessão) — a conferência contra cinco balancetes reais
+
+Denner mandou os balancetes de fevereiro a junho e pediu para conferir
+antes de publicar. Foi a primeira vez que o caminho novo (balancete como
+fonte única + bloco fiscal) rodou contra arquivo de verdade.
+
+**O que passou.** Os cinco arquivos foram lidos pela aba certa, com o
+período que cada um declara. Nenhuma linha inconsistente, nenhuma
+sintética que não soma as filhas, patrimonial e resultado apurando o mesmo
+número nos cinco meses. A prova de integridade fecha em todos: nada de
+valor caiu em `IGNORAR`. E, o teste mais forte que dá para fazer sem a DRE
+oficial, **o lucro líquido da DRE montada bate exatamente com o resultado
+que as contas 1 e 2 do próprio balancete implicam**, mês a mês.
+
+As contas sem movimento apareceram e se comportaram: todas com destino
+definido, nenhuma de natureza credora caindo em grupo de despesa, e a
+classificação das contas COM movimento **idêntica** com e sem elas nos
+cinco meses. Os dois defeitos silenciosos corrigidos na sessão anterior
+estão, portanto, confirmados contra arquivo real, não só contra teste
+sintético.
+
+**O que não passou — e o que mudou por causa disso.** O bloco fiscal
+acusava divergência de PIS/COFINS em todos os meses, com o recalculado
+perto de três vezes o lançado. Investigando: o De-Para de tributos acertou
+os três (PIS, COFINS e ISS têm conta própria), e o lançado corresponde a
+**exatamente** 0,65% e 3,00% de uma mesma base — ou seja, a contabilidade
+está internamente coerente e no regime certo. O que não bate é a BASE: a
+que o app deduzia da DRE ficava muito acima da usada, e a distância
+**variou de mês para mês**, o que exclui até a hipótese de um percentual
+fixo de isenção.
+
+Não era divergência: era o app afirmando uma base que ele chutou. A base
+de PIS/COFINS virou **campo**, com a estimativa da DRE mostrada ao lado
+como referência; enquanto ninguém informa, `pisCofins.confiavel` é falso e
+o placar diz "Incompleto — base de PIS/COFINS a informar", nunca "Diverge".
+O aviso vai junto no Excel, que circula sozinho. É a mesma doutrina do
+`[__________]` da nota de MPDA, aplicada onde ela estava faltando.
+
+**Uma corrida achada ao carregar os cinco de uma vez.** `EtapaImportar`
+dispara uma importação assíncrona por arquivo, e cada uma tomava o foco ao
+terminar: quem lesse por último ganhava. A tela abria num mês qualquer do
+meio, diferente a cada carga, sem nada explicando. Agora o foco só muda
+para período igual ou mais recente que o em foco — cinco arquivos ou um, o
+mês mais novo fica na tela.
+
+**Medido:** 256 testes (13 arquivos), lint limpo, build fecha. Cinco
+balancetes reais lidos pelo pipeline do app; app dirigido em Chromium com
+os cinco carregados — onze abas renderizam, sem erro de página, sem
+rolagem horizontal.
+
+**O que continua sem rodar:** `fixtures/validar.mjs`. Ele precisa da DRE
+oficial para comparar, e só os balancetes foram enviados. O que dava para
+conferir sem ela foi conferido e está acima; a comparação centavo a
+centavo contra a DRE oficial continua pendente.
 
 ### 24/08/2026 — o razão sai, as zeradas entram, o fiscal nasce
 
@@ -339,11 +394,20 @@ com as contas recolhidas debaixo de cada um, todas com `hidden` e
 
 ## Próximos passos, na ordem que eu priorizaria
 
-0. **RODAR `node fixtures/validar.mjs`** numa máquina com os arquivos
-   reais, antes de publicar. Ele foi reescrito nesta sessão e nunca
-   executado, e as mudanças em `classify.js` (natureza de conta zerada,
-   maioria por prefixo) mexem exatamente no que ele valida centavo a
-   centavo. Se ele acusar diferença, é regressão até prova em contrário.
+0. **RODAR `node fixtures/validar.mjs`** com a **DRE oficial** em
+   `fixtures/`. Os cinco balancetes de fev–jun/2026 já passaram pelo
+   pipeline (ver o registro de 24/08, 2ª sessão) e o que dava para
+   conferir sem a DRE oficial fechou — inclusive o lucro líquido contra o
+   resultado implícito nas contas 1 e 2. Falta a comparação centavo a
+   centavo grupo a grupo, que exige a planilha da DRE oficial; sem ela o
+   script para com `exit 2`, de propósito.
+0b. **Descobrir a base de PIS/COFINS da apuração.** É pergunta para o
+   Denner, não para o código: a base lançada é muito menor que a receita
+   bruta líquida de devoluções e descontos, e a proporção muda todo mês
+   (regime de caixa? isenção de entidade beneficente? exclusão específica
+   de receita?). Hoje o app pede a base na tela e se recusa a chamar a
+   diferença de divergência. Se a regra for derivável do balancete, ela
+   vira cálculo; se não for, o campo é a resposta certa e fica como está.
 1. **Editor de perfil de plano a partir do De-Para.** Agora que a tela
    mostra origem → destino → origem da decisão conta a conta, gerar o
    arquivo de perfil de plano a partir dessas decisões é um botão e uma

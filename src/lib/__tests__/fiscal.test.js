@@ -119,6 +119,54 @@ describe("apuração de PIS/COFINS", () => {
     expect(a.divergencia).toBeCloseTo(a.devido - 219000, 2);
   });
 
+  it("sem base informada, o app calcula mas NÃO afirma divergência", () => {
+    // A estimativa da DRE não é a base da apuração: ela não conhece
+    // regime de caixa nem isenção de receita. Nos balancetes reais a
+    // diferença chegou a três vezes, e variou mês a mês — o que exclui
+    // até a hipótese de um percentual fixo de isenção.
+    const a = apurarPisCofins({ dre: DRE, params: params(), linhasTributo: linhas });
+    expect(a.informada).toBe(false);
+    expect(a.baseInformada).toBe(null);
+    expect(a.baseEstimada).toBeCloseTo(1120000, 2);
+    expect(a.base).toBeCloseTo(1120000, 2);
+    // Calcula tudo — só não se declara confiável.
+    expect(a.devido).toBeGreaterThan(0);
+    expect(a.confiavel).toBe(false);
+  });
+
+  it("a base informada substitui a estimativa e libera o confronto", () => {
+    const a = apurarPisCofins({
+      dre: DRE, params: params(), linhasTributo: linhas, baseInformada: 400000,
+    });
+    expect(a.informada).toBe(true);
+    expect(a.base).toBeCloseTo(400000, 2);
+    expect(a.baseEstimada).toBeCloseTo(1120000, 2);
+    expect(a.pisDevido).toBeCloseTo(400000 * 0.0065, 2);
+    expect(a.confiavel).toBe(true);
+    // A memória guarda as duas, para quem confere ver de onde veio a conta.
+    const rotulos = a.memoria.map((l) => l.rotulo);
+    expect(rotulos.some((r) => /Base estimada pela DRE/.test(r))).toBe(true);
+    expect(rotulos.some((r) => /Base informada/.test(r))).toBe(true);
+  });
+
+  it("base zero ou negativa não conta como informada", () => {
+    for (const v of [0, -1, null, undefined, NaN]) {
+      const a = apurarPisCofins({ dre: DRE, params: params(), linhasTributo: linhas, baseInformada: v });
+      expect(a.informada).toBe(false);
+      expect(a.base).toBeCloseTo(1120000, 2);
+    }
+  });
+
+  it("base informada não salva o confronto se houver tributo sem classificar", () => {
+    const semNome = deParaTributos(
+      montarDRE([conta("3210599", -10000, "IMPOSTOS DIVERSOS")], () => "DED_IMPOSTOS"), {}
+    );
+    const a = apurarPisCofins({
+      dre: DRE, params: params(), linhasTributo: semNome, baseInformada: 400000,
+    });
+    expect(a.confiavel).toBe(false);
+  });
+
   it("com conta de tributo sem classificar, o confronto não é confiável", () => {
     const semNome = deParaTributos(
       montarDRE([conta("3210599", -10000, "IMPOSTOS DIVERSOS")], () => "DED_IMPOSTOS"), {}
@@ -288,6 +336,28 @@ describe("o placar não diz 'confere' quando ainda há julgamento pendente", () 
     expect(r.confere).toBe(false);
   });
 
+  it("mas 'confere' continua alcançável: base informada, sem pendência e sem diferença", () => {
+    // Sem este teste, apertar a régua da confiabilidade poderia deixar o
+    // placar preso em "Incompleto" para sempre, e ninguém veria.
+    const linhas = deParaTributos(DRE, {});
+    const pc = apurarPisCofins({ dre: DRE, params: params(), linhasTributo: linhas });
+    // A base que faz o recalculado bater exatamente com o contabilizado.
+    const exata = pc.contabilizado / (0.0065 + 0.03);
+    const pcOk = apurarPisCofins({
+      dre: DRE, params: params(), linhasTributo: linhas, baseInformada: exata,
+    });
+    const lOk = apurarLalur({
+      dre: DRE, params: params(), ajustes: [],
+      prejuizo: { fiscal: 0, baseNegativa: 0 },
+    });
+    const r = resumoFiscal(pcOk, { ...lOk, divergencia: 0 });
+    expect(pcOk.confiavel).toBe(true);
+    expect(Math.abs(pcOk.divergencia)).toBeLessThan(0.01);
+    expect(r.divergePis).toBe(false);
+    expect(r.pendencias).toBe(0);
+    expect(r.confere).toBe(true);
+  });
+
   it("a proporção estimada do PROUNI conta como pendência", () => {
     const p = params({ prouni: { aderente: true } });
     const pc = apurarPisCofins({ dre: DRE, params: p, linhasTributo: deParaTributos(DRE, {}) });
@@ -344,6 +414,15 @@ describe("o Excel da apuração", () => {
   it("acusa no Resumo quando há ajuste do LALUR pendente", async () => {
     const wb = await montar({ ajustes: ajustesEfetivos(DRE, []) });
     expect(textoDe(wb.getWorksheet("Resumo"))).toMatch(/ainda não confirmados/i);
+  });
+
+  it("avisa, na planilha, que a base de PIS/COFINS não foi informada", async () => {
+    // A planilha circula sozinha. Sem esta linha, a diferença ali dentro
+    // passa por divergência apurada quando é só a estimativa da DRE.
+    const wb = await montar();
+    const t = textoDe(wb.getWorksheet("Resumo"));
+    expect(t).toMatch(/base de PIS\/COFINS não foi informada/i);
+    expect(t).toMatch(/NÃO é uma divergência apurada/i);
   });
 
   it("o ajuste não confirmado sai marcado, não escondido", async () => {

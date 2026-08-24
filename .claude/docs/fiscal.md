@@ -21,7 +21,7 @@ circula sozinha: guia, saldo a compensar, período de recolhimento e
 obrigação acessória continuam sendo do sistema fiscal. Um arquivo que
 parece apuração oficial e não é seria pior que arquivo nenhum.
 
-## Seis decisões que não devem ser desfeitas
+## Sete decisões que não devem ser desfeitas
 
 1. **Nada aqui decide para onde uma conta vai.** A resolução continua em
    `classify.js` e `cpc51.js`; `fiscal.js` lê a DRE pronta. Uma terceira
@@ -39,7 +39,24 @@ parece apuração oficial e não é seria pior que arquivo nenhum.
    de cada uma. Enquanto houver ajuste pendente, `lalur.confiavel` é
    falso e a tela diz que a apuração está incompleta.
 
-4. **`DED_IMPOSTOS` mistura PIS, COFINS e ISS numa linha só.** Confrontar
+4. **A base de PIS/COFINS é um CAMPO, não uma conclusão.** O app deduz
+   uma estimativa da DRE (receita bruta − devoluções − descontos) e a
+   mostra, mas enquanto ninguém digitar a base da apuração ele **se recusa
+   a chamar a diferença de divergência** (`pisCofins.confiavel` é falso).
+
+   Isso saiu de conferência contra balancetes reais: a base efetivamente
+   usada ficou muito abaixo da estimativa em todos os meses, e a distância
+   **variou de um mês para outro** — o que exclui até a hipótese de um
+   percentual fixo de isenção. A estimativa não conhece regime de caixa,
+   isenção de entidade beneficente nem exclusão específica de receita. Um
+   "diverge R$ X" calculado sobre uma base que o próprio app chutou é a
+   afirmação que este bloco existe para não fazer.
+
+   A base é **valor** de uma empresa identificada: fica na sessão
+   (IndexedDB), sai no "Limpar tudo" e **não entra no perfil** — mesma
+   regra do prejuízo fiscal.
+
+5. **`DED_IMPOSTOS` mistura PIS, COFINS e ISS numa linha só.** Confrontar
    o grupo inteiro com PIS + COFINS daria divergência sempre, com o ISS
    escondido lá dentro. O bloco traz um **De-Para curto de tributos**,
    sugerido pelo nome da conta, corrigível, com a coluna de origem da
@@ -53,16 +70,17 @@ parece apuração oficial e não é seria pior que arquivo nenhum.
    genérica virava ISS e o valor saía do confronto sem ninguém ver. O
    nome do tributo, ou nada.
 
-5. **Bolsas e PROUNI não são exclusão de base.** Devoluções e descontos
+6. **Bolsas e PROUNI não são exclusão de base.** Devoluções e descontos
    incondicionais são: aquela receita não existiu. Bolsas e PROUNI
    definem a **proporção isenta** da receita da mantida — tratá-las como
    exclusão reduziria a base duas vezes. E a isenção reduz o **devido**,
    não a base, do lado do IRPJ/CSLL.
 
-6. **Valor não entra em perfil.** `params` (regime, alíquotas, adesão ao
+7. **Valor não entra em perfil.** `params` (regime, alíquotas, adesão ao
    PROUNI, periodicidade) e `mapaTributos` são **decisão** e viajam no
-   perfil, que continua podendo ser versionado no Git. **Prejuízo fiscal
-   e base negativa de CSLL são valores** de uma empresa identificada:
+   perfil, que continua podendo ser versionado no Git. **Prejuízo fiscal,
+   base negativa de CSLL e a base de PIS/COFINS são valores** de uma
+   empresa identificada:
    ficam só na sessão em IndexedDB e saem no "Limpar tudo". Há teste
    provando que eles não aparecem no JSON do perfil.
 
@@ -70,7 +88,7 @@ parece apuração oficial e não é seria pior que arquivo nenhum.
 
 | Peça | Regra |
 |---|---|
-| Base de PIS/COFINS | receita bruta − devoluções − descontos incondicionais |
+| Base de PIS/COFINS | **informada por quem confere**; na falta, estimada como receita bruta − devoluções − descontos incondicionais, e o confronto não vale |
 | Cumulativo | PIS 0,65% · COFINS 3% |
 | Não cumulativo | PIS 1,65% · COFINS 7,6% — **os créditos NÃO são calculados aqui** |
 | Lucro real | lucro antes do IR + adições − exclusões − compensação |
@@ -96,6 +114,8 @@ guardar isso e não deve fingir que tem.
 - Não tem LALUR Parte B (controle de diferenças temporárias no tempo).
 - Não gera guia, não controla saldo a recolher nem obrigação acessória.
 - Não sabe a proporção oficial do PROUNI — ela vem do termo de adesão.
+- Não sabe a base de PIS/COFINS da apuração — regime de caixa e isenção de
+  receita não estão no balancete.
 
 ## Arquivos
 
@@ -105,4 +125,4 @@ guardar isso e não deve fingir que tem.
 | `hooks/useFiscal.js` | o estado: parâmetros, ajustes, prejuízo, sessão |
 | `components/EtapaFiscal.jsx` | a tela, em três blocos |
 | `lib/exportacaoFiscal.js` | o Excel de cinco abas |
-| `lib/__tests__/fiscal.test.js` | 37 testes, inclusive sobre o arquivo gerado |
+| `lib/__tests__/fiscal.test.js` | 43 testes, inclusive sobre o arquivo gerado |

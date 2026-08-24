@@ -13,9 +13,10 @@ import {
  *   alíquotas, adesão ao PROUNI, qual conta é PIS e qual é COFINS). Vão
  *   para o perfil, que é compartilhável justamente por não carregar
  *   número de ninguém.
- * - `prejuizo` são VALORES — saldo de prejuízo fiscal e de base negativa
- *   de CSLL de uma empresa identificada. Ficam só na sessão (IndexedDB) e
- *   saem no "Limpar tudo". O perfil continua podendo ser versionado.
+ * - `prejuizo` e `basePisCofins` são VALORES — saldo de prejuízo fiscal,
+ *   base negativa de CSLL e a base de PIS/COFINS de uma empresa
+ *   identificada. Ficam só na sessão (IndexedDB) e saem no "Limpar tudo".
+ *   O perfil continua podendo ser versionado.
  * - `ajustes` ficam na sessão também: cada um carrega um valor.
  */
 export function useFiscal({ dre, nomesEfetivos }) {
@@ -23,6 +24,9 @@ export function useFiscal({ dre, nomesEfetivos }) {
   const [mapaTributos, setMapaTributos] = useState({});
   const [ajustesManuais, setAjustesManuais] = useState([]);
   const [prejuizo, setPrejuizo] = useState({ fiscal: 0, baseNegativa: 0 });
+  /* A base de PIS/COFINS efetivamente apurada. `null` = ninguém informou,
+     e aí o app usa a estimativa da DRE mas NÃO afirma divergência. */
+  const [basePisCofins, setBasePisCofins] = useState(null);
 
   const linhasTributo = useMemo(
     () => deParaTributos(dre, { mapaTributos, nomes: nomesEfetivos }),
@@ -32,8 +36,8 @@ export function useFiscal({ dre, nomesEfetivos }) {
   const ajustes = useMemo(() => ajustesEfetivos(dre, ajustesManuais), [dre, ajustesManuais]);
 
   const pisCofins = useMemo(
-    () => apurarPisCofins({ dre, params, linhasTributo }),
-    [dre, params, linhasTributo]
+    () => apurarPisCofins({ dre, params, linhasTributo, baseInformada: basePisCofins }),
+    [dre, params, linhasTributo, basePisCofins]
   );
 
   const lalur = useMemo(
@@ -80,24 +84,30 @@ export function useFiscal({ dre, nomesEfetivos }) {
 
   const sessao = {
     // `prejuizo` está aqui e NÃO em `paraPerfil`: é valor de cliente.
-    dados: { paramsFiscais: params, mapaTributos, ajustesFiscais: ajustesManuais, prejuizoFiscal: prejuizo },
+    dados: {
+      paramsFiscais: params, mapaTributos, ajustesFiscais: ajustesManuais,
+      prejuizoFiscal: prejuizo, basePisCofins,
+    },
     vazio: false,
     restaurar: (s) => {
       setParams({ ...PARAMS_FISCAIS_PADRAO, ...s.paramsFiscais });
       setMapaTributos(s.mapaTributos || {});
       setAjustesManuais(s.ajustesFiscais || []);
       setPrejuizo({ fiscal: 0, baseNegativa: 0, ...s.prejuizoFiscal });
+      setBasePisCofins(s.basePisCofins ?? null);
     },
     limpar: () => {
       setParams(PARAMS_FISCAIS_PADRAO);
       setMapaTributos({});
       setAjustesManuais([]);
       setPrejuizo({ fiscal: 0, baseNegativa: 0 });
+      setBasePisCofins(null);
     },
   };
 
   return {
     params, setParams, mapaTributos, prejuizo, setPrejuizo,
+    basePisCofins, setBasePisCofins,
     linhasTributo, ajustes, pisCofins, lalur, resumo,
     definirTributo, alterarAjuste, acrescentarAjuste, removerAjuste,
     aplicarPerfil,

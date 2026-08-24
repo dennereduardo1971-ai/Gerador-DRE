@@ -87,6 +87,21 @@ export const PARAMS_FISCAIS_PADRAO = {
   prouni: { aderente: false },
 };
 
+/* A base de PIS/COFINS que o app deduz da DRE — receita bruta menos
+ * devoluções e descontos — é uma ESTIMATIVA, e nos balancetes reais ela
+ * ficou muito acima da base efetivamente usada pela contabilidade.
+ *
+ * Ela não tem como conhecer regime de caixa, isenção de entidade
+ * beneficente nem exclusão específica de receita, e a diferença NÃO é um
+ * percentual fixo: nos cinco meses conferidos ela variou mês a mês, o que
+ * exclui a hipótese de uma proporção de isenção constante.
+ *
+ * Por isso a base é um CAMPO, e não uma conclusão. Enquanto ninguém a
+ * informar, o app mostra a estimativa e se recusa a chamar a diferença de
+ * divergência — dizer "diverge R$ X" a partir de uma base que ele mesmo
+ * chutou é exatamente o tipo de afirmação que este bloco não faz. */
+export const baseFoiInformada = (v) => Number.isFinite(v) && v > 0;
+
 /** Os parâmetros com as alíquotas de PIS/COFINS do regime escolhido, a
  *  menos que alguém as tenha editado à mão. */
 export function comAliquotasDoRegime(params) {
@@ -189,12 +204,14 @@ export function proporcaoProuni(dre, params) {
  *  já separa: devoluções e descontos incondicionais. Bolsas e PROUNI NÃO
  *  são exclusão de base — são o que define a proporção isenta, e tratá-las
  *  como exclusão reduziria a base duas vezes. */
-export function apurarPisCofins({ dre, params, linhasTributo = [] }) {
+export function apurarPisCofins({ dre, params, linhasTributo = [], baseInformada = null }) {
   const p = comAliquotasDoRegime(params);
   const bruta = dre.receitaBruta || 0;
   const devolucoes = dre.bal?.DED_DEVOLUCOES?.total || 0;
   const descontos = dre.bal?.DED_DESCONTOS?.total || 0;
-  const base = bruta - devolucoes - descontos;
+  const baseEstimada = bruta - devolucoes - descontos;
+  const informada = baseFoiInformada(baseInformada);
+  const base = informada ? baseInformada : baseEstimada;
 
   const prouni = proporcaoProuni(dre, p);
   const baseIsenta = base * prouni.proporcao;
@@ -212,7 +229,23 @@ export function apurarPisCofins({ dre, params, linhasTributo = [] }) {
       { rotulo: "Receita bruta de serviços", valor: bruta, origem: "DRE — Mensalidades + Taxas" },
       { rotulo: "( – ) Mensalidades devolvidas", valor: -devolucoes, origem: "DRE — grupo Devoluções" },
       { rotulo: "( – ) Descontos incondicionais", valor: -descontos, origem: "DRE — grupo Descontos" },
-      { rotulo: "( = ) Base de cálculo", valor: base, subtotal: true },
+      ...(informada
+        ? [
+            { rotulo: "( = ) Base estimada pela DRE", valor: baseEstimada, subtotal: true },
+            {
+              rotulo: "( = ) Base informada por quem confere",
+              valor: base,
+              subtotal: true,
+              origem: "digitada nesta tela — é ela que entra na conta",
+            },
+          ]
+        : [{
+            rotulo: "( = ) Base estimada pela DRE",
+            valor: base,
+            subtotal: true,
+            origem: "ESTIMATIVA — o app não conhece regime de caixa nem isenção de receita. Informe a base da apuração acima.",
+            confirmar: true,
+          }]),
       ...(prouni.proporcao > 0
         ? [{
             rotulo: `( – ) Parcela isenta por adesão ao PROUNI (${(prouni.proporcao * 100).toFixed(2).replace(".", ",")}%)`,
@@ -226,7 +259,8 @@ export function apurarPisCofins({ dre, params, linhasTributo = [] }) {
       { rotulo: `COFINS (${pct(p.aliquotas.cofins)})`, valor: cofinsDevido },
       { rotulo: "( = ) Total devido no período", valor: devido, subtotal: true },
     ],
-    base, baseIsenta, baseTributavel, prouni,
+    base, baseEstimada, baseInformada: informada ? base : null, informada,
+    baseIsenta, baseTributavel, prouni,
     pisDevido, cofinsDevido, devido,
     contabilizado,
     contabilizadoPis: contab.PIS,
@@ -234,11 +268,16 @@ export function apurarPisCofins({ dre, params, linhasTributo = [] }) {
     iss: contab.ISS,
     indefinido: contab.indefinido,
     divergencia: devido - contabilizado,
-    // Com conta de tributo ainda sem classificar, o confronto não vale:
-    // o valor indefinido pode ser PIS, COFINS ou ISS, e cada hipótese dá
-    // uma divergência diferente. Melhor dizer que não dá do que dar um
-    // número que parece resposta.
-    confiavel: contab.indefinido < 0.005,
+    // Duas condições, e as duas pelo mesmo motivo: o confronto só vale
+    // quando os dois lados são fato.
+    //
+    // - Conta de tributo sem classificar: o valor indefinido pode ser PIS,
+    //   COFINS ou ISS, e cada hipótese dá uma divergência diferente.
+    // - Base não informada: a estimativa da DRE não é a base da apuração,
+    //   e nos arquivos reais a diferença chegou a três vezes.
+    //
+    // Melhor dizer que não dá do que dar um número que parece resposta.
+    confiavel: contab.indefinido < 0.005 && informada,
   };
 }
 
