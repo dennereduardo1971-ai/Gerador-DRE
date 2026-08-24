@@ -11,6 +11,11 @@ export function EtapaClassificar({
   avisoPerfil, onAvisoPerfil, onSalvarPerfil, onAplicarPerfil, onAplicarPlano, planoAtivo,
 }) {
   const [buscaLocal, setBuscaLocal] = useState(busca);
+  /* Ligado por padrão: a conta sem movimento está na tela justamente
+     para ser parametrizada antes de ter saldo. O desligar existe para
+     quem só quer conferir o mês que fechou. */
+  const [mostrarZeradas, setMostrarZeradas] = useState(true);
+  const semMovimento = contasResultado.filter((c) => c.semMovimento).length;
   const planoRef = useRef(null);
   const perfilRef = useRef(null);
 
@@ -120,14 +125,24 @@ export function EtapaClassificar({
       <div className="card">
         <h2>Contas de resultado</h2>
         <p className="hint">
-          {contasResultado.length} contas de resultado. O que ficar em "Não entra na DRE" é
-          ignorado no cálculo.
+          {contasResultado.length} contas de resultado
+          {semMovimento > 0 && <> · <b>{semMovimento}</b> sem movimento no período</>}. O que
+          ficar em "Não entra na DRE" é ignorado no cálculo.
         </p>
         <div className="filters">
           <div>
             <label>Buscar conta</label>
             <input type="text" value={buscaLocal} placeholder="Código ou histórico"
               onChange={(e) => { setBuscaLocal(e.target.value); onBusca(e.target.value); }} />
+          </div>
+          <div>
+            <label>Contas sem movimento</label>
+            <label className="linha-check">
+              <input type="checkbox" checked={mostrarZeradas}
+                aria-label="Mostrar as contas sem movimento no período"
+                onChange={(e) => setMostrarZeradas(e.target.checked)} />
+              <span>Mostrar as {semMovimento} zeradas</span>
+            </label>
           </div>
           <div>
             <label>Nomes das contas</label>
@@ -160,12 +175,14 @@ export function EtapaClassificar({
             </thead>
             <tbody>
               {contasResultado
+                .filter((c) => mostrarZeradas || !c.semMovimento)
                 .filter((c) => !busca || (c.conta + " " + c.historico + " " + (nomes[c.conta] || "")).toLowerCase().includes(busca.toLowerCase()))
                 .map((c) => (
-                  <tr key={c.conta}>
+                  <tr key={c.conta} data-zerada={c.semMovimento ? "1" : "0"}>
                     <td className="code" data-rotulo="Conta">{c.conta}</td>
                     <td className="desc" data-rotulo="Descrição">
-                      {(c.historico.trim().split(",")[0] || "").slice(0, 38)}
+                      {(nomes[c.conta] || c.historico.trim().split(",")[0] || "").slice(0, 38)}
+                      {c.semMovimento && <span className="selo-zerada">sem movimento</span>}
                     </td>
                     <td className={"num destaque " + (c.saldo < 0 ? "neg" : "")} data-rotulo="Saldo">{brl(c.saldo)}</td>
                     <td data-rotulo="">

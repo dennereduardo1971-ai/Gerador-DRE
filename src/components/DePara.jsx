@@ -115,9 +115,22 @@ export function DePara({
           <div className="sub">{brl(resumo.valorSemGrupo)} que não entram em demonstração
             nenhuma. Confira se é mesmo o caso.</div>
         </div>
+        {/* A conta sem movimento é trabalho de CADASTRO, não risco na
+            demonstração: ela não move número nenhum. Sem este selo, o dia
+            em que o balancete passa a ser emitido com as zeradas parece
+            uma regressão no placar — dezenas de "pendentes" novas que na
+            verdade são contas a parametrizar antes de terem saldo. */}
+        {resumo.semMovimento > 0 && (
+          <div className="check">
+            <div className="k">Sem movimento no período</div>
+            <div className="v">{resumo.semMovimento}</div>
+            <div className="sub">{resumo.pendenteSemMovimento} delas ainda sem destino definido.
+              Não movem valor nenhum — são cadastro adiantado.</div>
+          </div>
+        )}
       </div>
 
-      {resumo.semGrupo > 0 && (
+      {resumo.valorSemGrupo > 0.005 && (
         <div className="warn">
           <b>{resumo.semGrupo} conta(s) de resultado estão em "Não entra na DRE"</b>, somando{" "}
           {brl(resumo.valorSemGrupo)}. Isso é legítimo quando são contas de encerramento ou de
@@ -188,10 +201,12 @@ export function DePara({
               </thead>
               <tbody>
                 {mostradas.map((l) => (
-                  <tr key={l.conta} data-pendente={l.pendente ? "1" : "0"}>
+                  <tr key={l.conta} data-pendente={l.pendente ? "1" : "0"}
+                    data-zerada={l.semMovimento ? "1" : "0"}>
                     <td className="code" data-rotulo="Conta">{l.conta}</td>
                     <td className="desc" data-rotulo="Descrição">
                       {l.descricao}
+                      {l.semMovimento && <span className="selo-zerada">sem movimento</span>}
                       {l.revisar && <span className="dp-motivo">{l.revisar}</span>}
                     </td>
                     <td className={"num destaque " + (l.saldo < 0 ? "neg" : "")} data-rotulo="Saldo">

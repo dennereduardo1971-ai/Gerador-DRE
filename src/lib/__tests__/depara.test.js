@@ -239,3 +239,72 @@ describe("o resumo por grupo do Excel abre nas contas que o formam", () => {
     fechar();
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * Contas sem movimento no período.
+ * ------------------------------------------------------------------ */
+const semMovimento = (codigo, historico) => ({
+  conta: codigo, saldo: 0, deb: 0, cre: 0, historico, semMovimento: true, natureza: 1,
+});
+
+describe("o De-Para leva as contas sem movimento, marcadas", () => {
+  const contas = [
+    { conta: "3110101", saldo: 10000, deb: 0, cre: 10000, historico: "MENSALIDADE" },
+    semMovimento("3110109", "POS-GRADUACAO"),
+    { conta: "4120101", saldo: -2500, deb: 2500, cre: 0, historico: "ALUGUEL" },
+  ];
+  const grupoDe = (c) => (c[0] === "3" ? "REC_MENSALIDADES" : "DESP_ADM");
+  const linhas = montarDePara(contas, { grupoDe, nomes: {} });
+
+  it("a linha da conta zerada carrega semMovimento", () => {
+    expect(linhas.find((l) => l.conta === "3110109").semMovimento).toBe(true);
+    expect(linhas.find((l) => l.conta === "3110101").semMovimento).toBe(false);
+  });
+
+  it("o placar separa a pendência de cadastro da pendência que custa dinheiro", () => {
+    const semGrupo = montarDePara(
+      [semMovimento("9990001", "CONTA NOVA"), { conta: "9990002", saldo: -500, deb: 500, cre: 0, historico: "X" }],
+      { grupoDe: () => "IGNORAR", nomes: {} }
+    );
+    const r = resumoDePara(semGrupo);
+    expect(r.semMovimento).toBe(1);
+    expect(r.pendenteSemMovimento).toBe(1);
+    // A que custa dinheiro é a outra: R$ 500 fora da demonstração.
+    expect(r.pendenteComMovimento).toBe(1);
+    expect(r.valorSemGrupo).toBeCloseTo(500, 2);
+  });
+
+  it("o filtro separa com e sem movimento", () => {
+    expect(filtrarDePara(linhas, { situacao: "sem-movimento" })).toHaveLength(1);
+    expect(filtrarDePara(linhas, { situacao: "com-movimento" })).toHaveLength(2);
+  });
+
+  it("o Excel traz a coluna, e o formato de moeda fica na coluna do Saldo", async () => {
+    /* O formato estava cravado na coluna 8. A coluna nova empurrou o
+       Saldo para a 9 e o formato caía sobre a célula de texto ao lado —
+       sem quebrar nada visivelmente. Ancorar em COLUNAS.length resolveu;
+       este teste é o que impede a próxima coluna de repetir isso. */
+    const wb = await montarWorkbookDePara(linhas, resumoDePara(linhas), porGrupo(linhas), {});
+    const ws = wb.getWorksheet("De-Para");
+    const cab = [];
+    ws.getRow(1).eachCell((c) => cab.push(c.value));
+    const iMovimento = cab.indexOf("Movimento no período") + 1;
+    const iSaldo = cab.indexOf("Saldo") + 1;
+    expect(iMovimento).toBeGreaterThan(0);
+    expect(iSaldo).toBe(cab.length);
+
+    const primeira = ws.getRow(2);
+    expect(["com movimento", "sem movimento"]).toContain(primeira.getCell(iMovimento).value);
+    // Saldo é NÚMERO com formato de moeda, não texto: o arquivo vira
+    // conferência por totais no Excel.
+    expect(typeof primeira.getCell(iSaldo).value).toBe("number");
+    expect(primeira.getCell(iSaldo).numFmt).toBeTruthy();
+    expect(primeira.getCell(iMovimento).numFmt).toBeFalsy();
+  });
+
+  it("o CSV também traz a coluna, e o saldo continua numérico", () => {
+    const csv = linhaCSV(linhas.find((l) => l.conta === "3110109"));
+    expect(csv).toContain('"sem movimento"');
+    expect(csv.endsWith('"0,00"')).toBe(true);
+  });
+});

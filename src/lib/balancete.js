@@ -372,7 +372,34 @@ export function contasDeMovimento(bal) {
     saldo: c.credito - c.debito,
     historico: c.descricao,
     n: 0, // o balancete não conta lançamentos: ele já vem somado
+    semMovimento: c.debito === 0 && c.credito === 0,
+    natureza: naturezaDaConta(c),
   }));
+}
+
+/** A natureza da conta pelo SALDO, não pelo movimento: +1 credora, −1
+ *  devedora, 0 quando não dá para saber.
+ *
+ *  Existe por causa das contas SEM MOVIMENTO no período. A natureza de
+ *  uma conta com movimento se lê do próprio movimento — receita é
+ *  credora, despesa é devedora. Numa conta zerada não há movimento que
+ *  leia, e o resto do app decidia por `saldo > 0`: zero caía no `else`,
+ *  ou seja, no ramo de DESPESA. Toda conta de receita sem movimento no
+ *  mês seria classificada como despesa em silêncio.
+ *
+ *  O desempate é o saldo que o balancete traz de qualquer jeito: o atual,
+ *  e na falta dele o anterior. `valorDC` devolve devedor positivo e
+ *  credor negativo, daí o sinal invertido aqui — a convenção do resto do
+ *  app é a oposta (credora positiva).
+ *
+ *  Quando saldo atual e anterior são os dois zero (conta nova, nunca
+ *  movimentada), devolve 0: não há o que deduzir, e afirmar uma natureza
+ *  aí seria inventar. Quem decide nesse caso é o plano de contas, pelo
+ *  código — ver `grupoPorPlano`. */
+export function naturezaDaConta(c) {
+  const saldo = c.atual || c.anterior || 0;
+  if (Math.abs(saldo) < 0.005) return 0;
+  return saldo > 0 ? -1 : 1;
 }
 
 /** Código → descrição de TODAS as contas do balancete, sintéticas

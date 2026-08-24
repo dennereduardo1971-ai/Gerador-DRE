@@ -31,3 +31,24 @@ export const GRUPOS = [
 export const NOME_GRUPO = Object.fromEntries(GRUPOS.map((g) => [g.id, g.nome]));
 
 export const SINAL_GRUPO = Object.fromEntries(GRUPOS.map((g) => [g.id, g.sinal || 1]));
+
+/** A conta é de natureza CREDORA (receita) ou devedora (despesa)?
+ *
+ *  Era `c.saldo > 0` espalhado por `classify.js` e `planoPerfil.js`, e o
+ *  problema estava no zero: saldo zero caía no ramo `else`, o de despesa.
+ *  Com o balancete emitido COM as contas sem movimento — que é o que se
+ *  quer, para parametrizar a conta antes de ela ter saldo —, toda conta
+ *  de receita zerada era classificada como despesa em silêncio.
+ *
+ *  O desempate é a natureza do SALDO que o balancete traz (`natureza`,
+ *  posta por `contasDeMovimento`). Quando nem isso existe — conta nova,
+ *  nunca movimentada — devolve `null`: não há o que deduzir, e quem
+ *  decide é o código da conta no plano. Chamador nenhum deve tratar
+ *  `null` como "despesa"; é para isso que ele não é `false`. */
+export function ehCredora(c) {
+  if (c.saldo > 0.005) return true;
+  if (c.saldo < -0.005) return false;
+  if (c.natureza > 0) return true;
+  if (c.natureza < 0) return false;
+  return null;
+}

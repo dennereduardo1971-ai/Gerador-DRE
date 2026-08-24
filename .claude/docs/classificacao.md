@@ -126,3 +126,51 @@ mapa não resolveu.
 Ao mexer aqui, os testes de `planoPerfil.test.js` cobrem a mecânica, mas
 **só `fixtures/validar.mjs` prova que o perfil do IESB continua certo.**
 
+
+## Contas sem movimento no período
+
+O balancete pode — e deve — ser emitido **com as contas zeradas**: é
+assim que uma conta fica parametrizada ANTES do primeiro mês em que ela
+tem saldo, que é justamente o que evita a surpresa depois. Elas não movem
+número nenhum da DRE, mas abriram dois defeitos reais na classificação.
+
+**1. A natureza não pode vir do sinal do saldo.** `classify.js` e
+`planoPerfil.js` decidiam por `saldo > 0 ? receita : despesa`. Saldo zero
+cai no `else` — o ramo de despesa. Com as zeradas no arquivo, toda conta
+de receita sem movimento no mês seria classificada como despesa em
+silêncio, e no fallback iria parar em `DESP_ADM` ou `DED_DESCONTOS`.
+
+O desempate é `ehCredora(c)` (em `grupos.js`), que lê nesta ordem:
+
+1. o **movimento** do período (`c.saldo`), quando existe;
+2. a **natureza do saldo** do balancete (`c.natureza`, posta por
+   `contasDeMovimento` a partir de `naturezaDaConta` — saldo atual, e na
+   falta dele o anterior);
+3. `null` quando nem isso existe (conta nova, nunca movimentada).
+
+**`null` não é `false`.** Nenhum ramo por sinal roda com `null`, e a
+regra `tipo: "sinal"` de um perfil de plano devolve `null` em vez de cair
+no lado negativo. Quem decide nesse caso é o **código da conta** no
+plano, que é fato e não depende de saldo. Se nem o código resolve, a
+conta vai para `IGNORAR` e a tela marca "a revisar" — a mesma doutrina do
+`[__________]` da nota de MPDA: **não se afirma o que não se sabe.**
+
+**2. Conta zerada afrouxa o fallback por maioria.** Ele decide por
+`contagem[prefixo] / n >= 0.5`. Contas sem movimento aumentam `n` sem
+aumentar `contagem`, então a maioria fica mais difícil de atingir e a
+classificação de contas que TÊM movimento muda — sem sinal nenhum na
+tela. Por isso `porPrefixo` e `contagem` contam só contas com movimento;
+as zeradas continuam sendo classificadas, só não votam numa estatística
+sobre as outras.
+
+Os dois pontos têm teste em `classify.test.js`, inclusive o de que a
+classificação das contas com movimento é **idêntica** com e sem vinte
+contas zeradas na lista.
+
+**Na tela**, as zeradas aparecem em Classificar e no De-Para (com selo
+âmbar `sem movimento` e filtro para escondê-las), e o placar do De-Para
+separa `pendenteSemMovimento` de `pendenteComMovimento` — a primeira é
+cadastro adiantado, a segunda é valor fora da demonstração. Na DRE nada
+muda: elas ordenam por último e a prova de integridade conta
+`nComMovimento`, senão a frase "das 800 contas, R$ X entraram" fica
+errada de um jeito difícil de perceber.

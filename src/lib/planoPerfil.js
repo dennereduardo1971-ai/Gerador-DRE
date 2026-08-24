@@ -81,7 +81,7 @@ export function padraoSeguro(padrao) {
   }
 }
 
-function aplicarRegra(regra, conta, nomes, saldo) {
+function aplicarRegra(regra, conta, nomes, credora) {
   if (regra.prefixo && conta.slice(0, regra.prefixo.length) !== regra.prefixo) return null;
   if (regra.tipo === "nome") {
     const alvo = (nomes[conta] || "").toUpperCase();
@@ -89,17 +89,28 @@ function aplicarRegra(regra, conta, nomes, saldo) {
     return new RegExp(regra.padrao, "i").test(alvo) ? regra.grupo : null;
   }
   if (regra.tipo === "sinal") {
-    return saldo > 0 ? regra.positivo : regra.negativo;
+    /* Sem natureza conhecida (conta nova, nunca movimentada) a regra de
+       sinal não decide nada — devolver `negativo` aqui era exatamente o
+       defeito que mandava receita zerada para o lado da despesa. Deixa
+       para o mapa por código, que é fato do plano e não depende de saldo. */
+    if (credora == null) return null;
+    return credora ? regra.positivo : regra.negativo;
   }
   return null;
 }
 
 /** Resolve o grupo de uma conta pelo perfil. Devolve null quando o perfil
- *  não reconhece o código — aí quem decide é o classificador por texto. */
-export function grupoPorPlano(plano, conta, nomes = {}, saldo = 0) {
+ *  não reconhece o código — aí quem decide é o classificador por texto.
+ *
+ *  `credora` é `true`/`false`/`null` (`ehCredora`, em grupos.js), não um
+ *  saldo: `null` significa "não dá para saber pela natureza", e é
+ *  diferente de "devedora". A assinatura antiga aceitava um número, e
+ *  continua aceita para não quebrar chamador nenhum. */
+export function grupoPorPlano(plano, conta, nomes = {}, credora = null) {
+  if (typeof credora === "number") credora = credora > 0.005 ? true : credora < -0.005 ? false : null;
   for (const r of plano.regras || []) {
     if (r.quando !== "depois") {
-      const g = aplicarRegra(r, conta, nomes, saldo);
+      const g = aplicarRegra(r, conta, nomes, credora);
       if (g) return g;
     }
   }
@@ -111,7 +122,7 @@ export function grupoPorPlano(plano, conta, nomes = {}, saldo = 0) {
   }
   for (const r of plano.regras || []) {
     if (r.quando === "depois") {
-      const g = aplicarRegra(r, conta, nomes, saldo);
+      const g = aplicarRegra(r, conta, nomes, credora);
       if (g) return g;
     }
   }

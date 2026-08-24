@@ -63,8 +63,8 @@ export function EtapaDRE({
             demonstração. */}
         <div className="prova" data-fecha={prova.fecha ? "1" : "0"}>
           <b>Prova de integridade.</b>{" "}
-          Das {prova.nContas} contas de resultado, {brl(prova.classificado)} entraram na
-          demonstração
+          Das {prova.nComMovimento ?? prova.nContas} contas de resultado com movimento no
+          período, {brl(prova.classificado)} entraram na demonstração
           {prova.nIgnoradas > 0 ? (
             <> e {brl(prova.ignorado)} ficaram de fora ({prova.nIgnoradas}{" "}
             {prova.nIgnoradas === 1 ? "conta" : "contas"} marcadas como ignorar)</>

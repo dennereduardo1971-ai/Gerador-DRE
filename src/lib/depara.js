@@ -48,6 +48,8 @@ export const SITUACOES = [
   { id: "revisar", nome: "Categoria a revisar" },
   { id: "manuais", nome: "Com decisão manual" },
   { id: "automaticas", nome: "Só no automático" },
+  { id: "com-movimento", nome: "Com movimento no período" },
+  { id: "sem-movimento", nome: "Sem movimento no período" },
 ];
 
 /** A tabela De-Para inteira, uma linha por conta de resultado.
@@ -76,6 +78,13 @@ export function montarDePara(contasResultado, {
         saldo: c.saldo,
         deb: c.deb || 0,
         cre: c.cre || 0,
+        /* Conta sem movimento no período. Ela está aqui de propósito: o
+           De-Para é cadastro, e cadastrar a conta ANTES do primeiro mês
+           em que ela tem saldo é justamente o que evita a surpresa
+           depois. Mas ela não é o mesmo tipo de pendência que uma conta
+           com dinheiro parado fora da DRE — por isso o placar separa as
+           duas, e a tela deixa esconder estas. */
+        semMovimento: !!c.semMovimento,
         grupo,
         grupoNome: NOME_GRUPO[grupo] || grupo,
         grupoManual,
@@ -111,16 +120,26 @@ export function resumoDePara(linhas) {
     resolvidas: 0,
     pendente: 0,
     completude: 0,
+    semMovimento: 0,
+    pendenteSemMovimento: 0,
   };
   linhas.forEach((l) => {
     if (l.grupoManual) r.manuaisGrupo++;
     if (l.categoriaManual) r.manuaisCategoria++;
-    if (l.semGrupo) { r.semGrupo++; r.valorSemGrupo += Math.abs(l.saldo); return; }
+    if (l.semMovimento) r.semMovimento++;
+    const contar = () => { if (l.semMovimento) r.pendenteSemMovimento++; };
+    if (l.semGrupo) { r.semGrupo++; r.valorSemGrupo += Math.abs(l.saldo); contar(); return; }
     r.comGrupo++;
-    if (l.revisar) { r.aRevisar++; r.valorARevisar += Math.abs(l.saldo); return; }
+    if (l.revisar) { r.aRevisar++; r.valorARevisar += Math.abs(l.saldo); contar(); return; }
     r.resolvidas++;
   });
   r.pendente = r.total - r.resolvidas;
+  /* A pendência que custa dinheiro é a da conta COM movimento: é ela que
+     está deixando valor fora da demonstração. A conta zerada pendente é
+     trabalho de cadastro, não risco na DRE — e é a que aparece em massa
+     no dia em que o balancete passa a ser emitido com as zeradas. Separar
+     as duas evita que o placar pareça uma regressão nesse dia. */
+  r.pendenteComMovimento = r.pendente - r.pendenteSemMovimento;
   r.completude = r.total ? r.resolvidas / r.total : 0;
   return r;
 }
@@ -165,6 +184,8 @@ export function filtrarDePara(linhas, { busca = "", grupo = "todos", categoria =
     if (situacao === "revisar" && !l.revisar) return false;
     if (situacao === "manuais" && !l.grupoManual && !l.categoriaManual) return false;
     if (situacao === "automaticas" && (l.grupoManual || l.categoriaManual)) return false;
+    if (situacao === "sem-movimento" && !l.semMovimento) return false;
+    if (situacao === "com-movimento" && l.semMovimento) return false;
     if (q && !(`${l.conta} ${l.descricao}`.toLowerCase().includes(q))) return false;
     return true;
   });

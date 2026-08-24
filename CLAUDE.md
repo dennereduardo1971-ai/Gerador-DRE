@@ -244,6 +244,16 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
   `['12/2025','01/2026'].sort()` inverte, e cada período passa a ser
   comparado com o "anterior" errado, sem sinal na tela. Por isso a chave
   de ordenação é `AAAAMMDD` (`identidadeDoPeriodo`).
+- **Natureza de conta zerada NÃO se decide por `saldo > 0`.** Movimento
+  zero cai no ramo `else` — o de despesa — e manda toda conta de receita
+  sem movimento para `DESP_ADM` em silêncio. Use `ehCredora()`
+  (`grupos.js`), que desempata pela natureza do saldo do balancete e
+  devolve `null` quando não há o que deduzir. **`null` não é "despesa".**
+  → `.claude/docs/classificacao.md`
+- **Conta zerada afrouxa estatística por maioria.** O fallback de
+  `sugerirClassificacao` decide por `contagem/n >= 0.5`; contas sem
+  movimento aumentam `n` sem aumentar `contagem`, e a classificação de
+  contas COM movimento muda sozinha. Só contas com movimento votam.
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença é o resultado do exercício, que vive nas contas 3 a 7. Nunca
   trate isso como erro de importação. → `.claude/docs/balancete.md`

@@ -897,6 +897,45 @@ input[type=checkbox] { accent-color: var(--marca); width: 16px; height: 16px; }
 .tag[data-s="auto"] { background: var(--marca-fraca); color: var(--marca); }
 .tag[data-s="edit"] { background: var(--atencao-fraca); color: var(--atencao); }
 
+/* ---------- contas sem movimento no período ----------
+   O balancete emitido com as contas zeradas é o que permite parametrizar
+   uma conta ANTES do primeiro mês em que ela tem saldo. Elas precisam ser
+   distinguíveis de relance sem virar alarme: âmbar (pendência), nunca
+   vermelho, que neste projeto pertence ao dado. A linha inteira recua um
+   pouco no contraste porque não há número para ler ali. */
+
+.selo-zerada {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--atencao-fraca);
+  color: var(--atencao);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+tr[data-zerada="1"] .code,
+tr[data-zerada="1"] .num { color: var(--tinta-2); }
+
+/* Caixa de opção com rótulo na mesma linha, dentro de `.filters`, onde
+   cada campo é uma coluna empilhada (label em cima, controle embaixo). */
+.linha-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  font-size: 13px;
+  color: var(--tinta-2);
+  cursor: pointer;
+}
+
+.linha-check input { margin: 0; }
+
 /* ---------- avisos ---------- */
 
 .warn, .ok, .err {

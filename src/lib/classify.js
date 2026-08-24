@@ -4,11 +4,11 @@
  * devoluções, descontos, PIS/COFINS/ISS, fopag, administrativas,
  * depreciação, provisões, financeiro e não operacional). */
 
-import { GRUPOS, SINAL_GRUPO } from "./grupos.js";
+import { GRUPOS, SINAL_GRUPO, ehCredora } from "./grupos.js";
 import { escolherPlano, grupoPorPlano } from "./planoPerfil.js";
 import { PLANOS_EMBUTIDOS } from "./planos/iesb.js";
 
-export { GRUPOS, NOME_GRUPO, SINAL_GRUPO } from "./grupos.js";
+export { GRUPOS, NOME_GRUPO, SINAL_GRUPO, ehCredora } from "./grupos.js";
 
 const PAT_MENSALIDADE = /MENSALIDADE|\bMENS\.?\b/i;
 const PAT_TAXA = /\bTAXA/i;
@@ -64,8 +64,16 @@ const PADROES = {
  * prefixo de 3 dígitos (o comportamento original, mais grosseiro mas que
  * não depende de nome nenhum — só do histórico dos lançamentos). */
 export function sugerirClassificacao(contas, nomes = {}, planos = PLANOS_EMBUTIDOS) {
+  /* O FALLBACK POR MAIORIA CONTA SÓ AS CONTAS COM MOVIMENTO.
+     Ele decide por `contagem[prefixo] / n >= 0.5`. Contas sem movimento
+     aumentam `n` sem aumentar `contagem` — ou seja, emitir o balancete
+     com as zeradas AFROUXA a maioria e pode mudar a classificação de
+     contas que têm movimento, sem nenhum sinal na tela. Elas continuam
+     sendo classificadas (o laço de baixo passa por todas); só não votam
+     numa estatística sobre as outras. Há teste travando isso. */
+  const comMovimento = contas.filter((c) => !c.semMovimento);
   const porPrefixo = {};
-  contas.forEach((c) => {
+  comMovimento.forEach((c) => {
     const p = c.conta.slice(0, 3);
     porPrefixo[p] = porPrefixo[p] || { saldo: 0, n: 0 };
     porPrefixo[p].saldo += c.saldo;
@@ -91,7 +99,7 @@ export function sugerirClassificacao(contas, nomes = {}, planos = PLANOS_EMBUTID
   // fallback por maioria do prefixo de 3 dígitos — igual ao comportamento
   // anterior, só entra em ação quando a conta em si não bate com nada
   const contagem = {};
-  contas.forEach((c) => {
+  comMovimento.forEach((c) => {
     const p = c.conta.slice(0, 3);
     contagem[p] = contagem[p] || {};
     const texto = textoDaConta(c);
@@ -110,18 +118,23 @@ export function sugerirClassificacao(contas, nomes = {}, planos = PLANOS_EMBUTID
     const p = c.conta.slice(0, 3);
     const texto = textoDaConta(c);
     const bate = (re) => re.test(texto);
-    let g = plano ? grupoPorPlano(plano, c.conta, nomes, c.saldo) : null;
+    /* A NATUREZA, e não o sinal do saldo. `ehCredora` devolve `null`
+       quando a conta não tem movimento nem saldo — conta nova, nunca
+       movimentada. Aí o código do plano é o único fato disponível, e
+       nenhum ramo por sinal roda: `null` NÃO é "despesa". */
+    const credora = ehCredora(c);
+    let g = plano ? grupoPorPlano(plano, c.conta, nomes, credora) : null;
     if (g) { mapa[c.conta] = g; return; }
 
     // decisão direta, conta por conta — a ordem importa: padrões mais
     // específicos (ex. IRPJ/CSLL) checados antes dos mais genéricos (ex.
     // provisão), porque "PROVISÃO DE IRPJ" bate nos dois.
-    if (c.saldo > 0) {
+    if (credora === true) {
       if (bate(PAT_MENSALIDADE)) g = "REC_MENSALIDADES";
       else if (bate(PAT_TAXA)) g = "REC_TAXAS";
       else if (bate(PAT_FIN)) g = "REC_FIN";
       else if (bate(PAT_NAO_OPER)) g = "OUTRAS_REC";
-    } else {
+    } else if (credora === false) {
       if (bate(PAT_BOLSA)) g = "DED_BOLSAS";
       else if (bate(PAT_PROUNI)) g = "DED_PROUNI";
       else if (bate(PAT_DEVOLU)) g = "DED_DEVOLUCOES";
@@ -135,11 +148,19 @@ export function sugerirClassificacao(contas, nomes = {}, planos = PLANOS_EMBUTID
       else if (bate(PAT_NAO_OPER)) g = "OUTRAS_DESP";
     }
 
+    /* Conta sem natureza que o plano não resolveu: fica em IGNORAR, e a
+       tela marca "a revisar". Não se chuta um grupo aqui — antes o
+       fallback mandava tudo o que não batia com nada para DESP_ADM, e
+       uma conta nova de receita entraria na DRE como despesa sem
+       ninguém ver. Não afirmar é a mesma doutrina do `[______]` da nota
+       de MPDA. */
+    if (!g && credora == null) { mapa[c.conta] = "IGNORAR"; return; }
+
     if (!g) {
-      const b = porPrefixo[p];
+      const b = porPrefixo[p] || { n: 0, saldo: 0 };
       const cnt = contagem[p] || {};
       const maioria = (k) => b.n > 0 && (cnt[k] || 0) / b.n >= 0.5;
-      if (c.saldo > 0) {
+      if (credora) {
         if (maioria("mens")) g = "REC_MENSALIDADES";
         else if (maioria("taxa")) g = "REC_TAXAS";
         else if (maioria("fin")) g = "REC_FIN";
@@ -236,17 +257,24 @@ export function montarDRE(contasResultado, grupoDe) {
  *  da DRE ou na pilha do que ficou de fora?". */
 export function provaIntegridade(contasResultado, grupoDe) {
   let total = 0, classificado = 0, ignorado = 0;
-  let nIgnoradas = 0;
+  let nIgnoradas = 0, nComMovimento = 0;
   contasResultado.forEach((c) => {
     const v = Math.abs(c.saldo);
     total += v;
-    if (grupoDe(c.conta) === "IGNORAR") { ignorado += v; nIgnoradas++; }
+    if (!c.semMovimento) nComMovimento++;
+    if (grupoDe(c.conta) === "IGNORAR") { ignorado += v; if (v > 0.005) nIgnoradas++; }
     else classificado += v;
   });
   const diferenca = total - (classificado + ignorado);
   return {
     total, classificado, ignorado, nIgnoradas,
     nContas: contasResultado.length,
+    /* A frase da tela conta as contas COM movimento. Com o balancete
+       emitido incluindo as zeradas, "das 800 contas de resultado, R$ X
+       entraram" fica errado de um jeito difícil de perceber: 500 delas
+       não tinham nada a entrar. Pelo mesmo motivo, uma conta zerada em
+       IGNORAR não conta como "ficou de fora" — não há valor de fora. */
+    nComMovimento,
     diferenca,
     fecha: Math.abs(diferenca) < 0.01,
   };

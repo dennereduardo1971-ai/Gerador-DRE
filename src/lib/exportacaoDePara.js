@@ -18,9 +18,14 @@ import {
   escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook, FORMATO_MOEDA,
 } from "./excelEstilo.js";
 
+/* "Movimento no período" é coluna de PRIMEIRA classe, não detalhe.
+   O arquivo vira parametrização de ERP, e a conta a cadastrar que ainda
+   não teve saldo é exatamente o que ele precisa levar — mas quem confere
+   o mês fechado precisa poder separar as duas de relance, sem cruzar com
+   a coluna de saldo. */
 const COLUNAS = [
   "Conta", "Descrição", "Grupo na DRE", "Origem do grupo",
-  "Categoria CPC 51", "Origem da categoria", "Situação", "Saldo",
+  "Categoria CPC 51", "Origem da categoria", "Situação", "Movimento no período", "Saldo",
 ];
 
 const nomeArquivo = (empresa, ext) =>
@@ -38,7 +43,8 @@ export function situacaoDaLinha(l) {
 
 const linhaMatriz = (l) => [
   l.conta, l.descricao, l.grupoNome, l.origemGrupo,
-  l.categoriaNome, l.origemCategoria, situacaoDaLinha(l), l.saldo,
+  l.categoriaNome, l.origemCategoria, situacaoDaLinha(l),
+  l.semMovimento ? "sem movimento" : "com movimento", l.saldo,
 ];
 
 /* NÚMERO GERADO POR NÓS NÃO PASSA PELO NEUTRALIZADOR DE FÓRMULA.
@@ -138,11 +144,16 @@ export async function montarWorkbookDePara(linhas, resumo, grupos, ctx = {}) {
   wb.created = new Date();
 
   const ws = wb.addWorksheet("De-Para");
-  definirLarguras(ws, [16, 48, 32, 15, 26, 18, 14, 16]);
+  definirLarguras(ws, [16, 48, 32, 15, 26, 18, 14, 20, 16]);
   const cabTabela = escreverCabecalhoTabela(ws, COLUNAS);
+  /* O Saldo é a ÚLTIMA coluna, e o formato de moeda se ancora nisso em
+     vez de num índice cravado. Uma coluna nova no meio já empurrou o
+     índice fixo uma vez: o formato caía sobre a célula de texto ao lado
+     e o saldo saía sem moeda, sem quebrar nada visivelmente. */
+  const COL_SALDO = COLUNAS.length;
   linhas.forEach((l) => {
     const row = ws.addRow(linhaMatriz(l));
-    row.getCell(8).numFmt = FORMATO_MOEDA;
+    row.getCell(COL_SALDO).numFmt = FORMATO_MOEDA;
   });
   aplicarZebra(ws, cabTabela.number + 1, ws.rowCount, COLUNAS.length);
   ws.autoFilter = { from: { row: cabTabela.number, column: 1 }, to: { row: ws.rowCount, column: COLUNAS.length } };
@@ -159,6 +170,7 @@ export async function montarWorkbookDePara(linhas, resumo, grupos, ctx = {}) {
     ["Categoria ainda a revisar", resumo.aRevisar],
     ["Decisões manuais de grupo", resumo.manuaisGrupo],
     ["Decisões manuais de categoria", resumo.manuaisCategoria],
+    ["Contas sem movimento no período", resumo.semMovimento || 0],
   ].forEach((l) => escreverMeta(wsRes, l));
   linhaEmBranco(wsRes);
   escreverMeta(wsRes, ["Clique no + à esquerda de cada grupo para abrir as contas que formam o saldo."]);

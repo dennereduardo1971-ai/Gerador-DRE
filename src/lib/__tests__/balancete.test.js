@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coberturaBalancete, contasDeMovimento, nomesDoBalancete, parsearBalancete, periodoDoBalancete, periodoLegivel, valorDC } from "../balancete.js";
+import { coberturaBalancete, contasDeMovimento, naturezaDaConta, nomesDoBalancete, parsearBalancete, periodoDoBalancete, periodoLegivel, valorDC } from "../balancete.js";
 
 /* Recorte fiel do balancete real (ctbr041.xlsx): mesma estrutura de
  * cabeçalho, mesma pontuação de código, mesma mistura de colunas
@@ -396,5 +396,69 @@ describe("periodoDoBalancete", () => {
     expect(periodoDoBalancete([{ nome: "Dados", linhas: BALANCETE }])).toBe(null);
     expect(periodoDoBalancete(null)).toBe(null);
     expect(periodoDoBalancete([])).toBe(null);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Contas SEM MOVIMENTO no período.
+ *
+ * O relatório pode ser emitido com elas, e deve: é assim que uma conta
+ * fica parametrizada antes do primeiro mês em que tem saldo. Elas não
+ * movem número nenhum da DRE, mas precisam chegar rotuladas — senão a
+ * classificação decide por `saldo > 0` e manda toda receita zerada para
+ * o lado da despesa.
+ * ------------------------------------------------------------------ */
+const BALANCETE_COM_ZERADAS = [
+  CABECALHO,
+  ["3", "RECEITAS LIQUIDAS", "0,00", 0, 10000, "10.000,00 C", "10.000,00 C"],
+  ["3.1", "RECEITA BRUTA", "0,00", 0, 10000, "10.000,00 C", "10.000,00 C"],
+  // com movimento
+  ["3.1.10.1", "GRADUACAO", "0,00", 0, 10000, "10.000,00 C", "10.000,00 C"],
+  // sem movimento no período, mas com saldo credor acumulado
+  ["3.1.10.2", "POS-GRADUACAO", "4.000,00 C", 0, 0, "0,00", "4.000,00 C"],
+  // sem movimento e sem saldo nenhum: conta nova
+  ["3.1.10.3", "EXTENSAO", "0,00", 0, 0, "0,00", "0,00"],
+  ["4", "DESPESAS", "300,00 D", 2500, 0, "2.500,00 D", "2.800,00 D"],
+  ["4.1.20.1", "ALUGUEL", "0,00", 2500, 0, "2.500,00 D", "2.500,00 D"],
+  ["4.1.20.2", "AGUA", "300,00 D", 0, 0, "0,00", "300,00 D"],
+];
+
+describe("contas sem movimento chegam rotuladas", () => {
+  const contas = contasDeMovimento(parsearBalancete(BALANCETE_COM_ZERADAS));
+  const de = (codigo) => contas.find((c) => c.conta === codigo);
+
+  it("as contas zeradas entram na lista, não são descartadas na leitura", () => {
+    expect(de("31102")).toBeTruthy();
+    expect(de("31103")).toBeTruthy();
+    expect(de("41202")).toBeTruthy();
+  });
+
+  it("marca semMovimento só em quem não teve débito nem crédito", () => {
+    expect(de("31101").semMovimento).toBe(false);
+    expect(de("31102").semMovimento).toBe(true);
+    expect(de("41201").semMovimento).toBe(false);
+    expect(de("41202").semMovimento).toBe(true);
+  });
+
+  it("a natureza vem do SALDO: credora +1, devedora −1", () => {
+    // O balancete guarda credor negativo (valorDC); a convenção do resto
+    // do app é a oposta, e é a do app que sai daqui.
+    expect(de("31102").natureza).toBe(1);
+    expect(de("41202").natureza).toBe(-1);
+  });
+
+  it("conta sem movimento E sem saldo tem natureza 0 — não se inventa uma", () => {
+    expect(de("31103").natureza).toBe(0);
+  });
+
+  it("naturezaDaConta cai para o saldo anterior quando não há atual", () => {
+    expect(naturezaDaConta({ atual: 0, anterior: -500 })).toBe(1);   // credora
+    expect(naturezaDaConta({ atual: 0, anterior: 500 })).toBe(-1);   // devedora
+    expect(naturezaDaConta({ atual: 0, anterior: 0 })).toBe(0);
+  });
+
+  it("conta zerada tem saldo zero e não move a soma", () => {
+    expect(de("31102").saldo).toBe(0);
+    expect(de("31103").saldo).toBe(0);
   });
 });

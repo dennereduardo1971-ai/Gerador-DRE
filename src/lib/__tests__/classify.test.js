@@ -189,3 +189,102 @@ describe("provaIntegridade", () => {
     expect(p.ignorado).toBeCloseTo(3_000_000, 2);
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * CONTAS SEM MOVIMENTO NO PERÍODO.
+ *
+ * O balancete pode (e deve) ser emitido com as contas zeradas: é assim
+ * que uma conta fica parametrizada ANTES do primeiro mês em que ela tem
+ * saldo. Isso abriu dois defeitos que estes testes travam.
+ * ------------------------------------------------------------------ */
+
+/** Conta sem movimento no período: débito e crédito zerados. `natureza`
+ *  é o que o balancete sabe pelo SALDO (credora +1, devedora −1, 0 quando
+ *  nem saldo há) — ver `naturezaDaConta` em balancete.js. */
+const zerada = (codigo, natureza = 0, historico = "") => ({
+  conta: codigo, saldo: 0, historico, deb: 0, cre: 0, n: 0,
+  semMovimento: true, natureza,
+});
+
+describe("contas sem movimento não são classificadas como despesa por omissão", () => {
+  it("conta de receita zerada, com saldo credor, vai para receita", () => {
+    // O defeito era `saldo > 0 ? receita : despesa`: zero caía no `else`.
+    const contas = [zerada("3110102", 1), conta("3110101", 5000)];
+    const mapa = sugerirClassificacao(contas, PLANO_IESB);
+    expect(mapa["3110102"]).toBe("REC_MENSALIDADES");
+  });
+
+  it("conta de despesa zerada, com saldo devedor, continua em despesa", () => {
+    const contas = [zerada("4111102", -1), conta("4111101", -1200)];
+    const mapa = sugerirClassificacao(contas, PLANO_IESB);
+    expect(mapa["4111102"]).toBe("DESP_FOPAG");
+  });
+
+  it("sem plano de contas, a natureza do saldo ainda decide o lado", () => {
+    const contas = [
+      zerada("9110001", 1, "MENSALIDADE GRADUACAO"),
+      zerada("9110002", -1, "ALUGUEL"),
+    ];
+    const mapa = sugerirClassificacao(contas, {}, []);
+    expect(mapa["9110001"]).toBe("REC_MENSALIDADES");
+    expect(mapa["9110002"]).not.toBe("REC_MENSALIDADES");
+  });
+
+  it("conta nova, sem movimento E sem saldo, cai em IGNORAR — nunca em DESP_ADM", () => {
+    // Não há o que deduzir: afirmar um grupo aqui é inventar. A tela
+    // marca "a revisar"; a doutrina é a mesma do [______] da nota de MPDA.
+    const mapa = sugerirClassificacao([zerada("9990001", 0, "CONTA NOVA")], {}, []);
+    expect(mapa["9990001"]).toBe("IGNORAR");
+  });
+
+  it("mas o CÓDIGO do plano decide mesmo sem natureza nenhuma", () => {
+    // O plano é fato, não dedução a partir de saldo: uma conta nova sob
+    // uma síntese conhecida já nasce no grupo certo.
+    const mapa = sugerirClassificacao([zerada("3110109", 0)], PLANO_IESB);
+    expect(mapa["3110109"]).toBe("REC_MENSALIDADES");
+  });
+});
+
+describe("contas zeradas não mudam a classificação das contas com movimento", () => {
+  /* O fallback por maioria decide por `contagem[prefixo] / n >= 0.5`.
+     Contas sem movimento aumentam `n` sem aumentar `contagem`, então
+     emitir o balancete com as zeradas afrouxaria a maioria e mudaria a
+     classificação de contas que TÊM movimento — sem sinal nenhum na tela. */
+  const comMovimento = [
+    conta("9110001", -1000, "FOPAG SALARIOS"),
+    conta("9110002", -900, "FOLHA DE PAGAMENTO"),
+    conta("9110003", -800, "ALGUMA OUTRA COISA"),
+  ];
+  const vinteZeradas = Array.from({ length: 20 }, (_, i) =>
+    zerada(`911001${i}`, -1, "CONTA SEM MOVIMENTO"));
+
+  it("a mesma decisão sai com e sem as zeradas na lista", () => {
+    const so = sugerirClassificacao(comMovimento, {}, []);
+    const com = sugerirClassificacao([...comMovimento, ...vinteZeradas], {}, []);
+    for (const c of comMovimento) {
+      expect(com[c.conta], `conta ${c.conta}`).toBe(so[c.conta]);
+    }
+  });
+
+  it("e as zeradas continuam sendo classificadas, não descartadas", () => {
+    const com = sugerirClassificacao([...comMovimento, ...vinteZeradas], {}, []);
+    expect(Object.keys(com)).toHaveLength(comMovimento.length + vinteZeradas.length);
+  });
+});
+
+describe("conta zerada não move nenhum número da DRE", () => {
+  it("o lucro líquido é o mesmo com e sem as contas sem movimento", () => {
+    const base = [
+      conta("3110101", 10000), conta("3210001", -1000),
+      conta("4111101", -3000), conta("4120101", -2500),
+    ];
+    const zeradas = [zerada("3110109", 1), zerada("4111109", -1), zerada("4120109", -1)];
+    const mapaA = sugerirClassificacao(base, PLANO_IESB);
+    const mapaB = sugerirClassificacao([...base, ...zeradas], PLANO_IESB);
+    const a = montarDRE(base, (c) => mapaA[c] ?? "IGNORAR");
+    const b = montarDRE([...base, ...zeradas], (c) => mapaB[c] ?? "IGNORAR");
+    for (const linha of ["receitaBruta", "deducoes", "receitaLiq", "despOper", "liquido"]) {
+      expect(b[linha], `linha ${linha}`).toBeCloseTo(a[linha], 2);
+    }
+  });
+});
