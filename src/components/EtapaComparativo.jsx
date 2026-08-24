@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { brl, competenciaLegivel, pct } from "../lib/parse.js";
+import { brl, pct } from "../lib/formato.js";
 import { montarLinhas } from "../lib/linhasDRE.js";
 
 /* A DRE no tempo — em dois níveis de zoom, numa aba só.
@@ -54,9 +54,9 @@ export function EtapaComparativo({ dresPorCompetencia }) {
           Este arquivo cobre{" "}
           {dresPorCompetencia.length === 1 ? "só uma competência" : "nenhuma competência reconhecida"}
         </b>
-        Comparar a DRE no tempo põe uma coluna por mês — precisa de pelo menos dois meses de
-        lançamentos no razão importado. Se o seu razão tem mais de um mês mas nenhum foi
-        reconhecido, confira o mapeamento das colunas de data e ano na etapa 2.
+        Comparar a DRE no tempo põe uma coluna por período — carregue o balancete de outro
+        mês na etapa Importar e ele vira uma coluna aqui. Dá para soltar vários arquivos de
+        uma vez.
       </div>
     );
   }
@@ -84,7 +84,7 @@ export function EtapaComparativo({ dresPorCompetencia }) {
               <tr>
                 <th>Linha</th>
                 {dresPorCompetencia.map((d) => (
-                  <th key={d.competencia} className="num" colSpan={2}>{competenciaLegivel(d.competencia)}</th>
+                  <th key={d.competencia} className="num" colSpan={2}>{d.rotulo}</th>
                 ))}
               </tr>
             </thead>
@@ -124,7 +124,7 @@ export function EtapaComparativo({ dresPorCompetencia }) {
             <tr>
               <th>Linha</th>
               {colunas.map((c) => (
-                <th key={c.competencia} className="num">{competenciaLegivel(c.competencia)}</th>
+                <th key={c.competencia} className="num">{c.rotulo}</th>
               ))}
             </tr>
           </thead>

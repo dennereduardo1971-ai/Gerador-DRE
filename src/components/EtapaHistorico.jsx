@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { brl, pct } from "../lib/parse.js";
+import { brl, pct } from "../lib/formato.js";
 import { SincronizacaoGitHub } from "./SincronizacaoGitHub.jsx";
 
 const LINHAS = [

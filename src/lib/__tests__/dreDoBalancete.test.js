@@ -1,38 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { agregarPorConta, mapearColunas } from "../parse.js";
 import { contasDeMovimento, parsearBalancete } from "../balancete.js";
 import { montarDRE, sugerirClassificacao } from "../classify.js";
 
-/* AS DUAS FONTES DESCREVEM O MESMO FATO.
+/* O BALANCETE MONTA A DRE SOZINHO.
  *
- * O razão soma lançamento a lançamento até chegar no movimento de cada
- * conta; o balancete já traz esse movimento somado pela contabilidade.
- * A afirmação central desta funcionalidade é que a DRE sai idêntica pelos
- * dois caminhos — e ela precisa estar travada por teste, porque um erro
- * de sinal na conversão inverteria a demonstração inteira sem quebrar
- * nada visivelmente.
+ * Este arquivo provava outra coisa até 24/08/2026: que a DRE saía
+ * idêntica pelo razão e pelo balancete. O razão saiu do app — e o que a
+ * afirmação tinha de mais valioso continua aqui, porque não dependia
+ * dele: o balancete guarda movimento = débito − crédito e o app usa
+ * saldo = crédito − débito. Um é o negativo do outro, e "simplificar"
+ * isso inverte a demonstração inteira sem quebrar mais nada
+ * visivelmente. Daí o último teste deste arquivo.
  *
- * Os dois blocos abaixo descrevem o MESMO mês: quatro lançamentos no
- * razão, e o balancete correspondente com o movimento já somado.
+ * O balancete abaixo descreve um mês inteiro: mensalidade recebida,
+ * bolsa concedida, aluguel e folha do administrativo pagos.
  */
-
-const CABECALHO = ["Dia/Mes", "Cta. Debito", "Cta. Credito", "Valor Debito", "Valor Credito", "Historico", "Ano"];
-const MAP = mapearColunas(CABECALHO);
-
-const RAZAO = [
-  // Mensalidade recebida: caixa (débito) contra receita (crédito)
-  { "Dia/Mes": "05/jan", Ano: "2026", "Cta. Debito": "1111001", "Cta. Credito": "3110101",
-    "Valor Debito": "10.000,00", "Valor Credito": "10.000,00", Historico: "MENSALIDADE" },
-  // Bolsa concedida: dedução (débito) contra caixa (crédito)
-  { "Dia/Mes": "10/jan", Ano: "2026", "Cta. Debito": "3210001", "Cta. Credito": "1111001",
-    "Valor Debito": "1.000,00", "Valor Credito": "1.000,00", Historico: "BOLSA" },
-  // Despesa administrativa paga
-  { "Dia/Mes": "15/jan", Ano: "2026", "Cta. Debito": "4120101", "Cta. Credito": "1111001",
-    "Valor Debito": "2.500,00", "Valor Credito": "2.500,00", Historico: "ALUGUEL" },
-  // Folha do administrativo
-  { "Dia/Mes": "20/jan", Ano: "2026", "Cta. Debito": "4111101", "Cta. Credito": "1111001",
-    "Valor Debito": "3.000,00", "Valor Credito": "3.000,00", Historico: "FOPAG" },
-];
 
 const BALANCETE = [
   ["Conta", "Descricao", "Saldo anterior", "Debito", "Credito", "Mov  periodo", "Saldo atual"],
@@ -70,34 +52,34 @@ const dreDe = (contas) => {
   return montarDRE(resultado, (c) => mapa[c]);
 };
 
-describe("razão e balancete produzem a mesma DRE", () => {
-  const doRazao = agregarPorConta(RAZAO, MAP, "todos", "todos", "todas").contas;
+describe("a DRE montada a partir do balancete", () => {
   const bal = parsearBalancete(BALANCETE);
   const doBalancete = contasDeMovimento(bal);
 
-  it("o movimento por conta bate entre as duas fontes", () => {
-    for (const codigo of ["3110101", "3210001", "4120101", "4111101"]) {
-      const r = doRazao.find((c) => c.conta === codigo);
+  it("traz uma conta por folha do balancete, com débito e crédito do período", () => {
+    for (const [codigo, deb, cre] of [
+      ["3110101", 0, 10000], ["3210001", 1000, 0],
+      ["4120101", 2500, 0], ["4111101", 3000, 0],
+    ]) {
       const b = doBalancete.find((c) => c.conta === codigo);
       expect(b, `conta ${codigo} ausente no balancete`).toBeTruthy();
-      expect(b.deb, `débito de ${codigo}`).toBeCloseTo(r.deb, 2);
-      expect(b.cre, `crédito de ${codigo}`).toBeCloseTo(r.cre, 2);
-      expect(b.saldo, `saldo de ${codigo}`).toBeCloseTo(r.saldo, 2);
+      expect(b.deb, `débito de ${codigo}`).toBeCloseTo(deb, 2);
+      expect(b.cre, `crédito de ${codigo}`).toBeCloseTo(cre, 2);
+      expect(b.saldo, `saldo de ${codigo}`).toBeCloseTo(cre - deb, 2);
     }
   });
 
-  it("a DRE sai idêntica pelos dois caminhos, linha por linha", () => {
-    const a = dreDe(doRazao);
-    const b = dreDe(doBalancete);
-    for (const linha of [
-      "receitaBruta", "deducoes", "receitaLiq", "resultadoOperBruto",
-      "despOper", "resultadoFin", "resultadoOper", "antesIR", "liquido",
-    ]) {
-      expect(b[linha], `linha ${linha}`).toBeCloseTo(a[linha], 2);
-    }
+  it("cada linha da demonstração fecha com o esperado", () => {
+    const d = dreDe(doBalancete);
+    expect(d.receitaBruta).toBeCloseTo(10000, 2);
+    expect(d.deducoes).toBeCloseTo(1000, 2);
+    expect(d.receitaLiq).toBeCloseTo(9000, 2);
+    expect(d.despOper).toBeCloseTo(5500, 2);
+    expect(d.resultadoOper).toBeCloseTo(3500, 2);
+    expect(d.antesIR).toBeCloseTo(3500, 2);
   });
 
-  it("o lucro líquido é o esperado por conta própria", () => {
+  it("o lucro líquido bate com o saldo do caixa", () => {
     // 10.000 de receita − 1.000 de bolsa − 2.500 de aluguel − 3.000 de
     // folha = 3.500, que é também o saldo do caixa no balancete.
     expect(dreDe(doBalancete).liquido).toBeCloseTo(3500, 2);

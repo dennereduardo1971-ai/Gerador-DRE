@@ -1,113 +1,100 @@
-import { brl, competenciaLegivel } from "../lib/parse.js";
+import { brl } from "../lib/formato.js";
 import { Balanca } from "./Eixo.jsx";
 
+/* Conferir o balancete antes de classificar.
+ *
+ * Esta tela já teve duas metades: uma para o razão (partidas dobradas,
+ * mapeamento de colunas, filtros de dia e centro de custo) e uma para o
+ * balancete. O razão saiu do app em 24/08/2026 e a metade dele foi junto
+ * — inclusive o teste de débito × crédito, que sobre um balancete não
+ * significa nada: o relatório sai da contabilidade já fechado, e num
+ * balancete completo os dois lados se anulam por partida dobrada.
+ *
+ * O que este arquivo confere agora é o que o ARQUIVO permite conferir:
+ * quanto ele traz, se a hierarquia fecha, qual período cobre, e se o
+ * resultado apurado pelas contas patrimoniais bate com o apurado pelas
+ * contas de resultado — dois caminhos independentes para o mesmo número.
+ * Essa é a validação mais forte que existe aqui. */
 export function EtapaConferir({
-  arquivo, nLinhas, contas, dif, tDeb, tCre, meses, ccs, filtroMes, filtroCC, semRazao = false,
-  competenciasDisponiveis, filtroCompetencia, onFiltroCompetencia,
-  empresa, cnpj, map, cols, nomes, avisosMap = [], debSemConta = 0, creSemConta = 0,
-  onFiltroMes, onFiltroCC,
-  onEmpresa, onCnpj, onMap, onIrClassificar,
+  contas, resumo, cobertura, periodo, balancetes = [], ativo, onAtivo,
+  empresa, cnpj, nomes, onEmpresa, onCnpj, onIrClassificar,
 }) {
+  const confere = resumo?.resultadoConfere;
+
   return (
     <>
-      {avisosMap.map((aviso, i) => (
-        <div className="warn" key={i}>{aviso}</div>
-      ))}
-
       <div className="checks">
-        {!semRazao && (
-          <div className="check"><div className="k">Arquivo</div><div className="v" style={{ fontSize: 13 }}>{arquivo}</div></div>
+        <div className="check"><div className="k">Contas no arquivo</div><div className="v">{resumo?.nContas ?? 0}</div></div>
+        <div className="check"><div className="k">Analíticas</div><div className="v">{resumo?.nFolhas ?? 0}</div></div>
+        {periodo && (
+          <div className="check" data-tone="ok"><div className="k">Período</div><div className="v" style={{ fontSize: 13 }}>{periodo}</div></div>
         )}
-        {/* O balancete já vem somado: não há lançamento para contar, nem
-            teste de partidas dobradas a fazer — a contabilidade já fechou
-            isso antes de emitir o relatório. Mostrar "0 lançamentos" e
-            "débito x crédito: confere" seria informação falsa. */}
-        {!semRazao && (
-          <div className="check"><div className="k">Lançamentos</div><div className="v">{nLinhas.toLocaleString("pt-BR")}</div></div>
-        )}
-        <div className="check"><div className="k">Contas movimentadas</div><div className="v">{contas.length}</div></div>
-        {filtroCompetencia !== "todas" && (
-          <div className="check" data-tone="ok"><div className="k">Competência isolada</div><div className="v">{competenciaLegivel(filtroCompetencia)}</div></div>
-        )}
-        {!semRazao && (
-          <div className="check" data-tone={Math.abs(dif) < 0.01 ? "ok" : "bad"}>
-            <div className="k">Débito x crédito</div>
-            <div className="v">{Math.abs(dif) < 0.01 ? "Confere" : brl(dif)}</div>
+        <div className="check" data-tone={resumo?.integro ? "ok" : "bad"}>
+          <div className="k">Conferência interna</div>
+          <div className="v">{resumo?.integro ? "Fecha" : "Não fecha"}</div>
+        </div>
+        {confere != null && (
+          <div className="check" data-tone={confere ? "ok" : "bad"}>
+            <div className="k">Patrimonial x resultado</div>
+            <div className="v">{confere ? "Confere" : "Diverge"}</div>
           </div>
         )}
       </div>
 
-      {!semRazao && <div className="card">
-        <h2>Partidas dobradas</h2>
-        <p className="hint">Fechou quando os dois braços têm o mesmo comprimento.</p>
-        <Balanca
-          esquerda={tDeb} direita={tCre}
-          rotuloEsq={`Débito ${brl(tDeb)}`} rotuloDir={`Crédito ${brl(tCre)}`}
-        />
-      </div>}
-
-      {Math.abs(dif) >= 0.01 && (
+      {resumo && !resumo.integro && (
         <div className="warn">
-          Diferença de <b>{brl(Math.abs(dif))}</b> entre débitos e créditos.
+          {resumo.inconsistentes} linha(s) não fecham <b>saldo anterior + movimento = saldo atual</b>{" "}
+          e {resumo.sinteticasErradas} sintética(s) não batem com a soma das próprias filhas.
           <details className="explica">
-            <summary>De onde costuma vir</summary>
+            <summary>Por que isso importa antes de classificar</summary>
             <p>
-              Arredondamento ou lançamento cortado na exportação. Vale conferir antes de
-              assinar a DRE.
+              A DRE é montada a partir das contas analíticas deste arquivo. Se a hierarquia não
+              fecha dentro dele, a demonstração pode sair certa em algumas linhas e errada em
+              outras, sem nenhum sinal na tela. Vale reexportar o relatório antes de seguir.
             </p>
           </details>
         </div>
       )}
 
-      {(debSemConta > 0.005 || creSemConta > 0.005) && (
+      {confere === false && (
         <div className="warn">
-          Há valor lançado <b>sem conta preenchida</b> do lado correspondente:{" "}
-          {debSemConta > 0.005 && <>débito de <b>{brl(debSemConta)}</b></>}
-          {debSemConta > 0.005 && creSemConta > 0.005 && " e "}
-          {creSemConta > 0.005 && <>crédito de <b>{brl(creSemConta)}</b></>}.
-          Esse valor entra no total acima, mas não aparece em nenhuma conta da tabela — é uma
-          das origens típicas de diferença que "some" quando se soma conta por conta.
+          O resultado do período apurado pelas contas <b>1 e 2</b> não bate com o apurado pelas
+          contas <b>3 a 7</b>. São dois caminhos independentes para o mesmo número — quando eles
+          divergem, o arquivo tem problema antes de qualquer classificação.
         </div>
       )}
 
-      {/* Os filtros são do razão e já se escondem sozinhos quando as
-          listas estão vazias — mas Empresa e CNPJ vivem neste card e são
-          necessários em qualquer fonte, porque saem no cabeçalho da DRE.
-          Por isso o card fica; só o texto muda. */}
+      {/* A prova cruzada, desenhada: os dois braços são o mesmo resultado
+          apurado por caminhos independentes, e o único trecho vermelho é
+          o quanto um excede o outro — literalmente o que não fecha. */}
+      {confere != null && resumo && (
+        <div className="card">
+          <h2>Resultado do período, por dois caminhos</h2>
+          <p className="hint">
+            Δ(Ativo + Passivo) do período tem que ser igual ao resultado apurado pelas contas
+            de resultado. Fechou quando os dois braços têm o mesmo comprimento.
+          </p>
+          <Balanca
+            esquerda={Math.abs(resumo.periodoPelaPatrimonial)}
+            direita={Math.abs(resumo.periodoPelaResultado)}
+            rotuloEsq={`Contas 1 e 2 · ${brl(resumo.periodoPelaPatrimonial)}`}
+            rotuloDir={`Contas 3 a 7 · ${brl(resumo.periodoPelaResultado)}`}
+          />
+        </div>
+      )}
+
       <div className="card">
-        <h2>{semRazao ? "Identificação" : "Filtros"}</h2>
-        <p className="hint">
-          {semRazao
-            ? "Sai no cabeçalho da demonstração e dos arquivos exportados."
-            : <>Recortam o razão antes de somar. A <b>competência</b> isola um mês inteiro.</>}
-        </p>
+        <h2>Identificação</h2>
+        <p className="hint">Sai no cabeçalho da demonstração e dos arquivos exportados.</p>
         <div className="filters">
-          {competenciasDisponiveis.length > 0 && (
+          {balancetes.length > 1 && (
             <div>
-              <label>Competência (mês/ano)</label>
-              <select value={filtroCompetencia} onChange={(e) => onFiltroCompetencia(e.target.value)}>
-                <option value="todas">Todas ({competenciasDisponiveis.length})</option>
-                {competenciasDisponiveis.map((c) => (
-                  <option key={c} value={c}>{competenciaLegivel(c)}</option>
+              <label>Balancete em foco</label>
+              <select value={ativo || ""} aria-label="Qual balancete monta a demonstração"
+                onChange={(e) => onAtivo(e.target.value)}>
+                {balancetes.map((b) => (
+                  <option key={b.chave} value={b.chave}>{b.rotulo}</option>
                 ))}
-              </select>
-            </div>
-          )}
-          {meses.length > 1 && (
-            <div>
-              <label>Dia específico (opcional)</label>
-              <select value={filtroMes} onChange={(e) => onFiltroMes(e.target.value)}>
-                <option value="todos">Todos ({meses.length})</option>
-                {meses.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-          )}
-          {ccs.length > 0 && (
-            <div>
-              <label>Centro de custo</label>
-              <select value={filtroCC} onChange={(e) => onFiltroCC(e.target.value)}>
-                <option value="todos">Todos ({ccs.length})</option>
-                {ccs.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           )}
@@ -122,39 +109,40 @@ export function EtapaConferir({
               onChange={(e) => onCnpj(e.target.value)} />
           </div>
         </div>
+        {balancetes.length > 1 && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            {balancetes.length} balancetes carregados. A DRE, o De-Para e o CPC 51 mostram o que
+            está em foco; a <b>Comparativa</b> põe todos lado a lado.
+          </p>
+        )}
       </div>
 
-      {!semRazao && <div className="card">
-        <h2>Mapeamento das colunas</h2>
-        <p className="hint">Reconhecidas automaticamente. Corrija se alguma ficou no lugar errado.</p>
-        <div className="filters">
-          {[
-            ["contaD", "Conta débito"], ["contaC", "Conta crédito"],
-            ["valorD", "Valor débito"], ["valorC", "Valor crédito"],
-            ["hist", "Histórico"], ["data", "Data / mês"], ["ano", "Ano"], ["cc", "Centro de custo"],
-          ].map(([k, lbl]) => (
-            <div key={k}>
-              <label>{lbl}</label>
-              <select value={map[k] || ""} onChange={(e) => onMap({ ...map, [k]: e.target.value })}>
-                <option value="">— nenhuma —</option>
-                {cols.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          ))}
+      {cobertura && !cobertura.resultado && (
+        <div className="warn">
+          Este balancete traz só as contas <b>{cobertura.digitos.join(" e ")}</b> — sem as contas
+          de resultado (3 a 7) não há DRE a montar.
+          <details className="explica">
+            <summary>Como resolver</summary>
+            <p>
+              Exporte o <b>mesmo relatório sem filtrar por conta</b>. O relatório típico de
+              fechamento patrimonial sai filtrado em 1 e 2; sem filtro, ele monta a demonstração
+              inteira e ainda traz o plano de contas junto.
+            </p>
+          </details>
         </div>
-      </div>}
+      )}
 
       <div className="card">
         <h2>Saldo por conta</h2>
         <p className="hint">
-          Todas as contas movimentadas no período. Saldo credor positivo, devedor negativo.
+          As contas analíticas do balancete em foco. Saldo credor positivo, devedor negativo.
         </p>
         <div className="scroll">
           <table className="tabela-cartao">
             <thead>
               <tr>
                 <th>Conta</th><th>Descrição</th><th className="num">Débito</th>
-                <th className="num">Crédito</th><th className="num">Saldo</th><th className="num">Lanç.</th>
+                <th className="num">Crédito</th><th className="num">Saldo</th>
               </tr>
             </thead>
             <tbody>
@@ -167,7 +155,6 @@ export function EtapaConferir({
                   <td className="num" data-rotulo="Débito">{brl(c.deb)}</td>
                   <td className="num" data-rotulo="Crédito">{brl(c.cre)}</td>
                   <td className={"num destaque " + (c.saldo < 0 ? "neg" : "")} data-rotulo="Saldo">{brl(c.saldo)}</td>
-                  <td className="num" data-rotulo="Lanç.">{c.n}</td>
                 </tr>
               ))}
             </tbody>

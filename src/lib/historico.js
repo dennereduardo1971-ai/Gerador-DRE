@@ -35,7 +35,7 @@ export function listarHistorico() {
 }
 
 /** Salva um retrato (snapshot) da DRE atual no histórico local — só os
- *  totais de cada linha, não o razão inteiro, para não pesar o navegador
+ *  totais de cada linha, não as contas inteiras, para não pesar o navegador
  *  e o repositório. Grava só localmente; use sincronizar() para mandar
  *  para o GitHub. */
 export function salvarNoHistorico({ empresa, cnpj, periodo, dre, chave }) {

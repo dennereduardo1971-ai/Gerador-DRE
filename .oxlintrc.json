@@ -7,5 +7,11 @@
     "no-undef": "error",
     "no-unused-vars": "warn"
   },
-  "ignorePatterns": ["docs/**", "dist/**"]
+  "ignorePatterns": ["docs/**", "dist/**"],
+  "overrides": [
+    {
+      "files": ["fixtures/**/*.mjs"],
+      "env": { "node": true }
+    }
+  ]
 }

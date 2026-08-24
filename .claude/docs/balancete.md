@@ -5,9 +5,9 @@
 `balancete.js` lê o relatório que o sistema contábil emite de verdade
 (`ctbr041`): código pontuado em vários níveis, saldo anterior, débito,
 crédito, movimento e saldo atual, com a natureza indicada por "D"/"C" no
-fim do número. Quando esse formato é reconhecido, ele vira a FONTE da
-DRE e o razão passa a ser a contraprova — não o contrário. **Só esse
-formato entra**: o `código;saldo` simples existia para dar abertura ao
+fim do número. Ele é a **única fonte** do app desde 24/08/2026: já passou
+pelo fechamento da contabilidade, monta a DRE sozinho e traz o plano de
+contas junto. **Só esse formato entra**: o `código;saldo` simples existia para dar abertura ao
 Balanço Patrimonial, tela que o app não tem mais, e aceitá-lo agora
 seria aceitar um arquivo que não produz nada.
 
@@ -59,7 +59,7 @@ Sete armadilhas deste formato, todas cobertas por teste:
   o mesmo período" sobre UM arquivo só. `resumir` devolve
   `resultadoAcumulado` e `resultadoPeriodo` separados, e a tela confronta
   a DRE com o do período (dizendo quando ela bate com o acumulado, que é o
-  caso do razão do exercício inteiro).
+  caso de um balancete do exercício inteiro).
 - **"Débitos − créditos = resultado" só vale no balancete FILTRADO em 1 e
   2.** Num balancete completo os dois lados se anulam por partida dobrada:
   débito e crédito do período saem IGUAIS, ou seja a diferença entre eles
@@ -71,39 +71,38 @@ Sete armadilhas deste formato, todas cobertas por teste:
   sai por escrito no aviso da importação: se os dois caminhos não batem, o
   arquivo tem problema antes de qualquer classificação.
 
-## As duas fontes (razão × balancete)
+## Vários balancetes ao mesmo tempo
 
-**Elas descrevem o mesmo fato por caminhos diferentes.** O razão soma
-lançamento a lançamento até chegar no movimento de cada conta; o
-balancete já traz esse movimento somado e fechado pela contabilidade.
-`contasDeMovimento()` converte as folhas do balancete para o formato de
-`agregarPorConta`, e `fontes.test.js` prova que a DRE sai idêntica pelos
-dois caminhos, linha por linha.
+**O que o razão contábil fazia de único era competência mês a mês num
+arquivo só.** Era o argumento mais forte a favor de manter uma segunda
+fonte — e ele caiu quando o app passou a aceitar VÁRIOS balancetes
+carregados juntos: cada arquivo declara o próprio período, e a lista
+ordenada alimenta a Comparativa (uma coluna por período) e a coluna
+comparativa da demonstração do CPC 51.
 
-**Atenção ao sinal.** `agregarPorConta` usa `saldo = crédito − débito`
-(natureza credora positiva, que é o que `montarDRE` espera para
-receitas); o balancete usa `movimento = débito − crédito`. Um é o
-negativo do outro. "Simplificar" isso inverte a DRE inteira sem quebrar
-mais nada visivelmente — há teste explícito guardando esse ponto.
+`identidadeDoPeriodo(periodo, arquivo)` dá a cada balancete uma **chave**
+(identidade e ordenação) e um **rótulo** (o que se imprime).
+`ordenarBalancetes` põe em ordem cronológica. Três decisões dentro disso:
 
-**Qual manda.** `fonteEfetiva = balancetePodeDRE && fonte !== "razao"`.
-Ou seja: o balancete vence por padrão quando cobre contas de resultado,
-porque passou pelo fechamento; o razão só assume por escolha explícita.
+- **A ordenação é `AAAAMMDD`, texto.** `['12/2025','01/2026'].sort()` põe
+  o mês na frente do ano e faz cada período ser comparado com o
+  "anterior" errado, sem nenhum sinal na tela.
+- **A chave leva a ordem junto do rótulo**, então reimportar o mesmo mês
+  SUBSTITUI em vez de duplicar — é a correção de um mês, não um mês novo.
+- **Arquivo que não declara período vai para o fim da fila** e é rotulado
+  pelo nome. Nunca se inventa uma data: período errado num arquivo
+  entregue ao cliente é pior que período nenhum.
 
-**Não são redundantes — e é por isso que o razão fica:**
+**ATENÇÃO AO SINAL.** `contasDeMovimento()` converte as folhas para o
+formato que `montarDRE` espera: `saldo = crédito − débito` (natureza
+credora positiva, que é o que a DRE precisa para receitas). O balancete
+guarda `movimento = débito − crédito`. Um é o negativo do outro, e
+"simplificar" isso inverte a demonstração inteira sem quebrar mais nada
+visivelmente — `dreDoBalancete.test.js` guarda esse ponto explicitamente.
 
-| | Balancete | Razão |
-|---|---|---|
-| DRE | sim, e já fechada | sim, somada pelo app |
-| Plano de contas | vem junto | arquivo separado |
-| Competência mês a mês | não (retrato de um período) | sim |
-| Centro de custo | não | sim |
-| Lançamento individual | não | sim |
-| Confiabilidade | fechado pela contabilidade | somado pelo app |
-
-Por isso a Comparativa e o filtro de centro de custo continuam dependendo
-do razão, e `FonteDados.jsx` diz isso na tela antes de alguém trocar de
-fonte sem entender o que perde.
+**O que se perdeu com o razão, e é aceito:** centro de custo e detalhe de
+lançamento individual. Nenhum dos dois alimentava a DRE nem a transição
+para o CPC 51, que é o escopo do projeto.
 
 **Balancete filtrado.** `coberturaBalancete()` detecta quais dígitos raiz
 o arquivo traz. O relatório típico de fechamento patrimonial vem filtrado
@@ -114,7 +113,7 @@ o mesmo relatório sem filtrar por conta.
 devolve código → descrição de todas as contas, sintéticas inclusive. Como
 a classificação por código reconhece o plano pela ASSINATURA (nome das
 contas-síntese de topo), carregar o balancete dispensa o arquivo separado
-de plano de contas. Em `App.jsx`, `nomesEfetivos` põe os nomes do
-balancete por baixo dos importados à mão — o usuário mantém a última
+de plano de contas. Em `useFontes`, `nomesEfetivos` põe os nomes de TODOS os balancetes carregados (o plano mais completo) por baixo dos
+importados à mão — o usuário mantém a última
 palavra.
 

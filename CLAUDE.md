@@ -29,8 +29,8 @@ que ficou pendente). Este arquivo é doutrina. Sessões antigas ficam em
 
 ## O que é
 
-App React (Vite) que importa um razão contábil ou um balancete de
-verificação (CSV ou Excel) e monta a Demonstração do Resultado do
+App React (Vite) que importa um ou mais balancetes de verificação (CSV
+ou Excel) e monta a Demonstração do Resultado do
 Exercício — peça de portfólio de
 Denner (contábil/fiscal, graduando em Ciências Contábeis). Roda 100% no
 navegador, sem backend. Site publicado via GitHub Pages a partir da pasta
@@ -67,10 +67,8 @@ como entregável de backup.
 ```
 src/
   lib/                       # lógica pura, sem React — testável isolada
-    parse.js                 # brl/pct/numeroBR, mapeamento de colunas do
-                              # razão, agregação por conta e por competência
-    importarArquivo.js       # CSV x Excel pela extensão
-    importarCSV.js           # CSV em chunks, com progresso (SEM worker)
+    formato.js               # brl, pct, numeroBR, plano de contas de 2 colunas
+    importarArquivo.js       # CSV x Excel pela extensão, sempre como linhas cruas
     importarExcel.js         # xlsx/xls/xlsm/xlsb/ods via SheetJS, import()
                               # dinâmico (code-splitting — ver "Armadilhas")
     balancete.js             # a FONTE: balancete de verificação hierárquico
@@ -100,26 +98,38 @@ src/
     Etapa*.jsx               # uma etapa do fluxo por arquivo
     LinhaDRE.jsx             # Linha/Secao/Cabecalho/Detalhe da DRE
     DePara.jsx               # os dois eixos editáveis na mesma linha
-    FonteDados.jsx           # razão x balancete, e o que se perde ao trocar
     Eixo.jsx                 # Canal e Balanca — o eixo visual compartilhado
     Icones.jsx               # SVG inline em currentColor (sem biblioteca)
     Inicio.jsx               # "o que eu faço agora?"
-  App.jsx                    # dono de todo o estado; as Etapas são "burras"
-                              # (recebem props, chamam callbacks). A navegação
-                              # é DADO (SECOES) e o casco mora aqui.
+  hooks/                     # O ESTADO, fatiado por assunto
+    useSessao.js             # restaurar/gravar a sessão, a trava de carga
+    useFontes.js             # os balancetes carregados, contas, nomes, plano
+    useClassificacao.js      # classif/tocadas/sugestão/DRE/prova/perfis
+    useCPC51.js              # política, categorias, MPDA, conciliação
+  App.jsx                    # o CASCO: navegação (SECOES), topo de contexto,
+                              # menu lateral e o <main>. As Etapas são "burras"
+                              # (recebem props, chamam callbacks).
   App.css                    # design system em variáveis CSS; tema escuro é
                               # o seletor :root[data-tema="dark"]
 ```
 
 Fluxo do app: **Importar → Conferir → Classificar → DRE**. As demais abas
 são vistas paralelas sobre o mesmo estado agregado (`contas`, calculado
-uma vez em `App.jsx` via `agregarPorConta`).
+uma vez em `useFontes`).
 
-**Na etapa Importar o balancete vem primeiro e o razão está atrás de
-"opções avançadas"**: o balancete já passou pelo fechamento e monta a DRE
-sozinho, enquanto o razão só é necessário para o que ele não carrega
-(competência mês a mês num arquivo só, centro de custo, lançamento
-individual). Ver `.claude/docs/balancete.md`.
+**O balancete de verificação é a ÚNICA fonte** desde 24/08/2026. Ele já
+passou pelo fechamento da contabilidade, monta a DRE sozinho e traz o
+plano de contas junto. O razão contábil foi removido: o que ele fazia de
+único (competência mês a mês) hoje se resolve carregando **vários
+balancetes ao mesmo tempo** — cada arquivo declara o próprio período e
+vira uma coluna da Comparativa e a coluna comparativa do CPC 51. Ver
+`.claude/docs/balancete.md`.
+
+**O estado mora em `src/hooks/`, não no `App.jsx`.** Cada hook é dono de
+um assunto e sabe se salvar e se restaurar sozinho (`sessao.dados`,
+`sessao.restaurar`, `sessao.limpar`); `useSessao` só junta as partes.
+Assunto novo entra sem que ninguém precise lembrar de mexer em três
+lugares — e mexer no CPC 51 deixa de exigir ler a importação de arquivo.
 
 **A navegação é dado, não JSX.** `SECOES` em `App.jsx` descreve quatro
 seções, cada uma agrupando abas que respondem à mesma pergunta. **Início**
@@ -225,11 +235,15 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
   Provisões misturam despesa (nova provisão) e receita (reversão) na mesma
   linha; `Math.abs` por conta perde o líquido e infla o grupo. →
   `.claude/docs/dre.md`
-- **`meses` (o array de `agregarPorConta`) é a lista de DIAS do arquivo**,
-  não de meses — nome historicamente errado, um `Set` sem ordem
-  cronológica. Usá-lo como "o período do arquivo" produz uma lista enorme
-  fora de ordem; aconteceu em cinco lugares ao mesmo tempo. Período é
-  COMPETÊNCIA: use `listarCompetencias()` e `competenciaLegivel()`.
+- **Período é o que o ARQUIVO declara, não o que o app deduz.** O
+  balancete traz "Data Inicial"/"Data Final" na aba de parâmetros;
+  `periodoDoBalancete` lê e `identidadeDoPeriodo` transforma em chave
+  ordenável + rótulo. A versão anterior deduzia o período dos
+  lançamentos e errou em cinco lugares ao mesmo tempo.
+- **Ordenar período como texto põe o mês na frente do ano.**
+  `['12/2025','01/2026'].sort()` inverte, e cada período passa a ser
+  comparado com o "anterior" errado, sem sinal na tela. Por isso a chave
+  de ordenação é `AAAAMMDD` (`identidadeDoPeriodo`).
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença é o resultado do exercício, que vive nas contas 3 a 7. Nunca
   trate isso como erro de importação. → `.claude/docs/balancete.md`
@@ -256,10 +270,9 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
 
 Duas camadas, e as duas importam:
 
-1. **Vitest** (`npm test`) — testes em `src/lib/__tests__/`, com razão
+1. **Vitest** (`npm test`) — testes em `src/lib/__tests__/`, com balancete
    sintético. Rodam em qualquer máquina, sem dado real. Eles congelam de
-   propósito as decisões que já custaram caro: o cabeçalho real do razão
-   do IESB, a separação custo/fopag,
+   propósito as decisões que já custaram caro: a separação custo/fopag,
    Prouni fora de Bolsas, provisões em duas linhas, a soma líquida
    (reversão reduz despesa), a hierarquia de subtotais, a igualdade entre
    o lucro líquido das duas estruturas (CPC 51) e o acordo entre as duas
@@ -268,7 +281,7 @@ Duas camadas, e as duas importam:
 2. **`node fixtures/validar.mjs`** — a validação contra a DRE real, mês a
    mês, centavo a centavo. Insubstituível: o Vitest prova que a lógica não
    mudou, só o arquivo real prova que ela está certa. Rode sempre que
-   mexer em `classify.js` ou `parse.js`. Precisa dos
+   mexer em `classify.js`, `balancete.js` ou `planoPerfil.js`. Precisa dos
    arquivos em `fixtures/`, que estão no `.gitignore` — **se você está numa
    máquina sem eles, diga isso ao usuário em vez de fingir que validou.**
 
@@ -305,7 +318,7 @@ uma tarefa do jeito deste projeto:
 | `manter-evolucao` | fechar a sessão: medir, registrar em `EVOLUCAO.md`, corrigir a doutrina no mesmo commit |
 | `nova-funcionalidade` | tela, módulo ou capacidade nova — inclusive os módulos do caminho para ERP |
 | `ajustar-classificacao-dre` | mudar para onde uma conta vai (padrões, mapa por código, perfis, categorias) |
-| `testar-com-arquivo-real` | validar contra o razão e a DRE reais de `fixtures/`, e ser honesto quando eles não estão na máquina |
+| `testar-com-arquivo-real` | validar contra os balancetes e a DRE reais de `fixtures/`, e ser honesto quando eles não estão na máquina |
 | `otimizar-app` | desempenho, bundle e código morto — medindo antes e depois |
 | `build-e-publicar` | levar a mudança ao site, com e sem terminal do lado do usuário |
 
@@ -344,8 +357,10 @@ em cada sessão, está em `EVOLUCAO.md`:
 4. **Seletor de aba do Excel** — `importarExcel.js` escolhe sozinho a aba
    com mais cara de conta; já devolve `abas`, falta UI para o caso em que
    ele escolhe errado.
-5. **Agregar durante a importação** em vez de guardar `linhas` cru em
-   memória — tiraria o teto de tamanho de arquivo.
+5. **Comparativa a partir do Histórico** — hoje ela lê só os balancetes
+   carregados na sessão. Cruzar com o histórico salvo daria a série
+   inteira sem manter todos os arquivos abertos.
 
 O que NÃO está no backlog, e não é esquecimento: indicadores, gráficos,
-Balanço Patrimonial, galeria de arquivos. Ver "O que é", no topo.
+Balanço Patrimonial, galeria de arquivos, importação de razão. Ver "O que
+é", no topo.

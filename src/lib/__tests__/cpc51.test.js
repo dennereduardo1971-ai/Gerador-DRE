@@ -341,18 +341,22 @@ describe("a coluna comparativa só traz período anterior de verdade", () => {
   const serie = () => {
     const { dre51 } = montar();
     const menor = montar({ contas: CONTAS.map((c) => ({ ...c, saldo: c.saldo / 2 })) }).dre51;
-    return [{ competencia: "05/2026", dre51: menor }, { competencia: "06/2026", dre51 }];
+    return [
+      { competencia: "20260501|maio de 2026", rotulo: "maio de 2026", dre51: menor },
+      { competencia: "20260601|junho de 2026", rotulo: "junho de 2026", dre51 },
+    ];
   };
 
-  it("fica vazia sem competência filtrada, ou quando a filtrada é a primeira", () => {
-    expect(comparativo51(serie(), "todas")).toBe(null);
+  it("fica vazia sem período em foco, ou quando o em foco é o primeiro", () => {
     expect(comparativo51(serie(), undefined)).toBe(null);
-    expect(comparativo51(serie(), "05/2026")).toBe(null);
+    expect(comparativo51(serie(), "20260501|maio de 2026")).toBe(null);
+    // Um período que não está entre os carregados também não compara.
+    expect(comparativo51(serie(), "20260301|março de 2026")).toBe(null);
   });
 
-  it("traz a competência imediatamente anterior, casada por rótulo", () => {
-    const comp = comparativo51(serie(), "06/2026");
-    expect(comp.rotulo).toBe("Mai/2026");
+  it("traz o período imediatamente anterior, casado por rótulo", () => {
+    const comp = comparativo51(serie(), "20260601|junho de 2026");
+    expect(comp.rotulo).toBe("maio de 2026");
     const { dre51 } = montar();
     expect(comp.valores["( = ) Resultado Líquido do Período"]).toBeCloseTo(dre51.liquido / 2, 2);
   });
@@ -366,7 +370,7 @@ describe("a aba 'DRE CPC 51' do Excel sai no layout do modelo", () => {
       conciliacao: conciliar(dre, dre51, CONTAS, grupoDe, categoriaDe),
       dePara: deParaCPC51(CONTAS, { grupoDe, categoriaPorConta: {}, politica: POLITICA_PADRAO, nomes: {} }),
       medidas: [], politica: POLITICA_PADRAO, empresa: "Exemplo",
-      competencias: ["05/2026", "06/2026"], nomes: {}, ...extra,
+      periodo: "junho de 2026", nomes: {}, ...extra,
     });
     const ws = wb.getWorksheet("DRE CPC 51");
     const linhas = [];
@@ -403,11 +407,14 @@ describe("a aba 'DRE CPC 51' do Excel sai no layout do modelo", () => {
     const menor = montar({ contas: CONTAS.map((c) => ({ ...c, saldo: c.saldo / 2 })) }).dre51;
     const { dre51 } = montar();
     const comparativo = comparativo51(
-      [{ competencia: "05/2026", dre51: menor }, { competencia: "06/2026", dre51 }],
-      "06/2026"
+      [
+        { competencia: "20260501|maio de 2026", rotulo: "maio de 2026", dre51: menor },
+        { competencia: "20260601|junho de 2026", rotulo: "junho de 2026", dre51 },
+      ],
+      "20260601|junho de 2026"
     );
-    const linhas = await exportar({ comparativo, filtroCompetencia: "06/2026" });
-    expect(linhas.find((l) => l[0] === "Categoria CPC 51").slice(3, 5)).toEqual(["Jun/2026", "Mai/2026"]);
+    const linhas = await exportar({ comparativo });
+    expect(linhas.find((l) => l[0] === "Categoria CPC 51").slice(3, 5)).toEqual(["junho de 2026", "maio de 2026"]);
     const mensalidades = linhas.find((l) => l[2] === "Receita Bruta com Mensalidades");
     expect(mensalidades[4]).toBeCloseTo(mensalidades[3] / 2, 2);
   });

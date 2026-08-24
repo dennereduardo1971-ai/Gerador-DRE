@@ -18,7 +18,7 @@
 import { montarLinhas51 } from "./linhasCPC51.js";
 import { CATEGORIAS, NOME_CATEGORIA, gruposParaRevisar } from "./cpc51.js";
 import { calcularMPDA, notaMPDA } from "./mpda.js";
-import { matrizDRE, matrizLinhas, cabecalho, baixar, dec, neutralizarFormula, periodoLegivel } from "./exportacao.js";
+import { matrizDRE, matrizLinhas, cabecalho, baixar, dec, neutralizarFormula } from "./exportacao.js";
 import {
   aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
   escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook,
@@ -49,7 +49,7 @@ function rotuloCategoria(l) {
 export function baixarNotaMPDA(medidas, dre51, ctx = {}) {
   const texto = notaMPDA(medidas, dre51, {
     empresa: ctx.empresa,
-    periodo: periodoLegivel(ctx),
+    periodo: ctx.periodo || "",
   });
   baixar("﻿" + texto, nomeArquivo(ctx.empresa, "Nota_MPDA", "txt"), "text/plain;charset=utf-8");
 }
@@ -98,7 +98,7 @@ export async function montarWorkbookCPC51(ctx) {
      explicativa é decisão de quem redige as demonstrações, e preencher
      por conta própria seria inventar uma referência que não existe. */
   const linhas51 = matrizLinhas(montarLinhas51(dre51).itens, base);
-  const rotuloPeriodo = periodoLegivel(ctx) || "Período";
+  const rotuloPeriodo = ctx.periodo || "Período";
   const COLS_DRE51 = [
     "Categoria CPC 51", "Código", "Descrição", rotuloPeriodo,
     comparativo ? comparativo.rotulo : "Comparativo", "AV %", "Notas",
@@ -136,7 +136,7 @@ export async function montarWorkbookCPC51(ctx) {
   const wsPar = wb.addWorksheet("DFs paralelas");
   definirLarguras(wsPar, [52, 18, 3, 62, 18]);
   escreverTitulo(wsPar, "DEMONSTRAÇÕES PARALELAS — ESTRUTURA ATUAL x CPC 51", 5);
-  escreverMeta(wsPar, [empresa || "Empresa", "", "", periodoLegivel(ctx)]);
+  escreverMeta(wsPar, [empresa || "Empresa", "", "", ctx.periodo || ""]);
   linhaEmBranco(wsPar);
   const cab2 = escreverCabecalhoTabela(wsPar, ["Estrutura atual", "Valor", "", "Estrutura CPC 51", "Valor"]);
   for (let i = 0; i < altura; i++) {
@@ -168,7 +168,7 @@ export async function montarWorkbookCPC51(ctx) {
   const wsConc = wb.addWorksheet("Conciliação");
   definirLarguras(wsConc, [66, 18]);
   escreverTitulo(wsConc, "CONCILIAÇÃO ENTRE AS DUAS ESTRUTURAS", 2);
-  escreverMeta(wsConc, [empresa || "Empresa", periodoLegivel(ctx)]);
+  escreverMeta(wsConc, [empresa || "Empresa", ctx.periodo || ""]);
   linhaEmBranco(wsConc);
   const cab3 = escreverCabecalhoTabela(wsConc, ["Do Resultado Operacional atual ao Resultado Operacional do CPC 51", "Valor"]);
   conciliacao.pontes.forEach((p) => { wsConc.addRow([p.lbl, p.val]).getCell(2).numFmt = FORMATO_VALOR; });
@@ -226,7 +226,7 @@ export async function montarWorkbookCPC51(ctx) {
   const wsPol = wb.addWorksheet("Política");
   definirLarguras(wsPol, [52, 34, 90]);
   escreverTitulo(wsPol, "POLÍTICA CONTÁBIL DE CLASSIFICAÇÃO — CPC 51", 3);
-  escreverMeta(wsPol, [empresa || "Empresa", periodoLegivel(ctx)]);
+  escreverMeta(wsPol, [empresa || "Empresa", ctx.periodo || ""]);
   linhaEmBranco(wsPol);
   const cabJ = escreverCabecalhoTabela(wsPol, ["Julgamento", "Definição adotada"], { congelar: false });
   [

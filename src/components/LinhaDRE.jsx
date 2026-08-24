@@ -1,4 +1,4 @@
-import { brl, pct } from "../lib/parse.js";
+import { brl, pct } from "../lib/formato.js";
 import { SINAL_GRUPO } from "../lib/classify.js";
 import { Canal } from "./Eixo.jsx";
 

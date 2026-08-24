@@ -12,18 +12,21 @@
  * padrão, dentro da tela que executa a tarefa.
  */
 
-import { brl, pct } from "../lib/parse.js";
+import { brl, pct } from "../lib/formato.js";
 import { Icone } from "./Icones.jsx";
 
 /* Um passo por vez. A ordem é a do fluxo real, e a primeira condição que
    bate vence — é o que impede a tela de sugerir "gere a DRE" enquanto as
    partidas não fecham. */
-function proximoPasso({ temDados, temBalancete, dif, temRazao, placar, nContasResultado }) {
-  if (!temDados && !temBalancete) {
-    return { aba: "importar", ico: "importar", titulo: "Importar o razão", sub: "CSV ou Excel do seu sistema contábil", cta: "Escolher arquivo" };
+function proximoPasso({ temDados, resumo, placar, nContasResultado }) {
+  if (!temDados) {
+    return { aba: "importar", ico: "importar", titulo: "Importar o balancete", sub: "CSV ou Excel do seu sistema contábil", cta: "Escolher arquivo" };
   }
-  if (temRazao && Math.abs(dif) >= 0.01) {
-    return { aba: "conferir", ico: "conferir", titulo: "Conferir as partidas", sub: `Diferença de ${brl(Math.abs(dif))} entre débito e crédito`, cta: "Conferir", alerta: true };
+  if (resumo && !resumo.integro) {
+    return { aba: "conferir", ico: "conferir", titulo: "Conferir o balancete", sub: "O arquivo não fecha consigo mesmo", cta: "Conferir", alerta: true };
+  }
+  if (resumo?.resultadoConfere === false) {
+    return { aba: "conferir", ico: "conferir", titulo: "Conferir o balancete", sub: "Patrimonial e resultado apuram números diferentes", cta: "Conferir", alerta: true };
   }
   if (nContasResultado && placar?.semGrupo) {
     return { aba: "classificar", ico: "classificar", titulo: "Classificar as contas", sub: `${placar.semGrupo} conta(s) ainda sem grupo na DRE`, cta: "Classificar", alerta: true };
@@ -48,16 +51,19 @@ function Atalho({ ico, nome, valor, alerta, onClick, disabled }) {
 }
 
 export function Inicio({
-  arquivo, empresa, periodo, temDados, temBalancete, temRazao, arquivoBalancete,
-  nLinhas, nContas, nContasResultado, dif, placar, concilia, dre, onIr, disponivel,
+  arquivo, empresa, periodo, temDados, nBalancetes = 0, resumo,
+  nContas, nContasResultado, placar, concilia, dre, onIr, disponivel,
 }) {
-  const passo = proximoPasso({ temDados, temBalancete, dif, temRazao, placar, nContasResultado });
+  const passo = proximoPasso({ temDados, resumo, placar, nContasResultado });
 
   /* Só entra na lista o que pede AÇÃO. Um "tudo certo" para cada
      verificação encheria a tela de verde e esconderia o que importa. */
   const pendencias = [];
-  if (temRazao && Math.abs(dif) >= 0.01) {
-    pendencias.push({ aba: "conferir", txt: "Partidas não fecham", val: brl(Math.abs(dif)) });
+  if (resumo && !resumo.integro) {
+    pendencias.push({ aba: "conferir", txt: "O balancete não fecha", val: `${resumo.inconsistentes + resumo.sinteticasErradas}` });
+  }
+  if (resumo?.resultadoConfere === false) {
+    pendencias.push({ aba: "conferir", txt: "Patrimonial x resultado", val: "diverge" });
   }
   if (placar?.semGrupo) {
     pendencias.push({ aba: "classificar", txt: "Contas fora da DRE", val: `${placar.semGrupo}` });
@@ -77,12 +83,12 @@ export function Inicio({
               informada" ocupa uma linha para não dizer nada. */}
           {empresa && <div className="rotulo">{empresa}</div>}
           <h2 className="inicio-tit">
-            {arquivo || arquivoBalancete || "Nenhum arquivo carregado"}
+            {arquivo || "Nenhum arquivo carregado"}
           </h2>
           <div className="inicio-meta">
-            {temRazao && <span>{nLinhas.toLocaleString("pt-BR")} lançamentos</span>}
-            {(temDados || temBalancete) && <span>{nContas} contas</span>}
+            {temDados && <span>{nContas} contas</span>}
             {periodo && <span>{periodo}</span>}
+            {nBalancetes > 1 && <span>{nBalancetes} períodos carregados</span>}
           </div>
         </div>
         {temDados && (
@@ -136,7 +142,7 @@ export function Inicio({
       <div className="rotulo secao-rot">Ir para</div>
       <div className="atalhos">
         <Atalho ico="dre" nome="DRE" valor={temDados ? brl(dre.liquido) : ""} disabled={!disponivel("dre")} onClick={() => onIr("dre")} />
-        <Atalho ico="comparativo" nome="Comparativa" disabled={!disponivel("comparativo")} onClick={() => onIr("comparativo")} />
+        <Atalho ico="comparativo" nome="Comparativa" valor={nBalancetes > 1 ? `${nBalancetes} períodos` : ""} disabled={!disponivel("comparativo")} onClick={() => onIr("comparativo")} />
         <Atalho ico="depara" nome="De-Para" valor={placar?.total ? pct(placar.completude) : ""} alerta={!!placar?.pendente} disabled={!disponivel("depara")} onClick={() => onIr("depara")} />
         <Atalho ico="cpc51" nome="CPC 51" valor={temDados ? (concilia ? "concilia" : "conferir") : ""} alerta={temDados && !concilia} disabled={!disponivel("cpc51")} onClick={() => onIr("cpc51")} />
         <Atalho ico="historico" nome="Histórico" onClick={() => onIr("historico")} />

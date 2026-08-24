@@ -10,7 +10,6 @@
 
 import { GRUPOS, SINAL_GRUPO } from "./classify.js";
 import { montarLinhas } from "./linhasDRE.js";
-import { competenciaLegivel } from "./parse.js";
 import {
   aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
   escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook,
@@ -26,7 +25,7 @@ import {
  *  comando no Windows com uma confirmação.
  *
  *  Isso importa aqui porque o texto vem do plano de contas e do
- *  histórico do razão — dados que o app não controla e que passam por
+ *  descrição do balancete — dados que o app não controla e que passam por
  *  vários sistemas antes de chegar. E o destino do CSV é justamente ser
  *  aberto no Excel por um contador, que é quem menos espera isso.
  *
@@ -40,33 +39,19 @@ export function neutralizarFormula(v) {
 
 export const dec = (n) => (n == null ? "" : n.toFixed(2));
 
-/* "jan a fev a mar a abr" era o que saía no cabeçalho de todo arquivo
-   exportado quando o razão cobria mais de dois meses — o `join(" a ")`
-   entre TODOS os meses. Com um razão diário, virava uma linha de
-   quinhentos caracteres. A correção de então cortou pro primeiro e o
-   último — mas usando `meses`, que apesar do nome é a lista de DIAS
-   (coluna Dia/Mês, "01/jan", "15/mar"...), um Set sem ordem cronológica
-   nenhuma: "primeiro e último" ali virava dois dias quase aleatórios
-   ("01/jan a 29/mar" para um arquivo de janeiro a junho). O sintoma
-   (linha enorme) sumiu; a causa (fonte errada) ficou. Período é
-   COMPETÊNCIA (mês/ano), não dia — por isso agora vem de
-   `competencias`, a lista que `listarCompetencias()` já devolve
-   ordenada de verdade. */
-export function periodoLegivel({ filtroMes, filtroCompetencia, competencias = [] }) {
-  if (filtroCompetencia && filtroCompetencia !== "todas") return competenciaLegivel(filtroCompetencia);
-  if (filtroMes && filtroMes !== "todos") return filtroMes;
-  if (!competencias.length) return "";
-  return competencias.length > 1
-    ? `${competenciaLegivel(competencias[0])} a ${competenciaLegivel(competencias[competencias.length - 1])}`
-    : competenciaLegivel(competencias[0]);
-}
-
-export function cabecalho({ empresa, cnpj, filtroMes, filtroCompetencia, competencias, titulo }) {
+/* O período do arquivo exportado é o do BALANCETE, que o declara sozinho
+   na aba de parâmetros ("Data Inicial"/"Data Final") — ver
+   `periodoDoBalancete` e `periodoLegivel` em balancete.js. Antes vinha
+   das competências do razão, e por muito tempo veio de `meses`, que
+   apesar do nome era a lista de DIAS do arquivo: um Set sem ordem
+   cronológica, que produzia "01/jan a 29/mar" para um arquivo de janeiro
+   a junho. Com o balancete não há o que deduzir — o arquivo diz. */
+export function cabecalho({ empresa, cnpj, periodo, titulo }) {
   return [
     [titulo || "DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO"],
     [empresa || "Empresa"],
     [cnpj ? `CNPJ ${cnpj}` : ""],
-    ["Período", periodoLegivel({ filtroMes, filtroCompetencia, competencias })],
+    ["Período", periodo || ""],
     [],
   ];
 }
@@ -140,7 +125,7 @@ export function baixarCSV(ctx) {
   baixar("\uFEFF" + csv, nomeArquivo(empresa, "csv"), "text/csv;charset=utf-8");
 }
 
-/** Excel estilizado: DRE, contas por grupo e, quando o razão cobre mais
+/** Excel estilizado: DRE, contas por grupo e, quando há mais
  *  de um mês, a comparativa — cada uma em sua aba, com números como
  *  NÚMERO (não texto), para o contador poder somar e filtrar em cima, e
  *  com o mesmo visual "Razão" da tela: cabeçalho de marca, rajado
@@ -187,7 +172,7 @@ export async function baixarExcel(ctx) {
   // --- Aba comparativa (só se houver mais de uma competência) ---
   if (dresPorCompetencia.length > 1) {
     const colunas = dresPorCompetencia.map((d) => ({
-      titulo: competenciaLegivel(d.competencia),
+      titulo: d.rotulo,
       valores: new Map(matrizDRE(d.dre).map((l) => [l.lbl, l.val])),
     }));
     // Esqueleto da última competência: seções condicionais aparecem

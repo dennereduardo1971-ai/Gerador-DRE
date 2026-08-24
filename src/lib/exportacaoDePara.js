@@ -45,7 +45,7 @@ const linhaMatriz = (l) => [
  *
  * `neutralizarFormula` prefixa com aspa simples tudo que começa com
  * `- = + @` — a defesa correta para TEXTO vindo do plano de contas e do
- * histórico do razão, que o app não controla. Mas `dec(-40000)` produz
+ * descrição do balancete, que o app não controla. Mas `dec(-40000)` produz
  * "-40000.00", que também começa com `-`: aplicada ali, a defesa
  * transformava toda despesa numa célula de TEXTO, que o Excel não soma.
  * Num arquivo cujo destino é carga em ERP e conferência por totais, isso

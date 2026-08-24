@@ -33,7 +33,7 @@ export const FASES = [
       { texto: "Levantar, para cada empresa/cliente, o regime tributário, o porte, a obrigatoriedade de elaborar demonstrações financeiras e a existência de indicadores gerenciais (MPDA) hoje divulgados." },
       {
         texto: "Revisar a DRE atual de cada empresa e identificar contas que hoje se misturam entre operacional, investimento, financiamento e operações descontinuadas.",
-        apoio: "A aba CPC 51 lista as contas mistas do razão importado, ordenadas por valor, com o motivo de cada apontamento.",
+        apoio: "A aba CPC 51 lista as contas mistas do balancete importado, ordenadas por valor, com o motivo de cada apontamento.",
       },
       { texto: "Comunicar formalmente a diretoria/sócios sobre prazos, riscos e necessidade de recursos (sistema, horas técnicas, treinamento)." },
       { texto: "Definir o cronograma-mestre e os marcos de controle conforme a estrutura de Fases 0 a 9 aprovada, adaptando por cliente quando necessário." },
@@ -271,7 +271,7 @@ export const FASES = [
       {
         n: 37,
         texto: "Gerar as demonstrações de 2027 (ou do primeiro período de apuração) já na estrutura do CPC 51.",
-        apoio: "Mesma aba, mesmo fluxo: importar o razão ou o balancete do período e a demonstração sai categorizada.",
+        apoio: "Mesma aba, mesmo fluxo: importar o balancete do período e a demonstração sai categorizada.",
       },
       {
         n: 38,

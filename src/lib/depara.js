@@ -151,7 +151,7 @@ export function porGrupo(linhas) {
  *  cai no histórico do lançamento quando a conta não tem nome no plano,
  *  então quem só lembra do texto do lançamento também acha. O histórico
  *  inteiro não entra: são até 20 mil caracteres por conta, e varrê-los a
- *  cada tecla digitada travaria a tabela num razão grande. */
+ *  cada tecla digitada travaria a tabela num plano de contas grande. */
 export function filtrarDePara(linhas, { busca = "", grupo = "todos", categoria = "todas", situacao = "todas" } = {}) {
   const q = busca.trim().toLowerCase();
   return linhas.filter((l) => {

@@ -20,13 +20,13 @@
  */
 
 import { useMemo, useState } from "react";
-import { brl, pct } from "../lib/parse.js";
+import { brl, pct } from "../lib/formato.js";
 import { GRUPOS } from "../lib/grupos.js";
 import { CATEGORIAS, NOME_CATEGORIA } from "../lib/cpc51.js";
 import { SITUACOES, filtrarDePara, porGrupo, resumoDePara } from "../lib/depara.js";
 import { situacaoDaLinha } from "../lib/exportacaoDePara.js";
 
-/* Teto de linhas desenhadas de uma vez. Um razão real chega a centenas
+/* Teto de linhas desenhadas de uma vez. Um plano de contas real chega a centenas
    de contas de resultado, e cada linha tem dois <select> — passar de
    algumas centenas trava a digitação na busca. Quem precisa de todas
    exporta; quem precisa de uma acha pelo filtro. */

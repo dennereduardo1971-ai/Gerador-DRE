@@ -1,10 +1,10 @@
 import { Fragment } from "react";
-import { brl } from "../lib/parse.js";
+import { brl } from "../lib/formato.js";
 import { Linha, Secao, Detalhe, Cabecalho } from "./LinhaDRE.jsx";
 import { montarLinhas } from "../lib/linhasDRE.js";
 
 export function EtapaDRE({
-  dre, empresa, cnpj, periodo, filtroCC, tDeb, tCre, dif,
+  dre, empresa, cnpj, periodo, resumo,
   nomes, detalhado, onToggleDetalhado, onBaixarCSV, onBaixarExcel, prova, onSalvarHistorico,
 }) {
   const base = dre.receitaLiq || 1;
@@ -31,8 +31,7 @@ export function EtapaDRE({
           <p>
             {empresa ? "Demonstração do Resultado Intermediária" : ""}
             {cnpj ? ` · CNPJ ${cnpj}` : ""}
-            {" · "}{periodo || "período do arquivo"}
-            {filtroCC !== "todos" ? ` · centro de custo ${filtroCC}` : ""} · valores em R$
+            {" · "}{periodo || "período do arquivo"} · valores em R$
           </p>
         </div>
 
@@ -60,7 +59,8 @@ export function EtapaDRE({
         {/* Prova de integridade: em R$, não em contagem de contas. "12
             contas ficaram de fora" não diz nada sozinho — podem ser R$ 3,00
             ou R$ 3 milhões. É esta linha que permite assinar a DRE sabendo
-            que nada se perdeu no caminho entre o razão e a demonstração. */}
+            que nada se perdeu no caminho entre o balancete e a
+            demonstração. */}
         <div className="prova" data-fecha={prova.fecha ? "1" : "0"}>
           <b>Prova de integridade.</b>{" "}
           Das {prova.nContas} contas de resultado, {brl(prova.classificado)} entraram na
@@ -72,7 +72,7 @@ export function EtapaDRE({
             <> e nada ficou de fora</>
           )}
           . Somando os dois: {brl(prova.total)}, que é exatamente o movimento das contas de
-          resultado do razão
+          resultado do balancete
           {prova.fecha ? "." : ` — com diferença de ${brl(Math.abs(prova.diferenca))}, que precisa ser investigada antes de assinar.`}
         </div>
 
@@ -80,8 +80,12 @@ export function EtapaDRE({
           A barra de cada linha mostra quanto da receita ainda restava naquele ponto da
           demonstração — verde soma, vermelho subtrai, índigo é o saldo acumulado.<br />
           Análise vertical calculada sobre a receita operacional líquida.<br />
-          Débitos {brl(tDeb)} · créditos {brl(tCre)} ·{" "}
-          {Math.abs(dif) < 0.01 ? "razão fechado" : `diferença de ${brl(Math.abs(dif))}`}.
+          {resumo
+            ? <>Balancete de {resumo.nContas} contas ·{" "}
+              {resumo.integro ? "hierarquia fecha" : "hierarquia NÃO fecha — conferir antes de assinar"}
+              {resumo.resultadoConfere === true && " · patrimonial e resultado batem"}
+              {resumo.resultadoConfere === false && " · patrimonial e resultado DIVERGEM"}.</>
+            : "Sem balancete carregado."}
         </div>
 
         {/* Só existe no papel: `display: none` na tela, visível dentro de

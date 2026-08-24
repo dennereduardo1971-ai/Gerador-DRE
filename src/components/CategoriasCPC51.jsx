@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { brl } from "../lib/parse.js";
+import { brl } from "../lib/formato.js";
 import { GRUPOS } from "../lib/classify.js";
 import { CATEGORIAS, NOME_CATEGORIA, categoriaDoGrupo, revisarGrupo } from "../lib/cpc51.js";
 

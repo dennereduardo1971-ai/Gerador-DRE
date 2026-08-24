@@ -1,20 +1,10 @@
 import Papa from "papaparse";
-import { lerTexto } from "./parse.js";
-import { importarCSV } from "./importarCSV.js";
-import { importarExcel, importarExcelAbas, importarExcelComoLinhas, ehArquivoExcel } from "./importarExcel.js";
-
-/** Importa o razão contábil, em CSV ou em Excel (.xlsx, .xls, .xlsm,
- *  .xlsb, .ods) — decide qual caminho usar pela extensão do arquivo e
- *  devolve sempre o mesmo formato ({ campos, linhas, ... }), para o resto
- *  do app não precisar saber a diferença. */
-export function importarArquivo(file, onProgress) {
-  if (ehArquivoExcel(file.name)) return importarExcel(file, onProgress);
-  return importarCSV(file, onProgress);
-}
+import { lerTexto } from "./formato.js";
+import { importarExcelAbas, importarExcelComoLinhas, ehArquivoExcel } from "./importarExcel.js";
 
 /** Importa um arquivo de duas colunas (código, descrição) — o plano de
  *  contas — em CSV ou Excel, devolvendo sempre um array de arrays (sem
- *  assumir cabeçalho), pronto para parsearPlanoDeContas (em parse.js).
+ *  assumir cabeçalho), pronto para parsearPlanoDeContas (em formato.js).
  *  Também serve ao balancete: em Excel, a aba certa já é escolhida por
  *  conteúdo (ver `pontuarAbaDeContas`), então quem chama não precisa
  *  saber qual aba tem o quê. */

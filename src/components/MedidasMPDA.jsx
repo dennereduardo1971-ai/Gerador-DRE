@@ -7,7 +7,7 @@
  * número sozinho é justamente o que a norma proíbe.
  */
 
-import { brl } from "../lib/parse.js";
+import { brl } from "../lib/formato.js";
 import { GRUPOS } from "../lib/classify.js";
 import { BASES, MODELOS, calcularMPDA } from "../lib/mpda.js";
 

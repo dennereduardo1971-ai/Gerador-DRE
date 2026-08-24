@@ -15,7 +15,7 @@
  */
 
 import { Fragment } from "react";
-import { brl, pct } from "../lib/parse.js";
+import { brl, pct } from "../lib/formato.js";
 import { Cabecalho, Linha, Secao } from "./LinhaDRE.jsx";
 import { montarLinhas51 } from "../lib/linhasCPC51.js";
 import { CATEGORIAS } from "../lib/cpc51.js";

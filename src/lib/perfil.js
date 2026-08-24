@@ -3,7 +3,7 @@
  *
  * Sem isto, o trabalho manual de classificar contas era descartável: se o
  * usuário arrumava 30 contas na mão em janeiro, em fevereiro arrumava as
- * mesmas 30 de novo, porque importar um razão novo zerava tudo. O perfil
+ * mesmas 30 de novo, porque importar um arquivo novo zerava tudo. O perfil
  * transforma esse trabalho num ativo — e é também o caminho para atender
  * um plano de contas que não seja o do IESB sem tocar em classify.js.
  *
@@ -106,7 +106,7 @@ export function lerPerfil(texto) {
   };
 }
 
-/** Quantas contas do perfil se aplicam ao razão aberto agora — o número
+/** Quantas contas do perfil se aplicam ao balancete aberto agora — o número
  *  que responde "esse perfil serve para este arquivo?" antes de aplicar. */
 export function cobertura(perfil, contasResultado = []) {
   const presentes = contasResultado.filter((c) => perfil.contas[c.conta]).length;

@@ -224,7 +224,7 @@ export function montarDRE(contasResultado, grupoDe) {
 }
 
 /** Prova de integridade: nada se perdeu nem foi contado duas vezes entre
- *  o razão e a demonstração.
+ *  o balancete e a demonstração.
  *
  *  A tela mostrava só a CONTAGEM de contas deixadas de fora ("12 contas
  *  não entraram") — número que não diz nada sozinho: 12 contas podem ser
@@ -232,7 +232,7 @@ export function montarDRE(contasResultado, grupoDe) {
  *  o VALOR, e a confirmação de que o resto fechou.
  *
  *  Compara em magnitude (`Math.abs`) de propósito: aqui a pergunta não é
- *  "qual o resultado", é "cada centavo do razão foi parar em alguma linha
+ *  "qual o resultado", é "cada centavo do balancete foi parar em alguma linha
  *  da DRE ou na pilha do que ficou de fora?". */
 export function provaIntegridade(contasResultado, grupoDe) {
   let total = 0, classificado = 0, ignorado = 0;

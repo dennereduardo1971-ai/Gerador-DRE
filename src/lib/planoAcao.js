@@ -9,7 +9,7 @@
  *    empresa, e perder o andamento do projeto junto seria um efeito
  *    colateral sem contrapartida.
  * 2. O plano é do escritório, não do arquivo aberto. Ele precisa
- *    sobreviver a trocar de razão, de empresa e de mês — que é
+ *    sobreviver a trocar de arquivo, de empresa e de mês — que é
  *    exatamente o que a sessão faz sumir.
  */
 

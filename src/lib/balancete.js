@@ -1,15 +1,20 @@
-/* Balancete de Verificação — o formato completo, com hierarquia.
+/* Balancete de Verificação — a FONTE do app.
  *
- * Diferente do balancete simples de `abertura.js` (código;saldo), este é o
- * relatório que o sistema contábil emite de verdade: código pontuado em
- * vários níveis, descrição, saldo anterior, débito e crédito do período,
- * movimento e saldo atual — com a natureza do saldo indicada por "D" ou
- * "C" no fim do número, não por sinal.
+ * É o relatório que o sistema contábil emite de verdade (ctbr041): código
+ * pontuado em vários níveis, descrição, saldo anterior, débito e crédito
+ * do período, movimento e saldo atual — com a natureza do saldo indicada
+ * por "D" ou "C" no fim do número, não por sinal.
  *
- * Ele traz muito mais do que o app pedia para montar o Balanço: traz o
- * Balanço inteiro, já hierarquizado e conferido pela contabilidade. Então
- * quando este formato é reconhecido, ele passa a ser a FONTE do Balanço, e
- * o razão importado vira a contraprova — não o contrário.
+ * Ele é a única fonte desde 24/08/2026, e por três motivos: já passou
+ * pelo fechamento da contabilidade, monta a DRE sozinho e traz o plano de
+ * contas junto. O razão contábil, que somava lançamento a lançamento até
+ * chegar no mesmo movimento, saiu do app.
+ *
+ * SÓ ESTE FORMATO ENTRA. Existiu um caminho para o formato simples
+ * `código;saldo`, e ele servia a uma coisa só: dar saldo de abertura ao
+ * Balanço Patrimonial, tela que o app não tem mais. Um arquivo desse
+ * formato seria aceito e não produziria nada — pior que recusá-lo,
+ * porque o usuário acharia que carregou.
  *
  * Três características da hierarquia que o parser precisa respeitar:
  *
@@ -289,9 +294,15 @@ export function resumir(contas, porCodigo) {
     : acumResultado != null ? -acumResultado : null;
   const resultadoPeriodo = movResultado != null ? -movResultado : movPatrimonial;
 
+  /* Os DOIS lados da conferência cruzada saem separados, não só o
+     veredito. Um booleano diz que diverge; os dois números dizem de
+     quanto e para que lado — e é isso que a tela desenha na balança. */
+  const periodoPelaPatrimonial = temPatrimonial ? movPatrimonial : null;
+  const periodoPelaResultado = movResultado != null ? -movResultado : null;
+
   // Conferência cruzada: só existe quando o arquivo traz os dois lados.
-  const resultadoConfere = (temPatrimonial && movResultado != null && movPatrimonial != null)
-    ? Math.abs(movPatrimonial - -movResultado) < 0.01
+  const resultadoConfere = (periodoPelaPatrimonial != null && periodoPelaResultado != null)
+    ? Math.abs(periodoPelaPatrimonial - periodoPelaResultado) < 0.01
     : null;
 
   // Consistência: anterior + movimento = atual, em toda linha.
@@ -311,6 +322,8 @@ export function resumir(contas, porCodigo) {
     resultadoExercicio: totalAtivo + totalPassivo,
     resultadoAcumulado,
     resultadoPeriodo,
+    periodoPelaPatrimonial,
+    periodoPelaResultado,
     resultadoConfere,
     debitoPeriodo: folhas.reduce((s, c) => s + c.debito, 0),
     creditoPeriodo: folhas.reduce((s, c) => s + c.credito, 0),
@@ -342,19 +355,14 @@ export function coberturaBalancete(bal) {
 }
 
 /** Converte as contas analíticas do balancete para o formato que o resto
- *  do app usa (`agregarPorConta`), permitindo montar a DRE a partir do
- *  balancete, sem razão.
+ *  do app usa, para `montarDRE` poder somar a demonstração.
  *
- *  As duas fontes descrevem o mesmo fato por caminhos diferentes: o razão
- *  soma lançamento a lançamento até chegar no movimento de cada conta; o
- *  balancete já traz esse movimento somado pela contabilidade. Por isso a
- *  conversão é direta — e por isso o balancete é a fonte mais confiável
- *  das duas, já que passou pelo fechamento.
- *
- *  Atenção ao sinal: `agregarPorConta` usa saldo = crédito − débito
+ *  ATENÇÃO AO SINAL. O resto do app usa saldo = crédito − débito
  *  (natureza credora positiva, que é o que `montarDRE` espera para
- *  receitas), enquanto o balancete usa movimento = débito − crédito. Um é
- *  o negativo do outro; trocar isso inverteria a DRE inteira. */
+ *  receitas), enquanto o balancete guarda movimento = débito − crédito.
+ *  Um é o negativo do outro; "simplificar" isso inverteria a DRE inteira
+ *  sem quebrar mais nada visivelmente. Há teste explícito guardando este
+ *  ponto (`dreDoBalancete.test.js`). */
 export function contasDeMovimento(bal) {
   if (!bal) return [];
   return bal.folhas.map((c) => ({
@@ -439,4 +447,44 @@ export function periodoLegivel(inicio, fim) {
     return `${MES_EXTENSO[a.mes - 1]} de ${a.ano}`;
   }
   return `${inicio} a ${fim}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * O balancete como uma coluna do tempo.
+ *
+ * Vários balancetes podem estar carregados ao mesmo tempo — é assim que a
+ * Comparativa põe um mês por coluna e que a demonstração do CPC 51 monta
+ * a coluna comparativa exigida para 2027. Para isso cada arquivo precisa
+ * de duas coisas: uma CHAVE estável (identidade e ordenação) e um RÓTULO
+ * (o que se imprime).
+ *
+ * A ordenação vem da data inicial declarada pelo próprio arquivo,
+ * convertida para AAAAMMDD justamente para ordenar como texto sem
+ * armadilha — `['12/2025','01/2026'].sort()` punha o mês na frente do ano
+ * e comparava cada período com o "anterior" errado, sem sinal nenhum na
+ * tela. Arquivo que não declara período vai para o fim da fila e é
+ * rotulado pelo nome, nunca com uma data inventada.
+ * ------------------------------------------------------------------ */
+export function identidadeDoPeriodo(periodo, arquivo) {
+  const paraOrdem = (d) => {
+    const m = String(d ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return m ? `${m[3]}${m[2]}${m[1]}` : "";
+  };
+  const ordem = paraOrdem(periodo?.inicio) || paraOrdem(periodo?.fim) || "";
+  const rotulo = periodo?.legivel || arquivo || "período não declarado";
+  // A chave leva a ordem junto para dois arquivos de mesmo rótulo (dois
+  // "junho de 2026" reimportados) continuarem sendo o mesmo período — é o
+  // que faz reimportar substituir em vez de duplicar.
+  return { ordem, rotulo, chave: `${ordem}|${rotulo}` };
+}
+
+/** Ordena balancetes cronologicamente; os sem período declarado vão para
+ *  o fim, em ordem de carregamento. */
+export function ordenarBalancetes(lista) {
+  return [...lista].sort((a, b) => {
+    if (!a.ordem && !b.ordem) return 0;
+    if (!a.ordem) return 1;
+    if (!b.ordem) return -1;
+    return a.ordem.localeCompare(b.ordem);
+  });
 }

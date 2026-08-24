@@ -1,14 +1,12 @@
 /* Persistência da sessão de trabalho.
  *
- * Antes, um F5 apagava tudo: razão importado, mapeamento de colunas,
- * classificações manuais, empresa e CNPJ — depois de o usuário ter
- * esperado um minuto importando dezenas de milhares de linhas. Era a
- * maior fonte de atrito do uso diário.
+ * Antes, um F5 apagava tudo: arquivo importado, classificações manuais,
+ * empresa e CNPJ. Era a maior fonte de atrito do uso diário.
  *
- * O razão inteiro não cabe em localStorage (que é síncrono, limitado a
- * poucos MB e bloqueia a thread), então vai para o IndexedDB, que é
- * assíncrono e aguenta o volume. Só o razão fica lá; nada é enviado para
- * lugar nenhum — continua tudo no navegador do usuário.
+ * Vai para o IndexedDB e não para localStorage porque localStorage é
+ * síncrono, limitado a poucos MB e bloqueia a thread — e os balancetes
+ * carregados (vários meses, milhares de contas cada) não cabem lá. Nada
+ * é enviado para lugar nenhum: continua tudo no navegador do usuário.
  *
  * Cuidado deliberado: isto grava dados financeiros reais no disco da
  * máquina. Em PC de empresa isso é sensível, então `limparSessao()` é
@@ -17,7 +15,14 @@
 const BANCO = "gerador-dre";
 const LOJA = "sessao";
 const CHAVE = "atual";
-const VERSAO_FORMATO = 1;
+/* Versão 2: a sessão passou a guardar `balancetes` (uma lista, com o
+   período de cada um) no lugar de `linhas`/`map`/`abertura`, que eram do
+   razão contábil. Sessão versão 1 é DESCARTADA na leitura em vez de
+   migrada: o que ela guarda de mais caro é o razão, que este app não lê
+   mais, e tentar reaproveitar o pedaço do balancete de dentro dela
+   traria de volta um formato que já não existe. O usuário reimporta um
+   arquivo; ninguém fica com estado meio convertido. */
+const VERSAO_FORMATO = 2;
 
 function abrir() {
   return new Promise((resolve, reject) => {
@@ -64,13 +69,8 @@ export async function lerSessao() {
     const dados = await transacao(db, "readonly", (loja) => loja.get(CHAVE));
     db.close();
     if (!dados || dados.versaoFormato !== VERSAO_FORMATO) return null;
-    /* Uma sessão vale se tiver QUALQUER uma das duas fontes. Exigir razão
-       aqui descartaria silenciosamente a sessão de quem trabalha só com
-       balancete — que é o fluxo principal desde que o balancete passou a
-       montar a DRE sozinho. */
-    const temRazao = Array.isArray(dados.linhas) && dados.linhas.length > 0;
-    const temBalancete = !!dados.abertura?.balancete;
-    if (!temRazao && !temBalancete) return null;
+    // Sessão sem nenhum balancete não tem o que restaurar.
+    if (!Array.isArray(dados.balancetes) || !dados.balancetes.length) return null;
     return dados;
   } catch {
     return null;

@@ -11,7 +11,7 @@
  *
  * O andamento fica em localStorage e sobrevive a "Limpar tudo" de
  * propósito: ali não há dado financeiro nenhum, e perder o andamento do
- * projeto ao limpar o razão seria dano sem contrapartida (ver
+ * projeto ao limpar o arquivo seria dano sem contrapartida (ver
  * `planoAcao.js`).
  */
 

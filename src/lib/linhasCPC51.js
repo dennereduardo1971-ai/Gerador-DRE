@@ -25,7 +25,6 @@
 
 import { aplicarCascata, totalizarSecoes } from "./linhasDRE.js";
 import { IDS_CATEGORIA } from "./cpc51.js";
-import { competenciaLegivel } from "./parse.js";
 
 /* O CÓDIGO DA LINHA (`1.1`, `2.3`...) — o que o modelo de DRE do CPC 51
    que o cliente usa como base traz na segunda coluna, para a nota
@@ -84,25 +83,28 @@ export function montarLinhas51(dre51) {
  * reapresentado) e o que o modelo de DRE usado como base traz como
  * segunda coluna de valores.
  *
- * Ela só é preenchida quando existe período anterior DE VERDADE no que
- * foi importado: a demonstração precisa estar filtrada numa competência
- * e o arquivo precisa ter a competência de antes dela. Fora disso a
- * coluna sai VAZIA, nunca com zero e nunca com o valor de um período
- * que não é o anterior — a mesma regra da nota de MPDA, onde o que o app
- * não sabe sai como lacuna. Comparar "Jan a Jun" com "Mai" produziria um
+ * Ela só é preenchida quando existe período anterior DE VERDADE entre os
+ * balancetes carregados: o que a tela mostra tem que ser um deles, e tem
+ * que haver outro imediatamente antes na ordem do tempo. Fora disso a
+ * coluna sai VAZIA, nunca com zero e nunca com o valor de um período que
+ * não é o anterior — a mesma regra da nota de MPDA, onde o que o app não
+ * sabe sai como lacuna. Comparar "Jan a Jun" com "Mai" produziria um
  * número que parece comparativo e não é.
+ *
+ * Carregar mais de um balancete é o que dá material a esta coluna: cada
+ * arquivo declara o próprio período, e a lista chega aqui já ordenada.
  *
  * O casamento é por RÓTULO, como em `EtapaComparativo`: um mês sem
  * determinado grupo simplesmente não tem aquela linha, e a célula fica
  * vazia em vez de deslocar a coluna inteira. */
-export function comparativo51(dres51PorCompetencia = [], filtroCompetencia) {
-  if (!filtroCompetencia || filtroCompetencia === "todas") return null;
-  const i = dres51PorCompetencia.findIndex((d) => d.competencia === filtroCompetencia);
+export function comparativo51(dres51PorPeriodo = [], periodoAtivo) {
+  if (!periodoAtivo) return null;
+  const i = dres51PorPeriodo.findIndex((d) => d.competencia === periodoAtivo);
   if (i <= 0) return null;
-  const anterior = dres51PorCompetencia[i - 1];
+  const anterior = dres51PorPeriodo[i - 1];
   const valores = {};
   montarLinhas51(anterior.dre51).itens.forEach((it) => {
     if (it.val != null) valores[it.lbl] = it.val;
   });
-  return { competencia: anterior.competencia, rotulo: competenciaLegivel(anterior.competencia), valores };
+  return { competencia: anterior.competencia, rotulo: anterior.rotulo, valores };
 }
