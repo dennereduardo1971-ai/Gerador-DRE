@@ -64,7 +64,7 @@ describe("cobertura", () => {
   });
 });
 
-describe("perfil versão 2 — as decisões do CPC 51 viajam junto", () => {
+describe("perfil — as decisões do CPC 51 viajam junto", () => {
   const perfil = montarPerfil({
     nome: "Cliente X",
     classif: { "4210201": "REC_FIN" },
@@ -74,7 +74,7 @@ describe("perfil versão 2 — as decisões do CPC 51 viajam junto", () => {
   });
 
   it("guarda categoria por conta, política e medidas — e nenhum valor", () => {
-    expect(perfil.versao).toBe(2);
+    expect(perfil.versao).toBe(3);
     expect(perfil.categorias).toEqual({ "4210201": "OPERACIONAL" }); // categoria inválida fora
     expect(perfil.politica.investirEhAtividadePrincipal).toBe(true);
     expect(perfil.politica.financiarClientesEhAtividadePrincipal).toBe(false);
@@ -105,5 +105,48 @@ describe("perfil versão 2 — as decisões do CPC 51 viajam junto", () => {
       medidas: [{ nome: "Vazia", base: "OPERACIONAL", ajustes: [] }],
     }));
     expect(r.perfil.medidas).toEqual([]);
+  });
+});
+
+describe("perfil versão 3 — os parâmetros fiscais viajam, os valores não", () => {
+  const fiscal = {
+    params: {
+      regime: "REAL_NAO_CUMULATIVO",
+      periodicidade: "TRIMESTRAL",
+      aliquotas: { pis: 0.0165, cofins: 0.076, irpj: 0.15, adicional: 0.10, csll: 0.09 },
+      prouni: { aderente: true },
+    },
+    mapaTributos: { "3210501": "PIS", "3210502": "COFINS" },
+  };
+
+  it("guarda regime, alíquotas e o mapa de tributos", () => {
+    const p = montarPerfil({ nome: "IESB", classif: {}, fiscal });
+    expect(p.versao).toBe(3);
+    expect(p.fiscal.params.regime).toBe("REAL_NAO_CUMULATIVO");
+    expect(p.fiscal.params.prouni.aderente).toBe(true);
+    expect(p.fiscal.mapaTributos["3210502"]).toBe("COFINS");
+  });
+
+  it("NÃO guarda prejuízo fiscal nem base negativa — são valores de cliente", () => {
+    /* O perfil existe para poder ser versionado no Git e mandado por
+       e-mail. Saldo de prejuízo fiscal de uma instituição identificada
+       num repositório público é exatamente o que este projeto tenta
+       evitar. Eles vivem só na sessão, em IndexedDB. */
+    const p = montarPerfil({
+      nome: "IESB", classif: {},
+      fiscal: { ...fiscal, prejuizo: { fiscal: 500000, baseNegativa: 300000 } },
+    });
+    const texto = JSON.stringify(p);
+    expect(texto).not.toContain("500000");
+    expect(texto).not.toContain("prejuizo");
+    expect(texto).not.toContain("baseNegativa");
+  });
+
+  it("perfil sem bloco fiscal continua válido — versões 1 e 2 são lidas", () => {
+    const p = montarPerfil({ nome: "Antigo", classif: { "3110101": "REC_MENSALIDADES" } });
+    expect(p.fiscal).toBe(null);
+    const r = lerPerfil(JSON.stringify({ ...p, versao: 1 }));
+    expect(r.ok).toBe(true);
+    expect(r.perfil.contas["3110101"]).toBe("REC_MENSALIDADES");
   });
 });

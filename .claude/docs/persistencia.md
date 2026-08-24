@@ -23,7 +23,11 @@ ser desfeitas:
   usa PC de empresa —, **"Limpar tudo" tem que continuar sendo um botão
   visível**, não uma opção escondida.
 
-`perfil.js` serializa o mapa conta → grupo num arquivo JSON (versão 2:
+`perfil.js` serializa o mapa conta → grupo num arquivo JSON (versão 3:
+leva também os PARÂMETROS fiscais — regime, alíquotas, adesão ao PROUNI e
+o mapa de qual conta é PIS, COFINS ou ISS; **prejuízo fiscal e base
+negativa de CSLL ficam de fora**, porque são valores de uma empresa
+identificada e o perfil precisa poder ser versionado; versão 2:
 leva junto a categoria do CPC 51 por conta, a política de atividade
 principal e as MPDA; perfis versão 1 continuam sendo lidos). Ele guarda
 **só decisões e nomes de conta, nunca valores** — de propósito, para

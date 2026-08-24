@@ -51,8 +51,9 @@ export function EtapaComparativo({ dresPorCompetencia }) {
     return (
       <div className="empty">
         <b>
-          Este arquivo cobre{" "}
-          {dresPorCompetencia.length === 1 ? "só uma competência" : "nenhuma competência reconhecida"}
+          {dresPorCompetencia.length === 1
+            ? "Só um período carregado"
+            : "Nenhum período carregado"}
         </b>
         Comparar a DRE no tempo põe uma coluna por período — carregue o balancete de outro
         mês na etapa Importar e ele vira uma coluna aqui. Dá para soltar vários arquivos de

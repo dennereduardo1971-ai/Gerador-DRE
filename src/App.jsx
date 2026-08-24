@@ -5,6 +5,7 @@ import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
 import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
 import { baixarCSVDeParaCompleto, baixarExcelDePara } from "./lib/exportacaoDePara.js";
+import { baixarExcelFiscal } from "./lib/exportacaoFiscal.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
 import { useTema } from "./lib/useTema.js";
 import { salvarNoHistorico, salvarOuAtualizar, listarHistorico, removerDoHistorico, sincronizarHistorico } from "./lib/historico.js";
@@ -15,6 +16,7 @@ import { useSessao } from "./hooks/useSessao.js";
 import { useFontes } from "./hooks/useFontes.js";
 import { useClassificacao } from "./hooks/useClassificacao.js";
 import { useCPC51 } from "./hooks/useCPC51.js";
+import { useFiscal } from "./hooks/useFiscal.js";
 
 import { EtapaImportar } from "./components/EtapaImportar.jsx";
 import { EtapaConferir } from "./components/EtapaConferir.jsx";
@@ -25,6 +27,7 @@ import { EtapaHistorico } from "./components/EtapaHistorico.jsx";
 import { EtapaCPC51 } from "./components/EtapaCPC51.jsx";
 import { Cronograma51 } from "./components/Cronograma51.jsx";
 import { DePara } from "./components/DePara.jsx";
+import { EtapaFiscal } from "./components/EtapaFiscal.jsx";
 import { Inicio } from "./components/Inicio.jsx";
 import { Icone } from "./components/Icones.jsx";
 
@@ -57,6 +60,16 @@ const SECOES = [
     id: "parametros",
     rotulo: "Parâmetros",
     abas: [["depara", "De-Para", "depara"]],
+  },
+  {
+    /* Apuração é seção própria porque responde outra pergunta: não "para
+       onde vai cada conta" (Parâmetros) nem "quanto deu" (DRE), mas "o
+       que a contabilidade lançou de imposto está certo?". Dentro da DRE
+       ela sumiria na rolagem; dentro de Parâmetros fingiria ser cadastro,
+       e o resultado de uma apuração não é cadastro. */
+    id: "fiscal",
+    rotulo: "Fiscal",
+    abas: [["fiscal", "Apuração", "fiscal"]],
   },
   {
     /* Comparativa e Histórico respondem à mesma pergunta em dois tempos:
@@ -120,6 +133,10 @@ export default function App() {
     nomesEfetivos: fontes.nomesEfetivos, aba,
     dresPorBalancete: cls.dresPorBalancete, periodoAtivo: fontes.emFoco?.chave,
   });
+  /* A apuração lê a MESMA DRE que a aba Demonstração mostra. É por isso
+     que reclassificar uma conta em Classificar refaz o imposto na hora —
+     e é por isso que este módulo não decide para onde conta nenhuma vai. */
+  const fisc = useFiscal({ dre: cls.dre, nomesEfetivos: fontes.nomesEfetivos });
 
   const identidade = {
     dados: { empresa, cnpj },
@@ -128,7 +145,7 @@ export default function App() {
     limpar: () => { setEmpresa(""); setCnpj(""); },
   };
 
-  const sessao = useSessao([fontes.sessao, cls.sessao, cpc.sessao, identidade]);
+  const sessao = useSessao([fontes.sessao, cls.sessao, cpc.sessao, fisc.sessao, identidade]);
 
   /* Volta sempre para o Início ao restaurar: é ele que diz, em uma linha,
      qual arquivo está aberto e o que ficou pendente da última vez. */
@@ -180,12 +197,17 @@ export default function App() {
     baixarPerfil(montarPerfil({
       nome: empresa || fontes.periodo || "Perfil", classif: cls.classif, nomes: fontes.nomesEfetivos,
       categorias: cpc.categoriaConta, politica: cpc.politica, medidas: cpc.medidas,
+      // Só os PARÂMETROS fiscais — regime, alíquotas, mapa de tributos.
+      // Prejuízo fiscal é valor de cliente e fica fora, para o perfil
+      // continuar podendo ser versionado e compartilhado.
+      fiscal: fisc.paraPerfil,
     }));
   }
 
   function aplicarPerfil(perfil) {
     cls.aplicarPerfil(perfil);
     cpc.aplicarPerfil(perfil);
+    fisc.aplicarPerfil(perfil);
     if (perfil.nomes && Object.keys(perfil.nomes).length) fontes.aplicarNomes(perfil.nomes);
   }
 
@@ -262,8 +284,15 @@ export default function App() {
         : { selo: "✓", titulo: "mapeamento completo" };
     }
     if (temDados && !cpc.conciliacao.fecha) e.cpc51 = { selo: "!", alerta: true, titulo: "não concilia" };
+    if (temDados) {
+      e.fiscal = fisc.resumo.confere
+        ? { selo: "✓", titulo: "imposto lançado confere" }
+        : fisc.resumo.diverge
+          ? { selo: "!", alerta: true, titulo: "imposto lançado diverge" }
+          : { selo: `${fisc.resumo.pendencias}`, alerta: true, titulo: `${fisc.resumo.pendencias} julgamentos a confirmar` };
+    }
     return e;
-  }, [fontes.resumo, fontes.balancetes.length, cls.contasResultado.length, placarDePara, temDados, cpc.conciliacao.fecha]);
+  }, [fontes.resumo, fontes.balancetes.length, cls.contasResultado.length, placarDePara, temDados, cpc.conciliacao.fecha, fisc.resumo]);
 
   /* Um item do menu. Mesma marcação para o Início e para as abas das
      seções, para não haver dois jeitos de desenhar a mesma coisa. */
@@ -313,7 +342,12 @@ export default function App() {
                 <span className="ctx-chip-txt">{fontes.emFoco.arquivo}</span>
               </button>
             )}
-            {periodo && (
+            {/* O selo do período some quando ele é o NOME DO ARQUIVO —
+                caso de um balancete que não declara "Data Inicial"/"Data
+                Final" na aba de parâmetros. Dois selos lado a lado com a
+                mesma palavra não informam nada e ainda sugerem que são
+                coisas diferentes. */}
+            {periodo && periodo !== fontes.emFoco?.arquivo && (
               <button className="ctx-chip" onClick={() => irPara("conferir")} disabled={!temDados} title="Trocar o período em foco">
                 <Icone nome="historico" tamanho={14} />
                 <span className="ctx-chip-txt">{periodo}</span>
@@ -443,6 +477,23 @@ export default function App() {
                 onLimparCategorias={cpc.limparCategorias}
                 onBaixarCSV={() => baixarCSVDeParaCompleto(deParaLinhas, ctxArquivo)}
                 onBaixarExcel={() => baixarExcelDePara(deParaLinhas, placarDePara, porGrupo(deParaLinhas), ctxArquivo)}
+              />
+            )}
+
+            {aba === "fiscal" && temDados && (
+              <EtapaFiscal
+                params={fisc.params} onParams={fisc.setParams}
+                prejuizo={fisc.prejuizo} onPrejuizo={fisc.setPrejuizo}
+                linhasTributo={fisc.linhasTributo} onTributo={fisc.definirTributo}
+                ajustes={fisc.ajustes} onAjuste={fisc.alterarAjuste}
+                onAcrescentarAjuste={fisc.acrescentarAjuste} onRemoverAjuste={fisc.removerAjuste}
+                pisCofins={fisc.pisCofins} lalur={fisc.lalur} resumo={fisc.resumo}
+                empresa={empresa} periodo={periodo}
+                onBaixarExcel={() => baixarExcelFiscal({
+                  params: fisc.params, pisCofins: fisc.pisCofins, lalur: fisc.lalur,
+                  ajustes: fisc.ajustes, linhasTributo: fisc.linhasTributo,
+                  empresa, cnpj, periodo,
+                })}
               />
             )}
 

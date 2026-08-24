@@ -18,6 +18,7 @@ daqui ou de `.claude/docs/`, corrija a frase no mesmo commit.
 | a leitura do balancete, a hierarquia, o período | `.claude/docs/balancete.md` |
 | a demonstração do CPC 51, MPDA, cronograma | `.claude/docs/cpc51.md` |
 | a tabela De-Para | `.claude/docs/depara.md` |
+| a apuração fiscal (LALUR, PIS/COFINS) | `.claude/docs/fiscal.md` |
 | qualquer tela `.jsx` ou `App.css` | `.claude/docs/visual.md` |
 | Excel, CSV, impressão/PDF | `.claude/docs/exportacao.md` |
 | o que sai do navegador, injeção, ReDoS | `.claude/docs/seguranca.md` |
@@ -36,16 +37,22 @@ Denner (contábil/fiscal, graduando em Ciências Contábeis). Roda 100% no
 navegador, sem backend. Site publicado via GitHub Pages a partir da pasta
 `/docs` (que é **saída de build**, não documentação).
 
-**O ESCOPO É A DRE E A TRANSIÇÃO PARA O CPC 51, E SÓ ISSO.** Este app já
+**O ESCOPO É A DRE, A APURAÇÃO FISCAL QUE A JUSTIFICA E A TRANSIÇÃO
+PARA O CPC 51.** Este app já
 teve Painel de indicadores com gráficos e torres 3D, Balanço Patrimonial, análise horizontal em aba própria e uma galeria de
 arquivos no GitHub. Tudo isso foi REMOVIDO de propósito, a pedido de quem
 usa: cada tela fora desse eixo era uma tela a manter, a explicar e a
 conferir sem servir ao objetivo.
 
-A pergunta-filtro antes de acrescentar qualquer coisa: **"isto serve à DRE
-ou à transição?"** Se a resposta for "é legal ter", a resposta é não. O
-histórico das telas removidas está no Git (ver `EVOLUCAO-ARQUIVO.md`, entrada de 20/08/2026,
-4ª sessão) caso alguma precise voltar.
+A pergunta-filtro antes de acrescentar qualquer coisa: **"isto serve à
+DRE, à apuração que prova duas linhas dela, ou à transição para o
+CPC 51?"** Se a resposta for "é legal ter", a resposta é não. O histórico
+das telas removidas está no Git (ver `EVOLUCAO-ARQUIVO.md`, entrada de
+20/08/2026, 4ª sessão) caso alguma precise voltar.
+
+O fiscal entrou no escopo em 24/08/2026 por justificar **duas linhas da
+própria DRE**: Deduções da Receita (PIS/COFINS/ISS) e IRPJ/CSLL. Ele
+**confere, não apura para recolhimento** — ver `.claude/docs/fiscal.md`.
 
 Link do site: https://dennereduardo1971-ai.github.io/Gerador-DRE/
 Repositório: https://github.com/dennereduardo1971-ai/Gerador-DRE
@@ -83,11 +90,13 @@ src/
     mpda.js                  # medidas de desempenho da administração
     cronograma51.js          # o cronograma de implementação, como dado
     planoAcao.js             # andamento do plano (localStorage)
+    fiscal.js                # LALUR e PIS/COFINS — confere o imposto lançado
     depara.js                # conta → grupo da DRE + categoria do CPC 51,
                               # com a ORIGEM de cada decisão
     exportacao.js            # CSV e Excel da DRE, a partir de linhasDRE
     exportacaoDePara.js      # o De-Para completo em CSV e Excel
     exportacaoCPC51.js       # Excel de seis abas + De-Para + nota
+    exportacaoFiscal.js      # LALUR Parte A + memória de PIS/COFINS
     excelEstilo.js           # o visual dos Excel exportados, uma vez só
     historico.js             # histórico local de DREs + sincronização
     githubApi.js             # lê/grava um JSON no repo — o "banco" do histórico
@@ -98,6 +107,7 @@ src/
     Etapa*.jsx               # uma etapa do fluxo por arquivo
     LinhaDRE.jsx             # Linha/Secao/Cabecalho/Detalhe da DRE
     DePara.jsx               # os dois eixos editáveis na mesma linha
+    EtapaFiscal.jsx          # apuração: parâmetros, PIS/COFINS, LALUR
     Eixo.jsx                 # Canal e Balanca — o eixo visual compartilhado
     Icones.jsx               # SVG inline em currentColor (sem biblioteca)
     Inicio.jsx               # "o que eu faço agora?"
@@ -106,6 +116,7 @@ src/
     useFontes.js             # os balancetes carregados, contas, nomes, plano
     useClassificacao.js      # classif/tocadas/sugestão/DRE/prova/perfis
     useCPC51.js              # política, categorias, MPDA, conciliação
+    useFiscal.js             # parâmetros, ajustes do LALUR, apuração
   App.jsx                    # o CASCO: navegação (SECOES), topo de contexto,
                               # menu lateral e o <main>. As Etapas são "burras"
                               # (recebem props, chamam callbacks).
@@ -131,7 +142,7 @@ um assunto e sabe se salvar e se restaurar sozinho (`sessao.dados`,
 Assunto novo entra sem que ninguém precise lembrar de mexer em três
 lugares — e mexer no CPC 51 deixa de exigir ler a importação de arquivo.
 
-**A navegação é dado, não JSX.** `SECOES` em `App.jsx` descreve quatro
+**A navegação é dado, não JSX.** `SECOES` em `App.jsx` descreve cinco
 seções, cada uma agrupando abas que respondem à mesma pergunta. **Início**
 fica solto acima delas, porque não pertence a nenhuma:
 
@@ -140,10 +151,11 @@ fica solto acima delas, porque não pertence a nenhuma:
 | — | o que eu faço agora? | Início |
 | Fluxo | como eu chego na DRE? | Importar → Conferir → Classificar → DRE |
 | Parâmetros | para onde vai cada conta? | De-Para |
+| Fiscal | o imposto lançado está certo? | Apuração |
 | Acompanhamento | como ela se moveu, e o que já foi fechado? | Comparativa, Histórico |
 | CPC 51 · 2027 | como isso fica em 2027? | Demonstração, Plano de ação |
 
-São **dez abas no total**, e esse número é para ser defendido. Já foram
+São **onze abas no total**, e esse número é para ser defendido. Já foram
 quatorze; o corte de 20/08/2026 tirou Painel, Balanço e Arquivos e fundiu
 Horizontal na Comparativa. Aba nova precisa passar pela pergunta-filtro do
 escopo lá em cima.
@@ -159,10 +171,11 @@ Quatro coisas a não desfazer aqui:
   `abaDisponivel()`. Ela governa o menu E o estado vazio do `<main>`; eram
   duas cópias antes, e aba nova aberta no menu caía em tela branca quando
   alguém esquecia da segunda.
-- **Parâmetros é seção própria, não um item no meio das outras.** De-Para
-  é cadastro, não leitura de resultado — e cadastro que se procura junto
-  de análise é cadastro que ninguém acha. É também a seção onde entram os
-  módulos de parametrização do caminho para ERP.
+- **Parâmetros e Fiscal são seções próprias.** De-Para é cadastro, não
+  leitura de resultado — e cadastro que se procura junto de análise é
+  cadastro que ninguém acha. A Apuração responde outra pergunta ainda
+  ("o que a contabilidade lançou está certo?"): dentro da DRE sumiria na
+  rolagem, dentro de Parâmetros fingiria ser cadastro.
 - **Início não analisa.** Ele responde "por onde começo e o que está me
   esperando": estado do arquivo, um único próximo passo, pendências e
   atalhos. Os números do topo situam, não concluem. Pôr cascata, ranking
@@ -231,6 +244,15 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
 
 **Contabilidade**
 
+- **Sugestão fiscal NÃO entra na soma até ser aceita.** Somar as
+  adições sugeridas por padrão produz um lucro real que parece calculado
+  e é um chute sobre a dedutibilidade de cada provisão. Enquanto houver
+  ajuste pendente, a apuração se declara incompleta.
+  → `.claude/docs/fiscal.md`
+- **`DED_IMPOSTOS` mistura PIS, COFINS e ISS numa linha só.** Confrontar
+  o grupo inteiro com PIS + COFINS dá divergência sempre. E `SOBRE
+  SERVIÇO` **não** identifica o ISS: é a frase que os três usam, e com
+  ela no padrão a conta-síntese genérica virava ISS.
 - **`montarDRE` soma o saldo COM SINAL, não a magnitude.** Grupos como
   Provisões misturam despesa (nova provisão) e receita (reversão) na mesma
   linha; `Math.abs` por conta perde o líquido e infla o grupo. →
@@ -367,7 +389,11 @@ em cada sessão, está em `EVOLUCAO.md`:
 4. **Seletor de aba do Excel** — `importarExcel.js` escolhe sozinho a aba
    com mais cara de conta; já devolve `abas`, falta UI para o caso em que
    ele escolhe errado.
-5. **Comparativa a partir do Histórico** — hoje ela lê só os balancetes
+5. **LALUR Parte B** — controle das diferenças temporárias ao longo do
+   tempo. A Parte A (a apuração do período) já existe.
+6. **Créditos de PIS/COFINS no não cumulativo** — hoje o regime muda a
+   alíquota e diz na tela que os créditos não são calculados.
+7. **Comparativa a partir do Histórico** — hoje ela lê só os balancetes
    carregados na sessão. Cruzar com o histórico salvo daria a série
    inteira sem manter todos os arquivos abertos.
 
