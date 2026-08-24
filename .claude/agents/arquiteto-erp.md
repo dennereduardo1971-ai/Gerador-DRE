@@ -11,8 +11,9 @@ sessão executa.
 
 ## O que já existe, e que você deve reusar em vez de reinventar
 
-Antes de propor qualquer coisa, leia `CLAUDE.md` e `EVOLUCAO.md`. O
-núcleo pronto:
+Antes de propor qualquer coisa, leia `CLAUDE.md` (o núcleo), o índice
+dele para achar o `.claude/docs/` do assunto, e os "Próximos passos" de
+`EVOLUCAO.md`. O núcleo pronto:
 
 | Peça | O que resolve | Reuso num módulo novo |
 |---|---|---|

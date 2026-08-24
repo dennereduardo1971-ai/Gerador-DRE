@@ -5,6 +5,9 @@ description: Valida o app contra o razão, o plano de contas e a DRE reais do cl
 
 # Validar contra o arquivo real
 
+> **Leia primeiro** `.claude/docs/classificacao.md` e `.claude/docs/balancete.md` — é o
+> que diz o que cada número validado significa.
+
 O Vitest prova que a lógica **não mudou**. Só o arquivo real prova que
 ela está **certa**. As duas camadas são obrigatórias e nenhuma substitui
 a outra — esta skill é a segunda.

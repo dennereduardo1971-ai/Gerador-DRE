@@ -5,6 +5,10 @@ description: Muda para onde uma conta vai na DRE — padrões PAT_*, mapa por c�
 
 # Mudar a classificação de contas
 
+> **Leia primeiro** `.claude/docs/classificacao.md` (as quatro camadas, o mapa
+> por código do IESB e as exceções) e `.claude/docs/dre.md` (a hierarquia de
+> subtotais que a classificação alimenta).
+
 Esta é a parte do projeto que mais dá errado quando se mexe por
 intuição. Antes de tocar em qualquer coisa, entenda **por qual das
 quatro camadas** a conta está sendo decidida hoje — mudar a camada

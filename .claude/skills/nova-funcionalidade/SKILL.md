@@ -12,7 +12,9 @@ demonstração oficial de uma instituição real. Isso muda o que significa
 
 ## 1. Antes de escrever: onde isso encaixa
 
-Leia `CLAUDE.md` inteiro (é curto e é doutrina) e a seção "Próximos
+Leia `CLAUDE.md` inteiro (é o núcleo, e é curto), o arquivo de
+`.claude/docs/` do assunto que a funcionalidade toca — o índice no topo
+do `CLAUDE.md` diz qual — e a seção "Próximos
 passos" de `EVOLUCAO.md`. Depois responda três perguntas por escrito, na
 sua resposta ao usuário, antes de codar:
 

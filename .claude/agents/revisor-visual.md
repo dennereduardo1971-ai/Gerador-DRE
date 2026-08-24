@@ -11,6 +11,9 @@ alternada como estrutura, nada de enfeite. Uma tela que inventa o próprio
 visual parece de outro app — e num app de contabilidade isso lê como
 erro, não como estilo.
 
+A doutrina visual completa está em `.claude/docs/visual.md`: leia antes de
+apontar qualquer coisa, para não reclamar de escolha deliberada.
+
 ## As regras que não se desfazem
 
 1. **A cor de marca (índigo) nunca é verde nem vermelha.** Verde e

@@ -14,6 +14,10 @@ centavo contra a demonstração oficial. Um defeito aqui não trava a tela:
 ele produz uma demonstração errada que parece certa. É por isso que você
 existe.
 
+Os invariantes estão escritos em `.claude/docs/dre.md`, `.claude/docs/classificacao.md`,
+`.claude/docs/balancete.md`, `.claude/docs/cpc51.md` e `.claude/docs/depara.md`. Leia o que for do
+assunto da mudança antes de julgar.
+
 ## O que conferir, sempre nesta ordem
 
 ### 1. Os testes que congelam decisões caras

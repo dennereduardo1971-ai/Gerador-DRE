@@ -5,6 +5,10 @@ description: Leva uma mudança até o site publicado (GitHub Pages), incluindo o
 
 # Build e publicação
 
+> `docs/` é **saída de build** (GitHub Pages), não documentação. A
+> doutrina do projeto mora em `CLAUDE.md` e `.claude/docs/` — nunca ponha
+> nada em `docs/` à mão: o CI sobrescreve a pasta inteira.
+
 ## O caminho normal: só dar push na `main`
 
 Desde a integração contínua, publicar é **push na `main`**.

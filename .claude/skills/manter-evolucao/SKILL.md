@@ -10,7 +10,8 @@ os dois é o erro que esta skill existe para evitar.
 
 | Arquivo | Responde | Muda |
 |---|---|---|
-| `CLAUDE.md` | como o projeto é e por que cada decisão foi tomada | pouco, e cada frase precisa continuar verdadeira |
+| `CLAUDE.md` | o núcleo: escopo, arquitetura, armadilhas, como testar | pouco, e cada frase precisa continuar verdadeira |
+| `.claude/docs/*.md` | a doutrina de cada assunto, lida sob demanda | só quando o assunto dela muda |
 | `EVOLUCAO.md` | onde ele está agora, o que foi medido, o que falta | toda sessão, por acréscimo |
 
 ## Passo a passo
@@ -42,9 +43,15 @@ os dois é o erro que esta skill existe para evitar.
    conhecidas" — é o arquivo que a próxima sessão lê primeiro. Em
    `EVOLUCAO.md` fica só o registro de que ela apareceu.
 
-6. **Corrija `CLAUDE.md` no mesmo commit** se alguma frase de lá deixou de
-   ser verdade: contagem de testes, árvore de arquivos, fluxo de telas,
-   backlog já entregue.
+6. **Corrija `CLAUDE.md` e o `.claude/docs/` do assunto no mesmo commit**
+   se alguma frase deles deixou de ser verdade: contagem de testes,
+   árvore de arquivos, fluxo de telas, backlog já entregue.
+
+7. **Arquive quando o diário passar de ~350 linhas.** As sessões mais
+   antigas vão para `EVOLUCAO-ARQUIVO.md` (que ninguém lê por padrão) e
+   `EVOLUCAO.md` fica com Estado atual, as três sessões mais recentes e
+   os Próximos passos. Um diário que não cabe numa leitura deixa de ser
+   lido — e aí a próxima sessão decide sem ele.
 
 ## Duas regras que não se afrouxam
 
