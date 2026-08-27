@@ -1,14 +1,16 @@
 /* Exportação da implementação do CPC 51.
  *
- * Um arquivo só, cinco abas, porque são cinco entregáveis diferentes do
+ * Um arquivo só, sete abas, porque são sete entregáveis diferentes do
  * cronograma que sempre andam juntos na mesma reunião:
  *
- *   DRE CPC 51    → Fase 5, "DRE piloto no novo formato"
- *   DFs paralelas → Fase 6, "DFs paralelas do 1º semestre (atual x CPC 51)"
- *   Conciliação   → Fase 5 passo 22 e Fase 6 passo 29 (o lucro não mudou)
- *   De-Para       → Fase 2, "Planilha De-Para do plano de contas por empresa"
- *   MPDA          → Fase 5, "Minuta de nota explicativa de MPDA"
- *   Política      → Fase 1, "Documento de política contábil de classificação"
+ *   DRE CPC 51            → Fase 5, "DRE piloto no novo formato"
+ *   DR_CPC_51_Detalhada   → o drill-down: as mesmas linhas, com as contas
+ *                           de cada tópico penduradas embaixo, recolhidas
+ *   DFs paralelas         → Fase 6, "DFs paralelas do 1º semestre (atual x CPC 51)"
+ *   Conciliação           → Fase 5 passo 22 e Fase 6 passo 29 (o lucro não mudou)
+ *   De-Para               → Fase 2, "Planilha De-Para do plano de contas por empresa"
+ *   MPDA                  → Fase 5, "Minuta de nota explicativa de MPDA"
+ *   Política              → Fase 1, "Documento de política contábil de classificação"
  *
  * Tudo sai de `montarLinhas51`, `conciliar` e `deParaCPC51` — as mesmas
  * funções que desenham a tela. A regra do projeto vale igual aqui: a
@@ -17,6 +19,7 @@
 
 import { montarLinhas51 } from "./linhasCPC51.js";
 import { CATEGORIAS, NOME_CATEGORIA, gruposParaRevisar } from "./cpc51.js";
+import { descricaoDaConta } from "./depara.js";
 import { calcularMPDA, notaMPDA } from "./mpda.js";
 import { matrizDRE, matrizLinhas, cabecalho, baixar, dec, neutralizarFormula } from "./exportacao.js";
 import {
@@ -55,7 +58,7 @@ export function baixarNotaMPDA(medidas, dre51, ctx = {}) {
 }
 
 /** O De-Para sozinho, em CSV — é o formato que TI costuma pedir para
- *  carregar no ERP na Fase 4, e ninguém quer abrir um Excel de seis abas
+ *  carregar no ERP na Fase 4, e ninguém quer abrir um Excel de sete abas
  *  para extrair uma. */
 export function baixarCSVDePara(dePara, ctx = {}) {
   const linhas = [
@@ -70,7 +73,7 @@ export function baixarCSVDePara(dePara, ctx = {}) {
   baixar("﻿" + csv, nomeArquivo(ctx.empresa, "DePara_CPC51", "csv"), "text/csv;charset=utf-8");
 }
 
-/** O Excel de seis abas como workbook — separado do download pelo mesmo
+/** O Excel de sete abas como workbook — separado do download pelo mesmo
  *  motivo que em `exportacaoDePara.js`: assim o teste afirma sobre o
  *  arquivo em si (colunas, código de linha, coluna comparativa) sem
  *  precisar de DOM. */
@@ -97,7 +100,8 @@ export async function montarWorkbookCPC51(ctx) {
      A coluna de notas sai VAZIA de propósito: a referência da nota
      explicativa é decisão de quem redige as demonstrações, e preencher
      por conta própria seria inventar uma referência que não existe. */
-  const linhas51 = matrizLinhas(montarLinhas51(dre51).itens, base);
+  const itens51 = montarLinhas51(dre51).itens;
+  const linhas51 = matrizLinhas(itens51, base);
   const rotuloPeriodo = ctx.periodo || "Período";
   const COLS_DRE51 = [
     "Categoria CPC 51", "Código", "Descrição", rotuloPeriodo,
@@ -127,7 +131,55 @@ export async function montarWorkbookCPC51(ctx) {
   });
   aplicarZebra(ws, cab1.number + 1, ws.rowCount, COLS_DRE51.length);
 
-  // --- Aba 2: as duas estruturas lado a lado ---
+  // --- Aba 2: a mesma demonstração, com as contas de cada tópico abertas ---
+  /* O QUE O CLIENTE PEDIU: clicar num tópico da DRE e ver as contas que
+     formam aquele saldo, dentro do próprio Excel. O Excel não tem clique
+     de app — o equivalente nativo é o agrupamento de linhas (o `+` da
+     margem esquerda), o mesmo recurso que já abre a aba "Resumo" do
+     De-Para (`exportacaoDePara.js`).
+
+     As linhas são as MESMAS de `montarLinhas51` — nenhuma estrutura nova,
+     só a árvore de contas que `montarDRE51` já monta dentro de cada grupo
+     (`dre51.cat[categoria].grupos[i].contas`) pendurada embaixo da linha
+     do tópico. Abrir o grupo nunca pode mostrar composição diferente da
+     que somou o valor de cima, porque é a mesma lista. */
+  const COLS_DET = [
+    "Categoria CPC 51", "Código", "Descrição", rotuloPeriodo, "AV %",
+    "Conta", "Descrição da conta", "Saldo da conta",
+  ];
+  const wsDet = wb.addWorksheet("DR_CPC_51_Detalhada");
+  wsDet.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
+  wsDet.properties.outlineLevelRow = 1;
+  definirLarguras(wsDet, [22, 9, 46, 16, 8, 14, 40, 16]);
+  escreverTitulo(wsDet, "DEMONSTRAÇÃO DO RESULTADO — CPC 51 (DETALHADA POR CONTA)", COLS_DET.length);
+  cabecalho(ctx).slice(1).forEach((l) => { if (l.length) escreverMeta(wsDet, l); else linhaEmBranco(wsDet); });
+  escreverMeta(wsDet, ["Clique no + à esquerda de cada tópico para abrir as contas que formam o saldo."]);
+  linhaEmBranco(wsDet);
+  escreverCabecalhoTabela(wsDet, COLS_DET);
+  itens51.forEach((l) => {
+    const av = l.val == null ? null : l.val / base;
+    const row = wsDet.addRow([rotuloCategoria(l), l.cod ?? null, l.lbl, l.val ?? null, av, null, null, null]);
+    row.getCell(4).numFmt = FORMATO_VALOR;
+    row.getCell(5).numFmt = FORMATO_PCT;
+    row.getCell(8).numFmt = FORMATO_VALOR;
+    if (l.t === "secao" || l.t === "sub" || l.t === "final") {
+      marcarSubtotal(wsDet, row.number, COLS_DET.length);
+      return;
+    }
+    const contas = dre51.cat[l.cat]?.grupos.find((g) => g.id === l.id)?.contas || [];
+    if (!contas.length) return;
+    marcarSubtotal(wsDet, row.number, COLS_DET.length); // o tópico é o "cabeçalho" das contas abaixo
+    const primeira = wsDet.rowCount + 1;
+    contas.forEach((c) => {
+      const rowC = wsDet.addRow([null, null, null, null, null, c.conta, descricaoDaConta(c, nomes), c.saldo]);
+      rowC.getCell(8).numFmt = FORMATO_VALOR;
+      rowC.outlineLevel = 1;
+      rowC.hidden = true;
+    });
+    aplicarZebra(wsDet, primeira, wsDet.rowCount, COLS_DET.length);
+  });
+
+  // --- Aba 3: as duas estruturas lado a lado ---
   /* Não é uma tabela de-para linha a linha, e não deveria ser: as duas
      estruturas têm linhas diferentes de propósito. O que se compara é o
      conjunto, e o que precisa bater é o último número de cada coluna. */
@@ -164,7 +216,7 @@ export async function montarWorkbookCPC51(ctx) {
   rowProva.getCell(2).numFmt = FORMATO_VALOR;
   if (!conciliacao.fecha) rowProva.getCell(1).font = { color: { argb: "FFB0302F" }, bold: true };
 
-  // --- Aba 3: a ponte entre um operacional e outro ---
+  // --- Aba 4: a ponte entre um operacional e outro ---
   const wsConc = wb.addWorksheet("Conciliação");
   definirLarguras(wsConc, [66, 18]);
   escreverTitulo(wsConc, "CONCILIAÇÃO ENTRE AS DUAS ESTRUTURAS", 2);
@@ -185,7 +237,7 @@ export async function montarWorkbookCPC51(ctx) {
     if (i === 2) marcarSubtotal(wsConc, row.number, 2);
   });
 
-  // --- Aba 4: o De-Para conta a conta ---
+  // --- Aba 5: o De-Para conta a conta ---
   const wsDp = wb.addWorksheet("De-Para");
   definirLarguras(wsDp, [16, 46, 32, 26, 18, 16]);
   const cab4 = escreverCabecalhoTabela(wsDp, ["Conta", "Descrição", "Grupo na DRE", "Categoria CPC 51", "Origem da decisão", "Saldo"]);
@@ -196,7 +248,7 @@ export async function montarWorkbookCPC51(ctx) {
   aplicarZebra(wsDp, cab4.number + 1, wsDp.rowCount, 6);
   wsDp.autoFilter = { from: { row: cab4.number, column: 1 }, to: { row: wsDp.rowCount, column: 6 } };
 
-  // --- Aba 5: MPDA com a conciliação de cada medida ---
+  // --- Aba 6: MPDA com a conciliação de cada medida ---
   const wsMp = wb.addWorksheet("MPDA");
   definirLarguras(wsMp, [58, 18, 20, 26]);
   escreverTitulo(wsMp, "MEDIDAS DE DESEMPENHO DEFINIDAS PELA ADMINISTRAÇÃO (MPDA)", 4);
@@ -222,7 +274,7 @@ export async function montarWorkbookCPC51(ctx) {
     linhaEmBranco(wsMp);
   });
 
-  // --- Aba 6: a política contábil que gerou tudo acima ---
+  // --- Aba 7: a política contábil que gerou tudo acima ---
   const wsPol = wb.addWorksheet("Política");
   definirLarguras(wsPol, [52, 34, 90]);
   escreverTitulo(wsPol, "POLÍTICA CONTÁBIL DE CLASSIFICAÇÃO — CPC 51", 3);

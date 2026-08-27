@@ -419,3 +419,52 @@ describe("a aba 'DRE CPC 51' do Excel sai no layout do modelo", () => {
     expect(mensalidades[4]).toBeCloseTo(mensalidades[3] / 2, 2);
   });
 });
+
+describe("a aba 'DR_CPC_51_Detalhada' abre as contas de cada tópico recolhidas", () => {
+  const wsDetalhada = async () => {
+    const { dre, dre51, categoriaDe, contas } = montar();
+    const wb = await montarWorkbookCPC51({
+      dre, dre51,
+      conciliacao: conciliar(dre, dre51, contas, grupoDe, categoriaDe),
+      dePara: deParaCPC51(contas, { grupoDe, categoriaPorConta: {}, politica: POLITICA_PADRAO, nomes: {} }),
+      medidas: [], politica: POLITICA_PADRAO, empresa: "Exemplo",
+      periodo: "junho de 2026", nomes: {},
+    });
+    return { dre51, ws: wb.getWorksheet("DR_CPC_51_Detalhada") };
+  };
+
+  it("existe, com o mesmo layout de agrupamento da aba 'Resumo' do De-Para", async () => {
+    const { ws } = await wsDetalhada();
+    expect(ws).toBeTruthy();
+    expect(ws.properties.outlineProperties.summaryBelow).toBe(false);
+    expect(ws.properties.outlineLevelRow).toBe(1);
+  });
+
+  it("pendura as contas de cada tópico embaixo dele, recolhidas", async () => {
+    const { dre51, ws } = await wsDetalhada();
+    let topicoAtual = null;
+    const vistas = {};
+    ws.eachRow((row) => {
+      const nivel = row.outlineLevel;
+      if (nivel === 1) {
+        expect(row.hidden).toBe(true); // nasce recolhida
+        expect(row.getCell(3).value).toBe(null); // colunas do tópico ficam vazias na conta
+        vistas[topicoAtual].push({ conta: row.getCell(6).value, saldo: row.getCell(8).value });
+        return;
+      }
+      const cod = row.getCell(2).value;
+      if (/^\d+\.\d+$/.test(String(cod ?? ""))) { topicoAtual = row.getCell(3).value; vistas[topicoAtual] = []; }
+    });
+
+    // Toda linha de tópico com contas aparece com o mesmo conjunto (e na
+    // mesma ordem) que `montarDRE51` já agrupou — abrir o grupo não pode
+    // mostrar composição diferente da que somou o valor de cima.
+    Object.values(dre51.cat).forEach((c) =>
+      c.grupos.forEach((g) => {
+        expect(vistas[g.nome].map((l) => l.conta)).toEqual(g.contas.map((l) => l.conta));
+        const soma = vistas[g.nome].reduce((s, l) => s + l.saldo, 0);
+        expect(soma).toBeCloseTo(g.total, 2);
+      })
+    );
+  });
+});
