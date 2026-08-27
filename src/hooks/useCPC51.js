@@ -15,15 +15,22 @@ import { comparativo51 } from "../lib/linhasCPC51.js";
  *
  * `politica`, `categoriaConta` e `medidas` são DECISÃO, não dado
  * importado: viajam na sessão e no perfil, junto da classificação manual.
+ *
+ * `plano` (o plano de contas reconhecido, de `useFontes`) entra como uma
+ * segunda opinião mais fraca que `categoriaConta`: quando o plano tem
+ * exceção conta a conta (`categoriaDoPlano`, em cpc51.js), ela decide
+ * sozinha, sem exigir clique nenhum — é a mesma ideia do plano já
+ * resolver o GRUPO sem que o usuário precise classificar cada conta de
+ * novo a cada balancete.
  */
-export function useCPC51({ contasResultado, grupoDe, dre, nomesEfetivos, aba, dresPorBalancete, periodoAtivo }) {
+export function useCPC51({ contasResultado, grupoDe, dre, nomesEfetivos, aba, dresPorBalancete, periodoAtivo, plano }) {
   const [politica, setPolitica] = useState(POLITICA_PADRAO);
   const [categoriaConta, setCategoriaConta] = useState({});
   const [medidas, setMedidas] = useState([]);
 
   const categoriaDe = useMemo(
-    () => fazerCategoriaDe({ grupoDe, categoriaPorConta: categoriaConta, politica }),
-    [grupoDe, categoriaConta, politica]
+    () => fazerCategoriaDe({ grupoDe, categoriaPorConta: categoriaConta, politica, plano }),
+    [grupoDe, categoriaConta, politica, plano]
   );
 
   const dre51 = useMemo(
@@ -51,13 +58,13 @@ export function useCPC51({ contasResultado, grupoDe, dre, nomesEfetivos, aba, dr
   );
 
   const cobertura = useMemo(
-    () => coberturaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica }),
-    [contasResultado, grupoDe, categoriaConta, politica]
+    () => coberturaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica, plano }),
+    [contasResultado, grupoDe, categoriaConta, politica, plano]
   );
 
   const dePara = useMemo(
-    () => deParaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica, nomes: nomesEfetivos }),
-    [contasResultado, grupoDe, categoriaConta, politica, nomesEfetivos]
+    () => deParaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica, nomes: nomesEfetivos, plano }),
+    [contasResultado, grupoDe, categoriaConta, politica, nomesEfetivos, plano]
   );
 
   /* A demonstração do CPC 51 de cada balancete carregado, para a coluna

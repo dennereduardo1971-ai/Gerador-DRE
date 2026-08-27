@@ -1,5 +1,8 @@
 /* Perfil do plano de contas do IESB — antes cravado dentro de
- * `classify.js`, agora um dado como qualquer outro.
+ * `classify.js`, agora um dado como qualquer outro. `codigos`/`regras`
+ * resolvem o GRUPO da DRE; `categorias` resolve a categoria do CPC 51
+ * conta a conta, onde o grupo sozinho não decide (financeiras, não
+ * operacionais) — os dois eixos, lado a lado no mesmo arquivo.
  *
  * Validado linha a linha contra a DRE real de jan a jun/2026: todo grupo
  * bateu com a DRE oficial até o centavo. Antes de mexer em qualquer
@@ -101,6 +104,67 @@ export const PLANO_IESB = {
 
     // Fechamento do exercício — não é conta de resultado
     "71101": "IGNORAR",
+  },
+
+  /* Exceções de CATEGORIA do CPC 51, conta a conta — o eixo PARALELO ao
+   * grupo acima (ver cpc51.js). Não é um mapa de prefixo como `codigos`:
+   * é exatamente DENTRO do mesmo grupo que juros de empréstimo (421) e
+   * tarifa bancária (421 também) nascem juntos e precisam de categoria
+   * diferente — por isso a busca é pelo código INTEIRO da conta, sem
+   * cascata. `MAPA_PADRAO` (cpc51.js) continua sendo o padrão do grupo
+   * para qualquer conta nova que apareça aqui e ainda não tenha sido
+   * julgada; só entra nesta lista a conta que JÁ foi resolvida — algumas
+   * confirmam o padrão do grupo (e mesmo assim entram, porque é isso que
+   * tira a conta da fila de revisão), outras divergem dele.
+   *
+   * Confirmado conta a conta contra o balancete real do IESB em
+   * 25/08/2026 — ver EVOLUCAO.md. */
+  categorias: {
+    // ---- Despesas Financeiras (padrão do grupo: Financiamento) ----
+    "4210100": "FINANCIAMENTO", // JUROS S/ CAPITAL PROPRIO — remunera capital próprio, é financiamento
+    "4210101": "FINANCIAMENTO", // JUROS INCORRIDOS — juros de empréstimo, financiamento de verdade
+    "4210108": "FINANCIAMENTO", // JUROS ARREND. MERCANTIL - CPC 06 R2 — custo financeiro do arrendamento
+    "4210102": "OPERACIONAL", // DESCONTOS CONCEDIDOS — desconto comercial a aluno, não capta recurso
+    "4210103": "OPERACIONAL", // DESPESAS BANCARIAS — tarifa, não remunera captação
+    "4210104": "OPERACIONAL", // TAXA ADM./CUSTODIA INVESTIMENTOS — custo de gerir aplicação, não captação
+    "4210105": "OPERACIONAL", // TARIFA EMISSAO BOLETOS — tarifa bancária operacional
+    "4210106": "OPERACIONAL", // DESCONTOS DE ANTECIPACAO — desconto comercial, não financiamento
+    "4210107": "OPERACIONAL", // DESCONTOS DE PONTUALIDADE — idem
+
+    // ---- Receitas Financeiras (padrão do grupo: Investimento) ----
+    "4210203": "INVESTIMENTO", // (-)REC. APLIC. FINANCEIRA — rendimento de aplicação, investimento de verdade
+    "4210201": "OPERACIONAL", // (-)DESCONTOS OBTIDOS — desconto de fornecedor, não rendimento de aplicação
+    "4210202": "OPERACIONAL", // (-)JUROS RECEBIDOS — juros de mora de aluno inadimplente, nasce da operação
+    "4210204": "OPERACIONAL", // (-) OUTRAS - PRECATORIOS — não é rendimento de aplicação
+    "4210205": "OPERACIONAL", // (-/+) VARIACAO MONETARIA /CAMBIAL — variação sobre item operacional
+
+    // ---- Receitas Não Operacionais (padrão do grupo: Operacional — maioria confirma) ----
+    "5110101": "INVESTIMENTO", // RESULTADO EQUIV.PATRIMONIAL — resultado de participação societária
+    "5110201": "OPERACIONAL", // GANHO/PERDA VENDA/DEV. IMOBILIZADO
+    "5110203": "OPERACIONAL", // DEMAIS GANHOS/PERDAS IMOBILIZADO
+    "5110204": "OPERACIONAL", // DOACOES/BRINDES/BONIF.
+    "5110205": "OPERACIONAL", // BAIXA ARREND. MERC. - CPC 06 R2
+    "5110301": "OPERACIONAL", // ALUGUEIS/PARC./CONV. OUTROS
+    "5110302": "OPERACIONAL", // ALUGUEL UNDF
+    "5110303": "OPERACIONAL", // ESTACIONAMENTO
+    "5110304": "OPERACIONAL", // CONCURSOS
+    "5110305": "OPERACIONAL", // VALORES RECUPERADOS/OUTROS
+    "5110306": "OPERACIONAL", // ESTACAO DE RECARGA P VEICULOS ELETRICOS
+    "5110309": "OPERACIONAL", // GANHO DE CAP. NA ALIENACAO DE PRECATORIO
+    "5110311": "OPERACIONAL", // HONOR. ADV./SUCUMBENCIA
+
+    // ---- Despesas Não Operacionais (padrão do grupo: Operacional — confirma) ----
+    "5110202": "OPERACIONAL", // CUSTOS (nome genérico no plano; fora do custo dos serviços)
+    "5110307": "OPERACIONAL", // (-) PIS NÃO-CUMULATIVO — tributo sobre receita, não sobre o lucro
+    "5110308": "OPERACIONAL", // (-) COF NÃO-CUMULATIVO — idem
+    "5110312": "OPERACIONAL", // (-)PIS S/RECEITAS FINANCEIRAS — mesma razão
+    "5110313": "OPERACIONAL", // (-)COFINS S/RECEITAS FINANCEIRAS — mesma razão
+
+    /* Mesma conta da exceção de GRUPO acima (linha ~100): a categoria
+     * segue o imóvel (é investimento), não o rótulo "não operacional" do
+     * grupo — os dois eixos concordam por coincidência de assunto, não
+     * por regra. */
+    "6110113": "INVESTIMENTO", // IPTU IMOVEIS INVESTIMENTO
   },
 
   regras: [

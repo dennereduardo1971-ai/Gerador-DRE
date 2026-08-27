@@ -26,7 +26,7 @@
  */
 
 import { NOME_GRUPO, GRUPOS } from "./grupos.js";
-import { NOME_CATEGORIA, POLITICA_PADRAO, resolverCategoria, revisarGrupo } from "./cpc51.js";
+import { NOME_CATEGORIA, POLITICA_PADRAO, categoriaDoPlano, resolverCategoria, revisarGrupo } from "./cpc51.js";
 
 /** Descrição legível de uma conta: o nome oficial do plano de contas
  *  quando existe, senão o começo do histórico dos lançamentos. É a mesma
@@ -56,21 +56,30 @@ export const SITUACOES = [
  *
  *  `tocadas` é o mapa de contas cujo grupo foi decidido à mão (ou veio
  *  de um perfil salvo, que é a mesma coisa: alguém já decidiu antes).
- *  `categoriaPorConta` é o equivalente do lado do CPC 51. */
+ *  `categoriaPorConta` é o equivalente do lado do CPC 51 — e `plano`,
+ *  quando o plano de contas embutido tem exceção conta a conta
+ *  (`categoriaDoPlano`), resolve exatamente do mesmo jeito que uma
+ *  decisão manual: a conta sai da fila de "a revisar", porque alguém
+ *  já julgou aquela conta antes — só não nesta sessão. */
 export function montarDePara(contasResultado, {
   grupoDe,
   tocadas = {},
   categoriaPorConta = {},
   politica = POLITICA_PADRAO,
   nomes = {},
+  plano = null,
 } = {}) {
   return contasResultado
     .map((c) => {
       const grupo = grupoDe(c.conta);
       const grupoManual = !!tocadas[c.conta];
-      const categoria = resolverCategoria({ conta: c.conta, grupo, categoriaPorConta, politica });
+      const categoria = resolverCategoria({ conta: c.conta, grupo, categoriaPorConta, politica, plano });
       const categoriaManual = !!categoria && categoriaPorConta[c.conta] === categoria;
-      const revisar = grupo === "IGNORAR" || categoriaManual ? null : revisarGrupo(grupo, politica);
+      const categoriaDoPlanoAtivo = !categoriaManual && !!categoriaDoPlano(plano, c.conta);
+      const revisar =
+        grupo === "IGNORAR" || categoriaManual || categoriaDoPlanoAtivo
+          ? null
+          : revisarGrupo(grupo, politica);
       const semGrupo = grupo === "IGNORAR";
       return {
         conta: c.conta,
@@ -92,7 +101,7 @@ export function montarDePara(contasResultado, {
         categoria,
         categoriaNome: categoria ? NOME_CATEGORIA[categoria] : "Não entra na DRE",
         categoriaManual,
-        origemCategoria: categoriaManual ? "manual" : "padrão do grupo",
+        origemCategoria: categoriaManual ? "manual" : categoriaDoPlanoAtivo ? "plano" : "padrão do grupo",
         revisar,
         semGrupo,
         pendente: semGrupo || !!revisar,

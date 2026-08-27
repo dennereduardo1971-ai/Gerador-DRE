@@ -132,6 +132,7 @@ export default function App() {
     contasResultado: cls.contasResultado, grupoDe: cls.grupoDe, dre: cls.dre,
     nomesEfetivos: fontes.nomesEfetivos, aba,
     dresPorBalancete: cls.dresPorBalancete, periodoAtivo: fontes.emFoco?.chave,
+    plano: fontes.planoAtivo,
   });
   /* A apuração lê a MESMA DRE que a aba Demonstração mostra. É por isso
      que reclassificar uma conta em Classificar refaz o imposto na hora —
@@ -219,9 +220,12 @@ export default function App() {
   const deParaLinhas = useMemo(
     () => montarDePara(cls.contasResultado, {
       grupoDe: cls.grupoDe, tocadas: cls.tocadas, categoriaPorConta: cpc.categoriaConta,
-      politica: cpc.politica, nomes: fontes.nomesEfetivos,
+      politica: cpc.politica, nomes: fontes.nomesEfetivos, plano: fontes.planoAtivo,
     }),
-    [cls.contasResultado, cls.grupoDe, cls.tocadas, cpc.categoriaConta, cpc.politica, fontes.nomesEfetivos]
+    [
+      cls.contasResultado, cls.grupoDe, cls.tocadas, cpc.categoriaConta, cpc.politica,
+      fontes.nomesEfetivos, fontes.planoAtivo,
+    ]
   );
   const placarDePara = useMemo(() => resumoDePara(deParaLinhas), [deParaLinhas]);
 
