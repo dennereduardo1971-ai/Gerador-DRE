@@ -182,6 +182,11 @@ export async function montarWorkbookCPC51(ctx) {
       const rowC = wsDet.addRow([null, c.conta, descricaoDaConta(c, nomes), c.saldo, c.saldo / base]);
       rowC.getCell(4).numFmt = FORMATO_VALOR;
       rowC.getCell(5).numFmt = FORMATO_PCT;
+      // Recuo visual: a conta é sub-área do tópico de cima, não uma linha
+      // nova — o recuo é o que faz a árvore ler como árvore, mesmo com
+      // Código e Descrição na mesma coluna do tópico.
+      rowC.getCell(2).alignment = { indent: 1 };
+      rowC.getCell(3).alignment = { indent: 1 };
       rowC.outlineLevel = 1;
       rowC.hidden = true;
     });
