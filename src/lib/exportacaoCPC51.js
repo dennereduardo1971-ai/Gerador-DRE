@@ -142,26 +142,34 @@ export async function montarWorkbookCPC51(ctx) {
      só a árvore de contas que `montarDRE51` já monta dentro de cada grupo
      (`dre51.cat[categoria].grupos[i].contas`) pendurada embaixo da linha
      do tópico. Abrir o grupo nunca pode mostrar composição diferente da
-     que somou o valor de cima, porque é a mesma lista. */
-  const COLS_DET = [
-    "Categoria CPC 51", "Código", "Descrição", rotuloPeriodo, "AV %",
-    "Conta", "Descrição da conta", "Saldo da conta",
-  ];
+     que somou o valor de cima, porque é a mesma lista.
+
+     UMA SÓ TABELA EM DOIS NÍVEIS, como a aba "Resumo" do De-Para: o
+     tópico e as contas que ele soma COMPARTILHAM a coluna de código, a
+     de descrição e a de valor, em vez de cada nível ter as suas. A
+     primeira versão desta aba dava cada nível suas próprias colunas
+     (Código/Descrição/Valor do tópico à esquerda, Conta/Descrição da
+     conta/Saldo da conta à direita) — abrir o grupo jogava o valor três
+     colunas para o lado do valor de cima, e conferir se a composição
+     fecha virava cruzar duas tabelas em vez de olhar uma coluna só. */
+  const COLS_DET = ["Categoria CPC 51", "Código / Conta", "Descrição", rotuloPeriodo, "AV %"];
   const wsDet = wb.addWorksheet("DR_CPC_51_Detalhada");
   wsDet.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
   wsDet.properties.outlineLevelRow = 1;
-  definirLarguras(wsDet, [22, 9, 46, 16, 8, 14, 40, 16]);
+  definirLarguras(wsDet, [22, 13, 54, 18, 9]);
   escreverTitulo(wsDet, "DEMONSTRAÇÃO DO RESULTADO — CPC 51 (DETALHADA POR CONTA)", COLS_DET.length);
   cabecalho(ctx).slice(1).forEach((l) => { if (l.length) escreverMeta(wsDet, l); else linhaEmBranco(wsDet); });
-  escreverMeta(wsDet, ["Clique no + à esquerda de cada tópico para abrir as contas que formam o saldo."]);
+  escreverMeta(wsDet, [
+    "Clique no + à esquerda de cada tópico para abrir as contas que formam o saldo. " +
+    "O valor da conta sai na mesma coluna do valor do tópico, para conferir a composição sem cruzar coluna nenhuma.",
+  ]);
   linhaEmBranco(wsDet);
   escreverCabecalhoTabela(wsDet, COLS_DET);
   itens51.forEach((l) => {
     const av = l.val == null ? null : l.val / base;
-    const row = wsDet.addRow([rotuloCategoria(l), l.cod ?? null, l.lbl, l.val ?? null, av, null, null, null]);
+    const row = wsDet.addRow([rotuloCategoria(l), l.cod ?? null, l.lbl, l.val ?? null, av]);
     row.getCell(4).numFmt = FORMATO_VALOR;
     row.getCell(5).numFmt = FORMATO_PCT;
-    row.getCell(8).numFmt = FORMATO_VALOR;
     if (l.t === "secao" || l.t === "sub" || l.t === "final") {
       marcarSubtotal(wsDet, row.number, COLS_DET.length);
       return;
@@ -171,8 +179,9 @@ export async function montarWorkbookCPC51(ctx) {
     marcarSubtotal(wsDet, row.number, COLS_DET.length); // o tópico é o "cabeçalho" das contas abaixo
     const primeira = wsDet.rowCount + 1;
     contas.forEach((c) => {
-      const rowC = wsDet.addRow([null, null, null, null, null, c.conta, descricaoDaConta(c, nomes), c.saldo]);
-      rowC.getCell(8).numFmt = FORMATO_VALOR;
+      const rowC = wsDet.addRow([null, c.conta, descricaoDaConta(c, nomes), c.saldo, c.saldo / base]);
+      rowC.getCell(4).numFmt = FORMATO_VALOR;
+      rowC.getCell(5).numFmt = FORMATO_PCT;
       rowC.outlineLevel = 1;
       rowC.hidden = true;
     });

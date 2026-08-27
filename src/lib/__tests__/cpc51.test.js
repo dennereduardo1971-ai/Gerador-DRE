@@ -448,8 +448,8 @@ describe("a aba 'DR_CPC_51_Detalhada' abre as contas de cada tópico recolhidas"
       const nivel = row.outlineLevel;
       if (nivel === 1) {
         expect(row.hidden).toBe(true); // nasce recolhida
-        expect(row.getCell(3).value).toBe(null); // colunas do tópico ficam vazias na conta
-        vistas[topicoAtual].push({ conta: row.getCell(6).value, saldo: row.getCell(8).value });
+        expect(row.getCell(1).value).toBe(null); // só a coluna da categoria fica vazia na conta
+        vistas[topicoAtual].push({ conta: row.getCell(2).value, saldo: row.getCell(4).value });
         return;
       }
       const cod = row.getCell(2).value;
@@ -466,5 +466,25 @@ describe("a aba 'DR_CPC_51_Detalhada' abre as contas de cada tópico recolhidas"
         expect(soma).toBeCloseTo(g.total, 2);
       })
     );
+  });
+
+  it("tópico e conta compartilham a mesma coluna de código, descrição e valor", async () => {
+    // A tabela é uma SÓ em dois níveis, como a aba "Resumo" do De-Para:
+    // sem coluna própria para "Conta"/"Descrição da conta"/"Saldo da
+    // conta", ou o valor da conta sairia deslocado do valor do tópico
+    // que ele soma, e conferir a composição viraria cruzar duas tabelas.
+    const { ws } = await wsDetalhada();
+    const cab = [];
+    ws.eachRow((row) => { if (row.getCell(1).value === "Categoria CPC 51") cab.push(...row.values); });
+    expect(cab).toEqual([undefined, "Categoria CPC 51", "Código / Conta", "Descrição", "junho de 2026", "AV %"]);
+
+    const mensalidades = [];
+    let dentro = false;
+    ws.eachRow((row) => {
+      if (row.getCell(3).value === "Receita Bruta com Mensalidades") { dentro = true; return; }
+      if (dentro && row.outlineLevel === 1) mensalidades.push(row.getCell(2).value);
+      else if (dentro) dentro = false;
+    });
+    expect(mensalidades).toContain("3110101"); // a conta de mensalidades da fixture
   });
 });
