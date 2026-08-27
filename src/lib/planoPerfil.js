@@ -29,11 +29,20 @@
  *                          contas de receita e de despesa).
  *                Regras "antes" rodam antes do mapa de códigos; "depois",
  *                só se o mapa não resolveu.
+ *   categorias — código de conta (exato, sem cascata de prefixo) →
+ *                categoria do CPC 51. O EIXO PARALELO ao grupo (ver
+ *                cpc51.js): existe para as contas que o grupo sozinho não
+ *                decide — financeiras, não operacionais — porque duas
+ *                contas do MESMO grupo têm natureza diferente. Campo
+ *                opcional; um perfil sem ele funciona igual, só sem essa
+ *                camada (a categoria cai no padrão do grupo).
  */
 
+import { CATEGORIAS } from "./cpc51.js";
 import { GRUPOS } from "./grupos.js";
 
 const IDS_VALIDOS = new Set(GRUPOS.map((g) => g.id));
+const IDS_CATEGORIA_VALIDAS = new Set(CATEGORIAS.map((c) => c.id));
 
 /** O perfil serve para este plano de contas? Confere a assinatura contra
  *  os nomes importados. Sem plano de contas, nenhum perfil se aplica —
@@ -161,6 +170,12 @@ export function lerPlano(texto) {
   );
   const regrasRecusadas = (d.regras || []).length - regras.length;
 
+  const categorias = {};
+  for (const [cod, cat] of Object.entries(d.categorias || {})) {
+    if (IDS_CATEGORIA_VALIDAS.has(cat)) categorias[String(cod)] = cat;
+    else ignorados++;
+  }
+
   return {
     ok: true,
     ignorados,
@@ -170,6 +185,7 @@ export function lerPlano(texto) {
       assinatura: d.assinatura,
       codigos,
       regras,
+      categorias,
     },
   };
 }

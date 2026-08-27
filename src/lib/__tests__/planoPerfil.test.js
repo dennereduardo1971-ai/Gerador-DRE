@@ -4,6 +4,8 @@ import { escolherPlano, grupoPorPlano, lerPlano, planoCombina } from "../planoPe
 import { montarLinhas } from "../linhasDRE.js";
 import { matrizDRE } from "../exportacao.js";
 import { montarDRE, sugerirClassificacao } from "../classify.js";
+import { categoriaDoPlano, resolverCategoria } from "../cpc51.js";
+import { montarDePara } from "../depara.js";
 
 const NOMES_IESB = {
   "3": "RECEITAS LIQUIDAS",
@@ -89,6 +91,77 @@ describe("lerPlano", () => {
   it("recusa arquivo que não é perfil de plano", () => {
     expect(lerPlano(JSON.stringify({ formato: "outra/coisa" })).ok).toBe(false);
     expect(lerPlano("nada disso").ok).toBe(false);
+  });
+
+  it("valida e mantém a exceção de categoria do CPC 51, conta a conta", () => {
+    const r = lerPlano(JSON.stringify({
+      formato: "gerador-dre/plano", versao: 1,
+      assinatura: { "3": "RECEITA" }, codigos: { "31": "REC_MENSALIDADES" },
+      categorias: { "42101": "FINANCIAMENTO", "42102": "CATEGORIA_INVENTADA" },
+    }));
+    expect(r.ok).toBe(true);
+    expect(r.plano.categorias).toEqual({ "42101": "FINANCIAMENTO" });
+    expect(r.ignorados).toBe(1); // a categoria inventada foi descartada, não travou o resto
+  });
+});
+
+/* As exceções de CATEGORIA do plano do IESB — o eixo paralelo ao grupo,
+ * conferido conta a conta contra o balancete real em 25/08/2026 (ver
+ * EVOLUCAO.md). Só a ESTRUTURA da decisão (código → categoria) é
+ * testada, nunca um valor de saldo. */
+describe("categorias do IESB — exceção de CPC 51 conta a conta", () => {
+  it("financiamento de verdade (juros de empréstimo/arrendamento) diverge do resto do grupo", () => {
+    // Despesas Financeiras: padrão do grupo é FINANCIAMENTO, mas a
+    // maioria das contas reais é tarifa/desconto comercial — Operacional.
+    expect(categoriaDoPlano(PLANO_IESB, "4210101")).toBe("FINANCIAMENTO"); // JUROS INCORRIDOS
+    expect(categoriaDoPlano(PLANO_IESB, "4210108")).toBe("FINANCIAMENTO"); // JUROS ARREND. MERCANTIL
+    expect(categoriaDoPlano(PLANO_IESB, "4210102")).toBe("OPERACIONAL"); // DESCONTOS CONCEDIDOS
+    expect(categoriaDoPlano(PLANO_IESB, "4210103")).toBe("OPERACIONAL"); // DESPESAS BANCARIAS
+  });
+
+  it("só rendimento de aplicação é investimento — juros de mora de aluno é operacional", () => {
+    // Receitas Financeiras: padrão do grupo é INVESTIMENTO, mas a
+    // maioria das contas reais nasce da própria operação (mora, desconto).
+    expect(categoriaDoPlano(PLANO_IESB, "4210203")).toBe("INVESTIMENTO"); // REC. APLIC. FINANCEIRA
+    expect(categoriaDoPlano(PLANO_IESB, "4210202")).toBe("OPERACIONAL"); // JUROS RECEBIDOS
+  });
+
+  it("equivalência patrimonial e IPTU de imóvel de investimento vão para Investimento", () => {
+    expect(categoriaDoPlano(PLANO_IESB, "5110101")).toBe("INVESTIMENTO"); // RESULTADO EQUIV.PATRIMONIAL
+    expect(categoriaDoPlano(PLANO_IESB, "6110113")).toBe("INVESTIMENTO"); // IPTU IMOVEIS INVESTIMENTO — mesma conta da exceção de grupo
+  });
+
+  it("conta nova do mesmo grupo, ainda não julgada, cai no padrão do grupo — não inventa", () => {
+    expect(categoriaDoPlano(PLANO_IESB, "4210199")).toBe(null);
+    expect(resolverCategoria({ conta: "4210199", grupo: "DESP_FIN", plano: PLANO_IESB })).toBe("FINANCIAMENTO");
+  });
+
+  it("decisão manual desta sessão ainda vence a exceção do plano", () => {
+    expect(resolverCategoria({
+      conta: "4210101", grupo: "DESP_FIN", plano: PLANO_IESB,
+      categoriaPorConta: { "4210101": "OPERACIONAL" },
+    })).toBe("OPERACIONAL");
+  });
+
+  it("tira a conta da fila de revisão sem exigir clique nenhum na sessão", () => {
+    const grupoDe = () => "DESP_FIN";
+    const [confirmada] = montarDePara(
+      [{ conta: "4210102", saldo: -100, historico: "DESCONTOS CONCEDIDOS", deb: 100, cre: 0 }],
+      { grupoDe, plano: PLANO_IESB }
+    );
+    expect(confirmada.categoria).toBe("OPERACIONAL");
+    expect(confirmada.revisar).toBe(null);
+    expect(confirmada.categoriaManual).toBe(false); // ninguém clicou nesta sessão
+    expect(confirmada.origemCategoria).toBe("plano");
+  });
+
+  it("uma conta nova do mesmo grupo, sem exceção, continua pedindo revisão", () => {
+    const grupoDe = () => "DESP_FIN";
+    const [pendente] = montarDePara(
+      [{ conta: "4210199", saldo: -50, historico: "CONTA NOVA SEM EXCECAO", deb: 50, cre: 0 }],
+      { grupoDe, plano: PLANO_IESB }
+    );
+    expect(pendente.revisar).toBeTruthy();
   });
 });
 

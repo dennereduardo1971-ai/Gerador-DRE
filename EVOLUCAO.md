@@ -43,18 +43,18 @@ _Atualizado em 27/08/2026._
 
 | | |
 |---|---|
-| Testes | 260 (Vitest, 13 arquivos) |
+| Testes | 268 (Vitest, 13 arquivos) |
 | Lint | `npx oxlint src/ fixtures/` — **zero avisos em tudo** (o ruído de `process` em `validar.mjs`, documentado desde agosto, saiu com um `overrides` no `.oxlintrc.json`) |
-| Bundle | app 401 kB (124 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
+| Bundle | app 402 kB (124 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
 | CSS | 31,3 kB (6,6 kB gzip) — zero classe órfã (conferido por script) |
-| Código | ~8.900 linhas de JS/JSX em `src/` (fora `__tests__/`) |
-| Maiores arquivos | `App.jsx` (558), `balancete.js` (517), `fiscal.js` (473), `cpc51.js` (455) |
+| Código | ~9.000 linhas de JS/JSX em `src/` (fora `__tests__/`) |
+| Maiores arquivos | `App.jsx` (562), `balancete.js` (517), `cpc51.js` (479), `fiscal.js` (473) |
 | Contexto por sessão | `CLAUDE.md` 402 linhas / 22 kB (era 969 / 55 kB); `EVOLUCAO.md` 346 (era 890) |
 | Abas | 11 (eram 10; a Apuração entrou em 24/08/2026) |
 | Fonte de dados | **só o balancete de verificação** — o razão contábil saiu em 24/08/2026 |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina). O script foi REESCRITO contra os balancetes e não foi executado por ninguém ainda. |
-| Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante) conferidos em 20/08/2026, antes desta sessão |
-| Excel conferido por lib independente | sim — `openpyxl` releu o De-Para e a Apuração gerados por `exceljs` |
+| Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante) conferidos em 20/08/2026, antes desta sessão. Nesta sessão, as 33 exceções de categoria do CPC 51 do IESB foram conferidas contra o Excel real de 25/08/2026 (ver Registro) — não é o `validar.mjs`, mas é a mesma disciplina: conferir contra dado real, não só contra o razão sintético. |
+| Excel conferido por lib independente | sim — `openpyxl` releu o De-Para e a Apuração gerados por `exceljs`, e também a aba DR_CPC_51_Detalhada nova (ver Registro) |
 | App rodado no navegador | sim — 8 abas renderizam sem erro, sem rolagem horizontal a 390px, sem interativo sem nome acessível |
 | Skills versionadas | 6 |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) — **nenhum rodou nesta sessão** |
@@ -76,6 +76,59 @@ arquitetura, armadilhas e um índice "quero mudar X → leia Y"; o detalhe
 de cada assunto mora num arquivo lido sob demanda.
 
 ## Registro
+
+### 27/08/2026 (continuação) — o plano do IESB ganha exceção de categoria do CPC 51
+
+Denner mandou o Excel do CPC 51 que ele mesmo tinha exportado e depois
+editado à mão: 34 contas ganharam categoria manual (as financeiras e as
+não operacionais, os grupos que a doutrina já marca como "mistura
+natureza"), e uma delas ("Apuração", conta técnica de fechamento do
+exercício) veio com rótulo e categoria que não existem no app.
+
+**Decisão estrutural.** Até esta sessão, o plano de contas embutido
+(`planos/iesb.js`) só resolvia o GRUPO da DRE por código; a categoria do
+CPC 51 só tinha DOIS níveis — decisão manual da sessão, ou padrão do
+grupo inteiro. Para os grupos que misturam natureza (REC_FIN, DESP_FIN,
+OUTRAS_REC, OUTRAS_DESP) isso significava reclassificar as mesmas contas
+todo mês. Criei um terceiro nível, `categoriaDoPlano` (`cpc51.js`) —
+busca EXATA pelo código da conta, sem cascata de prefixo (é dentro do
+MESMO prefixo que convivem naturezas diferentes), entre a decisão manual
+e o padrão do grupo. `PLANO_IESB.categorias` guarda as 33 contas
+confirmadas (34 menos a de fechamento, que ficou de fora — ver abaixo).
+`resolverCategoria`, `fazerCategoriaDe`, `deParaCPC51`, `coberturaCPC51`
+e `montarDePara` (depara.js) foram todos ajustados para consultar essa
+camada e — o ponto que quase passou despercebido — para tirar a conta da
+fila de "a revisar" quando o plano já resolveu, não só quando a sessão
+resolveu. Sem esse segundo ajuste as 33 contas continuariam pedindo
+revisão todo mês mesmo já classificadas certo.
+
+`lerPlano`/`baixarPlano` (planoPerfil.js) também passam a validar e
+preservar `categorias` num perfil carregado de arquivo — não só no plano
+embutido —, para um cliente novo poder usar a mesma camada sem exigir
+build.
+
+**A conta "Apuração" (7110101) ficou de fora, a pedido de Denner: foi
+engano.** É o lançamento técnico de fechamento do exercício, que o app
+já excluía da DRE (`IGNORAR`) antes desta sessão — incluir ela no CPC 51
+contaria o resultado em dobro. Nada mudou nela; ela só não teve a
+categoria manual do Excel promovida a padrão.
+
+**O que foi medido.** Vitest 268/268 (13 arquivos, +8 testes novos em
+`planoPerfil.test.js` — só ESTRUTURA testada, nenhum valor de saldo).
+`oxlint` — zero avisos. `npm run build` — passou. E o que mais importa
+aqui: **as 33 contas foram conferidas contra o Excel real do IESB**
+(fora do repositório, por `openpyxl`/script descartável) — o app hoje
+resolve as 33 automaticamente, sem clique nenhum, com o mesmo valor que
+Denner confirmou à mão, e nenhuma delas aparece mais na fila de revisão.
+A conta técnica de fechamento confirmou continuar fora da DRE.
+
+**O que ficou de fora.** `node fixtures/validar.mjs` não rodou (arquivos
+reais gitignorados nesta máquina) — mas a mudança tocou `planoPerfil.js`,
+que é um dos três que a doutrina manda validar com ele. Vale rodar na
+próxima máquina que tiver os arquivos, antes da próxima entrega. O
+arquivo Excel que o Denner mandou não foi commitado em lugar nenhum (uso
+só em memória/scratch, descartado ao fim da sessão) — é dado real de
+cliente, e a doutrina proíbe.
 
 ### 27/08/2026 — aba "DR_CPC_51_Detalhada" no Excel do CPC 51
 

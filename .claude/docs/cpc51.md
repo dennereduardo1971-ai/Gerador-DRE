@@ -10,7 +10,7 @@ subtotais obrigatórios** (resultado operacional; resultado antes do
 financiamento e dos tributos sobre o lucro). Some o "não operacional": o
 operacional vira a categoria RESIDUAL.
 
-Seis coisas que não devem ser desfeitas por acidente:
+Oito coisas que não devem ser desfeitas por acidente:
 
 1. **A categoria é um eixo PARALELO ao grupo, não um grupo novo.** Cada
    conta tem um grupo (a linha da DRE atual) e uma categoria (o bloco do
@@ -54,6 +54,31 @@ Seis coisas que não devem ser desfeitas por acidente:
    efeito tributário e de não controladores por item de conciliação; o
    app não tem esses dados. Sai `[__________]`, nunca zero — zero é uma
    afirmação.
+7. **A categoria também tem um plano de contas embutido, igual ao
+   grupo.** `resolverCategoria` decide em três níveis — manual da sessão
+   > `categoriaDoPlano` (exceção conta a conta do plano embutido,
+   `cpc51.js`) > padrão do grupo (`MAPA_PADRAO`) — na mesma ordem que
+   `grupoDe` já decide o GRUPO (manual > `grupoPorPlano` > texto). Existe
+   porque REC_FIN/DESP_FIN/OUTRAS_REC/OUTRAS_DESP misturam natureza por
+   desenho: o padrão do GRUPO nunca vai servir para todas as contas dele,
+   mas uma vez que alguém julgou cada conta para um cliente (`PLANO_IESB.
+   categorias`), essa decisão é permanente — não deveria se perder a cada
+   balancete novo. **Ao adicionar uma exceção, lembre de tirar a conta da
+   fila de "a revisar"** (`montarDePara`, `coberturaCPC51`) — resolver a
+   categoria sem isso deixa a conta classificada certo E ainda pedindo
+   revisão todo mês, o que é pior que não ter feito nada. Busca sempre
+   EXATA pelo código completo, nunca por prefixo: é dentro do MESMO
+   prefixo que convivem contas de natureza diferente (juros de empréstimo
+   e tarifa bancária nascem as duas em "421"), e herdar por prefixo
+   devolveria a mistura que esta camada existe para desfazer.
+8. **A aba "DR_CPC_51_Detalhada" é a mesma demonstração com as contas
+   penduradas embaixo de cada tópico, recolhidas.** Usa o agrupamento de
+   linhas do Excel (`outlineLevel` + `hidden`, o mesmo recurso da aba
+   "Resumo" do De-Para), NUNCA colunas próprias para a conta: tópico e
+   conta compartilham a mesma coluna de código, descrição e valor — já
+   houve uma versão com colunas separadas, e o valor da conta saía
+   deslocado do valor do tópico que ele soma, obrigando a cruzar duas
+   tabelas para conferir a composição.
 
 O cronograma de implementação (10 fases, 49 passos, go-live em
 jan-fev/2027) está em `cronograma51.js` e aparece na aba "Plano de ação",

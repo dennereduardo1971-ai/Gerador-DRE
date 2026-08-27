@@ -176,21 +176,43 @@ export function categoriaDoGrupo(grupo, politica = POLITICA_PADRAO) {
   return base;
 }
 
-/** A categoria efetiva de uma conta: decisão manual vence o padrão do
- *  grupo, exatamente como a classificação manual vence a sugestão
- *  automática no resto do app. */
-export function resolverCategoria({ conta, grupo, categoriaPorConta = {}, politica = POLITICA_PADRAO }) {
+/** A categoria de uma conta segundo o PLANO de contas embutido — o
+ *  equivalente de `plano.codigos` (que resolve o GRUPO) para a categoria
+ *  do CPC 51. Existe porque alguns grupos (REC_FIN, DESP_FIN, OUTRAS_REC,
+ *  OUTRAS_DESP) misturam natureza por desenho — o padrão do grupo
+ *  inteiro nunca vai servir para todas as contas dele — mas, uma vez que
+ *  alguém já julgou cada conta desse grupo para um cliente, a decisão é
+ *  permanente e não deveria se perder a cada balancete novo.
+ *
+ *  Busca EXATA pelo código completo da conta, sem cascata de prefixo
+ *  como em `grupoPorPlano`: é exatamente DENTRO do mesmo prefixo que
+ *  convivem contas de natureza diferente (juros de empréstimo e tarifa
+ *  bancária nascem as duas em "421"), e herdar por prefixo devolveria a
+ *  mistura que esta camada existe para desfazer. */
+export function categoriaDoPlano(plano, conta) {
+  const cat = plano?.categorias?.[conta];
+  return cat && VALIDA.has(cat) ? cat : null;
+}
+
+/** A categoria efetiva de uma conta, da decisão mais forte para a mais
+ *  fraca: (1) decisão manual desta sessão/perfil; (2) exceção conta a
+ *  conta do plano de contas embutido (`categoriaDoPlano`); (3) padrão do
+ *  grupo. É a mesma hierarquia de `grupoDe` (manual > plano > padrão),
+ *  só que para o eixo do CPC 51 em vez do grupo da DRE. */
+export function resolverCategoria({ conta, grupo, categoriaPorConta = {}, politica = POLITICA_PADRAO, plano = null }) {
   const manual = categoriaPorConta[conta];
   if (manual && VALIDA.has(manual)) return manual;
+  const doPlano = categoriaDoPlano(plano, conta);
+  if (doPlano) return doPlano;
   return categoriaDoGrupo(grupo, politica);
 }
 
 /** Fábrica da função `categoriaDe(conta)` usada pelo resto do app —
  *  evita que cada chamador repita a mesma composição de grupoDe +
- *  override + política (e erre em um dos três). */
-export function fazerCategoriaDe({ grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO }) {
+ *  override + plano + política (e erre em um dos quatro). */
+export function fazerCategoriaDe({ grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO, plano = null }) {
   return (conta) =>
-    resolverCategoria({ conta, grupo: grupoDe(conta), categoriaPorConta, politica });
+    resolverCategoria({ conta, grupo: grupoDe(conta), categoriaPorConta, politica, plano });
 }
 
 const ordemGrupo = Object.fromEntries(GRUPOS.map((g, i) => [g.id, i]));
@@ -392,12 +414,13 @@ export function contasMistas(contasResultado, { grupoDe, categoriaDe, sugestaoTe
  *  A coluna `origem` é o que transforma a planilha em documento de
  *  auditoria: sem ela, ninguém sabe se aquela categoria foi escolhida
  *  por alguém ou herdada do padrão do grupo. */
-export function deParaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO, nomes = {} }) {
+export function deParaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO, nomes = {}, plano = null }) {
   return contasResultado
     .map((c) => {
       const grupo = grupoDe(c.conta);
       const manual = categoriaPorConta[c.conta] && VALIDA.has(categoriaPorConta[c.conta]);
-      const categoria = resolverCategoria({ conta: c.conta, grupo, categoriaPorConta, politica });
+      const categoria = resolverCategoria({ conta: c.conta, grupo, categoriaPorConta, politica, plano });
+      const origem = manual ? "decisão manual" : categoriaDoPlano(plano, c.conta) ? "definição do plano" : "padrão do grupo";
       return {
         conta: c.conta,
         descricao: nomes[c.conta] || "",
@@ -405,7 +428,7 @@ export function deParaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, 
         grupoNome: NOME_GRUPO[grupo] || grupo,
         categoria,
         categoriaNome: categoria ? NOME_CATEGORIA[categoria] : "Não entra na DRE",
-        origem: manual ? "decisão manual" : "padrão do grupo",
+        origem,
         saldo: c.saldo,
       };
     })
@@ -431,13 +454,14 @@ export function revisarGrupo(grupo, politica = POLITICA_PADRAO) {
 
 /** Quanto do trabalho de categorização já está de pé — o número que a
  *  Fase 2 precisa reportar ao cliente na Fase 3. */
-export function coberturaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO }) {
+export function coberturaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO, plano = null }) {
   let categorizadas = 0, manuais = 0, aRevisar = 0, valorARevisar = 0;
   contasResultado.forEach((c) => {
     const grupo = grupoDe(c.conta);
     if (grupo === "IGNORAR") return;
     categorizadas++;
     if (categoriaPorConta[c.conta] && VALIDA.has(categoriaPorConta[c.conta])) manuais++;
+    else if (categoriaDoPlano(plano, c.conta)) return; // já resolvida pelo plano — não é pendência
     else if (revisarGrupo(grupo, politica)) { aRevisar++; valorARevisar += Math.abs(c.saldo); }
   });
   return { categorizadas, manuais, aRevisar, valorARevisar };

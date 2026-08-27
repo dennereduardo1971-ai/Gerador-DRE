@@ -68,8 +68,29 @@ quebra a DRE validada centavo a centavo e faz dinheiro sumir da tela no
 dia em que uma conta cair num grupo que a hierarquia de subtotais não
 soma.
 
-Mudanças de categoria se fazem em `MAPA_PADRAO` (`cpc51.js`), na política
-contábil, ou conta a conta na aba De-Para.
+Mudanças de categoria se fazem, da mais fraca para a mais forte — a
+mesma ordem de prioridade das camadas do grupo, só que para o eixo do
+CPC 51:
+
+1. **`MAPA_PADRAO`** (`cpc51.js`) — o padrão do GRUPO inteiro. Só mude
+   aqui quando a maioria das contas do grupo, em QUALQUER plano de
+   contas, precisar da nova categoria — não para acertar um caso.
+2. **Política contábil** — quando investir ou financiar clientes é a
+   atividade principal da empresa (colapsa a categoria inteira para
+   operacional).
+3. **Exceção conta a conta no plano embutido** (`categorias` em
+   `planos/iesb.js`, resolvida por `categoriaDoPlano` em `cpc51.js`) —
+   quando a conta é do cliente principal e a decisão é permanente. É o
+   caso mais comum para REC_FIN/DESP_FIN/OUTRAS_REC/OUTRAS_DESP: esses
+   grupos misturam natureza por desenho, então o padrão do grupo nunca
+   serve para todas as contas dele. **Depois de adicionar, confira que a
+   conta some da fila de "a revisar"** — `revisarGrupo` só olha o grupo,
+   quem sabe que aquela conta específica já foi resolvida é
+   `montarDePara`/`coberturaCPC51`, e os dois precisam saber consultar o
+   plano, não só a decisão manual da sessão.
+4. **Conta a conta na aba De-Para** (decisão manual da sessão,
+   `categoriaPorConta`) — para um caso pontual, ou antes de promover a
+   decisão para o plano embutido.
 
 ## Conferência obrigatória, toda vez
 
