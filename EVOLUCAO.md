@@ -39,16 +39,16 @@ Duas regras que não se afrouxam:
 
 ## Estado atual
 
-_Atualizado em 24/08/2026._
+_Atualizado em 27/08/2026._
 
 | | |
 |---|---|
-| Testes | 256 (Vitest, 13 arquivos) |
+| Testes | 259 (Vitest, 13 arquivos) |
 | Lint | `npx oxlint src/ fixtures/` — **zero avisos em tudo** (o ruído de `process` em `validar.mjs`, documentado desde agosto, saiu com um `overrides` no `.oxlintrc.json`) |
-| Bundle | app 397 kB (123 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
+| Bundle | app 401 kB (124 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
 | CSS | 31,3 kB (6,6 kB gzip) — zero classe órfã (conferido por script) |
-| Código | ~8.800 linhas de JS/JSX em `src/` |
-| Maiores arquivos | `App.jsx` (557), `balancete.js` (517), `cpc51.js` (455), `fiscal.js` (434) |
+| Código | ~8.900 linhas de JS/JSX em `src/` (fora `__tests__/`) |
+| Maiores arquivos | `App.jsx` (558), `balancete.js` (517), `fiscal.js` (473), `cpc51.js` (455) |
 | Contexto por sessão | `CLAUDE.md` 402 linhas / 22 kB (era 969 / 55 kB); `EVOLUCAO.md` 346 (era 890) |
 | Abas | 11 (eram 10; a Apuração entrou em 24/08/2026) |
 | Fonte de dados | **só o balancete de verificação** — o razão contábil saiu em 24/08/2026 |
@@ -76,6 +76,45 @@ arquitetura, armadilhas e um índice "quero mudar X → leia Y"; o detalhe
 de cada assunto mora num arquivo lido sob demanda.
 
 ## Registro
+
+### 27/08/2026 — aba "DR_CPC_51_Detalhada" no Excel do CPC 51
+
+Denner pediu uma aba nova no Excel do CPC 51 para clicar num tópico da
+DRE e ver as contas que formam aquele saldo — mandou de exemplo uma tela
+de outro sistema com o tópico em cima e as contas indentadas embaixo.
+
+**Decisão estrutural.** Excel não tem "clique" de app; o equivalente
+nativo é o agrupamento de linhas (o `+` da margem esquerda), o mesmo
+recurso que já abre a aba "Resumo" do De-Para
+(`exportacaoDePara.js::escreverResumoPorGrupo`). A aba nova
+(`DR_CPC_51_Detalhada`, entre "DRE CPC 51" e "DFs paralelas" no workbook)
+repete as linhas de `montarLinhas51` e pendura embaixo de cada tópico as
+contas que `montarDRE51` já agrupa em `dre51.cat[categoria].grupos[i].contas`
+— **nenhum dado novo foi calculado**, só a árvore que já existia ganhou
+uma segunda vista. Contas nascem `hidden` com `outlineLevel = 1`, exatamente
+como no De-Para, para abrir recolhida e não virar uma parede de linhas.
+
+**O que foi medido.** Vitest 259/259 (13 arquivos, +1 describe com 2
+`it` novos que conferem: a aba existe com o mesmo layout de agrupamento
+do De-Para; cada tópico pendura o mesmo conjunto de contas, na mesma
+ordem, que `dre51.cat[...].grupos` — e a soma delas bate com o valor do
+tópico). `oxlint src/ fixtures/` — zero avisos. `npm run build` — passou
+(bundle principal foi de 397 kB para 401 kB gzip 124 kB, porque
+`exportacaoCPC51.js` é importado estático em `App.jsx`, fora do chunk
+sob demanda do `exceljs`).
+
+O `.xlsx` gerado com um razão sintético foi relido com `openpyxl`
+(biblioteca independente do `exceljs`, que escreveu o arquivo) — o
+`outlinePr.summaryBelow` sai `False`, cada tópico com contas vem com
+`outline_level=1`/`hidden=True` embaixo dele, e a composição bate com o
+valor de cima. É o mesmo cuidado que valeu para o De-Para em sessão
+anterior: escritor e leitor não podem ser a mesma lib no dia da
+conferência.
+
+**O que ficou de fora.** `node fixtures/validar.mjs` não rodou — os
+arquivos reais não estão nesta máquina (gitignorados) e a mudança não
+tocou `classify.js`, `balancete.js` nem `planoPerfil.js`, que são os três
+que a doutrina manda validar contra arquivo real.
 
 ### 24/08/2026 (2ª sessão) — a conferência contra cinco balancetes reais
 
