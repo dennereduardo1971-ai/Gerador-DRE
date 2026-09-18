@@ -123,6 +123,13 @@ O que foi feito:
 - Apelidos e catálogo atravessam DRE, CPC 51, Comparativa, De-Para e as
   três exportações; perfil subiu para a versão 5 levando os dois.
 
+**Achado ao fechar:** "Salvar perfil" habilitava só com reclassificação
+manual (`manuais`). Quem tivesse apenas renomeado — o caso que esta
+sessão acabou de criar — não conseguia baixar o próprio trabalho. O botão
+passou a contar TUDO que o perfil leva (grupo, modalidade, categoria,
+apelidos e catálogo) e ganhou um irmão dentro do painel de nomes, que é
+onde a pessoa está quando acaba de renomear.
+
 **Medido nesta sessão:** Vitest 327/327 (25 testes novos em
 `rotulos.test.js`, 4 no `modalidade.test.js`); `npx oxlint src/ fixtures/`
 zero avisos; build ok (app 420 kB, +12 kB; CSS +1,1 kB); app rodado no

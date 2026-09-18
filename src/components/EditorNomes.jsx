@@ -167,14 +167,23 @@ export function EditorNomes({ catalogo, rotulos, editor }) {
       </details>
 
       <div className="row">
+        {/* O download fica AQUI, e não só na etapa Classificar: quem
+            acabou de renomear cinquenta contas está nesta tela, e o
+            arquivo é o único jeito de esse trabalho sobreviver ao
+            próximo balancete. */}
+        <button className="btn" type="button" onClick={editor.onSalvarPerfil}
+          disabled={!editor.decisoes}>
+          Baixar perfil{editor.decisoes ? ` (${editor.decisoes} decisões)` : ""}
+        </button>
         <button className="btn ghost" type="button" onClick={editor.restaurarNomes}>
           Voltar todos os nomes ao padrão
         </button>
       </div>
       <p className="hint">
-        Para levar estas edições para o mês que vem — ou mandar para alguém —, salve o
-        perfil na etapa <b>Classificar</b>: ele leva os nomes, o catálogo de modalidades e
-        as decisões, sem nenhum valor.
+        O perfil é um arquivo JSON com os nomes, o catálogo de modalidades e as decisões de
+        classificação — <b>sem nenhum valor dentro</b>. É ele que leva este trabalho para o
+        mês que vem, para outro computador ou para outra pessoa. O mesmo arquivo se carrega
+        de volta na etapa <b>Classificar</b>.
       </p>
     </div>
   );

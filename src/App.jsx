@@ -4,6 +4,7 @@ import "./App.css";
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
 import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
+import { catalogoPersonalizado } from "./lib/modalidade.js";
 import { baixarCSVDeParaCompleto, baixarExcelDePara } from "./lib/exportacaoDePara.js";
 import { baixarExcelFiscal } from "./lib/exportacaoFiscal.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
@@ -250,6 +251,19 @@ export default function App() {
   );
   const placarDePara = useMemo(() => resumoDePara(deParaLinhas), [deParaLinhas]);
 
+  /* Tudo que o perfil leva, somado: é o que habilita "Salvar perfil" e o
+     que ele conta no rótulo. Antes o botão olhava só a reclassificação
+     manual — quem tinha renomeado 200 contas e não mexido em grupo
+     nenhum não conseguia baixar o próprio trabalho. */
+  const decisoesSalvaveis = useMemo(
+    () => cls.manuais
+      + Object.keys(cls.modalidade).length
+      + rot.quantosRotulos
+      + Object.keys(cpc.categoriaConta).length
+      + (catalogoPersonalizado(rot.catalogo) ? 1 : 0),
+    [cls.manuais, cls.modalidade, rot.quantosRotulos, rot.catalogo, cpc.categoriaConta]
+  );
+
   const periodo = fontes.periodo;
   /* `rotulos` viaja em TODO contexto de exportação: o arquivo entregue
      tem que sair com os mesmos nomes da tela conferida. */
@@ -472,6 +486,7 @@ export default function App() {
                 nomes={fontes.nomesEfetivos} manuais={cls.manuais}
                 busca={busca} onBusca={setBusca}
                 onClassificar={cls.classificar}
+                decisoes={decisoesSalvaveis}
                 onImportarPlano={fontes.importarPlano}
                 onGerarDRE={() => irPara("dre")}
                 onLimparManuais={cls.limparManuais}
@@ -513,6 +528,8 @@ export default function App() {
                   moverModalidade: rot.moverModalidade,
                   restaurarCatalogo: rot.restaurarCatalogo,
                   quantosRotulos: rot.quantosRotulos,
+                  decisoes: decisoesSalvaveis,
+                  onSalvarPerfil: salvarPerfil,
                 }}
                 onBaixarCSV={() => baixarCSVDeParaCompleto(deParaLinhas, ctxArquivo)}
                 onBaixarExcel={() => baixarExcelDePara(deParaLinhas, placarDePara, porGrupo(deParaLinhas), ctxArquivo)}

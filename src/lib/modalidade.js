@@ -289,3 +289,12 @@ export function rotuloPorConta(porModalidade) {
   );
   return mapa;
 }
+
+/** O catálogo foi mexido? Compara com o de fábrica pelo conteúdo que
+ *  importa (id, nome e termos) — é o que diz se há trabalho de
+ *  parametrização a salvar quando o usuário só mexeu em nome. */
+export function catalogoPersonalizado(catalogo) {
+  const resumo = (lista) =>
+    JSON.stringify(normalizarCatalogo(lista).map((m) => [m.id, m.nome, [...m.termos].sort()]));
+  return resumo(catalogo) !== resumo(CATALOGO_PADRAO);
+}
