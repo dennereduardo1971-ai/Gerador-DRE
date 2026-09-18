@@ -25,6 +25,7 @@ import { GRUPOS } from "../lib/grupos.js";
 import { CATEGORIAS, NOME_CATEGORIA } from "../lib/cpc51.js";
 import { EditorNomes } from "./EditorNomes.jsx";
 import { SITUACOES, filtrarDePara, porGrupo, resumoDePara } from "../lib/depara.js";
+import { RESIDUAL, faixasVisiveis } from "../lib/modalidade.js";
 import { situacaoDaLinha } from "../lib/exportacaoDePara.js";
 
 /* Teto de linhas desenhadas de uma vez. Um plano de contas real chega a centenas
@@ -49,6 +50,10 @@ export function DePara({
   const [situacao, setSituacao] = useState("todas");
   const [modalidade, setModalidade] = useState("todas");
 
+  /* As faixas que se escolhem são só as de ensino: "fora da divisão" não
+     é modalidade, é o lugar de quem o alcance deixou de fora — e entra
+     nos dois seletores como opção explícita, nunca como mais uma faixa. */
+  const faixas = useMemo(() => faixasVisiveis(catalogo), [catalogo]);
   const resumo = useMemo(() => resumoDePara(linhas), [linhas]);
   const grupos = useMemo(() => porGrupo(linhas), [linhas]);
   const visiveis = useMemo(
@@ -122,10 +127,10 @@ export function DePara({
           <div className="k">Segregadas por modalidade</div>
           <div className="v">{resumo.segregadas}</div>
           <div className="sub">
-            {catalogo.filter((m) => !m.residual).map((m) => (
+            {faixas.map((m) => (
               <span key={m.id}>{resumo.porModalidade[m.id] || 0} em {m.nome}. </span>
             ))}
-            {resumo.semModalidade} sem modalidade. {resumo.manuaisModalidade} decididas à mão.
+            {resumo.foraDaDivisao} fora da divisão. {resumo.manuaisModalidade} decididas à mão.
           </div>
         </div>
         <div className="check" data-tone={resumo.semGrupo ? "bad" : "ok"}>
@@ -184,7 +189,8 @@ export function DePara({
             <label htmlFor="dp-modalidade">Modalidade</label>
             <select id="dp-modalidade" value={modalidade} onChange={(e) => setModalidade(e.target.value)}>
               <option value="todas">Todas as modalidades</option>
-              {catalogo.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              {faixas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              <option value={RESIDUAL}>Fora da divisão</option>
             </select>
           </div>
           <div>
@@ -242,12 +248,19 @@ export function DePara({
                         `rotulos.js`), senão encurtar um nome moveria a
                         conta de grupo ou de faixa sem ninguém pedir. */}
                     <td className="desc" data-rotulo="Descrição">
+                      {/* O CAMPO VALE O APELIDO, e o nome do plano é o
+                          `placeholder` — igual a todo campo de nome deste
+                          app. Com o nome do plano como VALOR, apagar o
+                          campo para reescrever era impossível: o apelido
+                          vazio se removia, o valor voltava na mesma tecla
+                          e o que a pessoa digitava em seguida grudava no
+                          fim do nome antigo. */}
                       <input
                         type="text"
                         className="dp-nome"
-                        value={l.apelido || l.descricao}
-                        placeholder={l.descricaoOriginal || l.conta}
-                        aria-label={`Nome da conta ${l.conta}`}
+                        value={l.apelido}
+                        placeholder={l.descricaoOriginal || l.descricao || l.conta}
+                        aria-label={`Nome da conta ${l.conta} — ${l.descricaoOriginal || l.descricao}`}
                         onChange={(e) => editor?.renomear("contas", l.conta, e.target.value)}
                       />
                       {l.apelido && l.descricaoOriginal && (
@@ -285,7 +298,8 @@ export function DePara({
                         aria-label={`Modalidade de ensino da conta ${l.conta}`}
                         onChange={(e) => onModalidade(l.conta, e.target.value)}>
                         <option value="">Padrão: {l.modalidadeNome}</option>
-                        {catalogo.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                        {faixas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                        <option value={RESIDUAL}>Fora da divisão</option>
                       </select>
                     </td>
                     <td data-rotulo="Situação">

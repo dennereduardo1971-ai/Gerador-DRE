@@ -46,16 +46,43 @@ Detalhes que já foram decididos:
   caracteres** — o mesmo texto vai para célula de Excel e para CSV, onde
   quebra de linha rompe o arquivo.
 
-## `modalidade.js` — o catálogo
+## `modalidade.js` — o catálogo, o alcance e a faixa padrão
 
 A lista de faixas é **dado**, não código: o usuário cria, renomeia,
 reordena e remove, e diz os `termos` que identificam cada uma no nome da
-conta. De fábrica vêm Presencial, EAD, Médio / Fundamental e a residual.
+conta. De fábrica vêm **Presencial, EAD e Médio / Fundamental** — três, e
+só três, porque foi o que o primeiro uso real pediu.
 
-- **A faixa residual (`RESIDUAL = "COMUM"`) não se remove.** Ela é o
-  destino de toda conta sem modalidade — aluguel, PIS/COFINS/ISS,
-  depreciação. Renomeável como qualquer outra; sem ela, conta sem
-  modalidade cairia num id inexistente e sumiria de toda faixa.
+Três perguntas, três respostas do usuário, todas na mesma tela:
+
+| pergunta | resposta |
+|---|---|
+| quais faixas existem, e como se reconhecem? | o catálogo (`nome` + `termos`) |
+| quais contas se dividem? | o **alcance** (`ALCANCE_PADRAO = ["3"]`) |
+| onde cai a conta do alcance que o plano não identifica? | a **faixa padrão** (`FAIXA_PADRAO = "PRESENCIAL"`) |
+
+- **O alcance é por prefixo de código, e o padrão é o grupo 3.** É onde a
+  modalidade é um fato do plano de contas: mensalidade, taxa, bolsa e
+  desconto nascem de um curso. Aluguel, PIS/COFINS/ISS e depreciação
+  nascem da instituição inteira, e dividi-los exigiria rateio — número
+  que a contabilidade não lançou. Alcance vazio divide tudo.
+- **A faixa padrão existe para a faixa "Comum" não existir.** Sem ela,
+  toda conta não declarada virava uma terceira faixa embaixo de cada
+  tópico, e a demonstração ficava cheia de linha que ninguém queria ler.
+  Escolher `RESIDUAL` na tela ("Nenhuma") devolve o comportamento antigo.
+- **A escolha manual vence o alcance.** O alcance governa o automático;
+  uma conta de despesa que alguém abriu e marcou como EAD é a exceção
+  declarada, e desfazê-la apagaria um clique deliberado.
+- **A faixa residual (`RESIDUAL = "COMUM"`) não se remove, e não é faixa.**
+  Virou o BALDE ESTRUTURAL de quem está fora do alcance: sem ela, a
+  despesa cairia num id inexistente e sumiria de toda faixa. Ela não
+  aparece no catálogo que se edita (`faixasVisiveis` a filtra) e só vira
+  linha quando um mesmo tópico mistura conta de dentro e de fora do
+  alcance — aí é ela que faz as faixas fecharem com a linha de cima.
+- **Faixa sozinha não vira linha.** Uma única faixa é, por construção, o
+  valor da linha logo acima: repeti-la dobra a demonstração e ainda
+  afirma mais do que se sabe ("( – ) PIS/COFINS/ISS / Presencial" leria
+  como imposto segregado quando o que houve foi o plano não dizer nada).
 - **O id nunca muda no rename.** Ele é a chave que as contas decididas à
   mão guardam; regerá-lo apagaria todas de uma vez.
 - **Remover não perde conta:** `fazerModalidadeDe` valida contra o
@@ -67,10 +94,39 @@ conta. De fábrica vêm Presencial, EAD, Médio / Fundamental e a residual.
   inteira, "presencial" casaria dentro de "semipresencial"; sem o
   desempate por tamanho, a ordem da lista na tela viraria regra escondida
   de classificação.
-- **O catálogo viaja com o resolvedor**, em `modalidadeDe.catalogo`.
+- **O catálogo viaja com o resolvedor**, em `modalidadeDe.catalogo` — e o
+  alcance e a faixa padrão junto (`.alcance`, `.faixaPadrao`).
   `montarDRE` e `montarDRE51` montam os blocos a partir dele — passar
   resolvedor de um catálogo e lista de outro faria a faixa renomeada
   aparecer com o nome antigo, ou sumir. Já aconteceu uma vez; há teste.
+- **O padrão do app mora no hook, não na assinatura das funções.** Em
+  `modalidade.js`, alcance ausente = não restringe e faixa padrão ausente
+  = residual: chamada sem parâmetro nunca decide política por conta
+  própria. Quem escolhe `ALCANCE_PADRAO` e `FAIXA_PADRAO` é `useRotulos`,
+  e o perfil os carrega.
+
+## Digitar não pode brigar com quem digita
+
+Defeito de 18/09/2026, achado na primeira vez que alguém **escreveu** um
+nome em vez de colar: a limpeza rodava a cada tecla e aparava o fim do
+texto, então o espaço entre duas palavras nunca chegava a aparecer —
+nome de mais de uma palavra era impossível. A vírgula dos `termos` sumia
+pelo mesmo motivo, e o campo de nome da conta, cujo valor era o nome do
+plano, se recompunha sozinho quando alguém o apagava para reescrever.
+
+A regra que saiu disso, e que vale para todo campo de texto deste app:
+
+- **Normalizar é trabalho de LEITURA e de GRAVAÇÃO, nunca de tecla.**
+  `textoDigitado` (só tira caractere de controle e excesso de tamanho)
+  roda no `onChange`; `limparRotulo` e `normalizarCatalogo` rodam quando
+  o texto vai para a tela, para a planilha ou para o perfil.
+- **O estado guarda o que foi digitado.** `useRotulos` mantém o catálogo
+  CRU (`catalogoEdicao`, com a vírgula recém-teclada e o nome vazio) e
+  entrega o normalizado (`catalogo`) para o resto do app.
+- **Campo de nome vale o APELIDO; o nome de fábrica é `placeholder`.** Com
+  o padrão como *valor*, apagar para reescrever é impossível: o apelido
+  vazio se remove, o valor volta na mesma tecla e o que se digita depois
+  gruda no fim do nome antigo.
 
 ## Onde se edita
 
@@ -82,8 +138,8 @@ do plano visível embaixo quando os dois diferem); o resto fica no painel
 
 ## Como isso sai do app
 
-O **perfil** (etapa Classificar) leva apelidos e catálogo junto das
-decisões — versão 5. Continua sendo só decisão e texto: nenhum valor,
+O **perfil** (etapa Classificar) leva apelidos, catálogo, alcance e faixa
+padrão junto das decisões — versão 6. Continua sendo só decisão e texto: nenhum valor,
 então o arquivo pode ser versionado, mandado por e-mail ou anexado numa
 conversa. É o que transforma renomear 200 contas num ativo em vez de um
 trabalho a refazer todo mês, e é o caminho para mandar as edições de volta

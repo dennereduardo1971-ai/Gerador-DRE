@@ -243,7 +243,7 @@ describe("nomes e catálogo viajam no perfil", () => {
   });
 
   it("salva apelidos, catálogo e a modalidade manual válida nele", () => {
-    expect(ida.versao).toBe(5);
+    expect(ida.versao).toBe(6);
     expect(ida.rotulos.grupos.REC_MENSALIDADES).toBe("Receita com Cursos");
     expect(ida.catalogoModalidades.map((m) => m.id)).toEqual(["PRESENCIAL", "TECNICO", RESIDUAL]);
     // modalidade que não existe no catálogo do próprio perfil não entra
@@ -269,5 +269,82 @@ describe("nomes e catálogo viajam no perfil", () => {
     expect(perfil.modalidades).toEqual({ "3110101": "PRESENCIAL" });
     expect(perfil.catalogoModalidades.map((m) => m.id)).toEqual(CATALOGO_PADRAO.map((m) => m.id));
     expect(perfil.rotulos).toEqual(ROTULOS_VAZIOS);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * DIGITAR NÃO PODE BRIGAR COM QUEM DIGITA.
+ *
+ * Defeito encontrado em 18/09/2026, na primeira vez que alguém escreveu
+ * um nome em vez de colar: a limpeza rodava a cada tecla e APARAVA o fim
+ * do texto, então o espaço entre duas palavras nunca chegava a aparecer
+ * — nome de mais de uma palavra era impossível de escrever. O mesmo com
+ * a vírgula que separa os termos de uma modalidade.
+ * ------------------------------------------------------------------ */
+describe("o campo de nome aceita o que se está digitando", () => {
+  it("o espaço do fim sobrevive à tecla — senão a segunda palavra nunca começa", () => {
+    const r = definirRotulo(ROTULOS_VAZIOS, "grupos", "REC_MENSALIDADES", "Receita ");
+    expect(r.grupos.REC_MENSALIDADES).toBe("Receita ");
+    // digitando a palavra seguinte
+    const r2 = definirRotulo(r, "grupos", "REC_MENSALIDADES", "Receita de Cursos");
+    expect(r2.grupos.REC_MENSALIDADES).toBe("Receita de Cursos");
+  });
+
+  it("mas o texto que vai para o arquivo sai aparado", () => {
+    const r = definirRotulo(ROTULOS_VAZIOS, "grupos", "REC_MENSALIDADES", "Receita ");
+    expect(normalizarRotulos(r).grupos.REC_MENSALIDADES).toBe("Receita");
+    expect(limparRotulo("Receita  de \t Cursos ")).toBe("Receita de Cursos");
+  });
+
+  it("campo em branco continua removendo o apelido", () => {
+    const r = definirRotulo(ROTULOS_VAZIOS, "grupos", "REC_MENSALIDADES", "Receita");
+    expect(definirRotulo(r, "grupos", "REC_MENSALIDADES", "   ").grupos).toEqual({});
+  });
+
+  it("caractere de controle nunca entra — ele rompe a linha do CSV", () => {
+    const r = definirRotulo(ROTULOS_VAZIOS, "grupos", "CUSTOS", "Custo\ndos serviços");
+    expect(r.grupos.CUSTOS).not.toMatch(/\n/);
+  });
+
+  it("a vírgula recém-teclada sobrevive, e o termo vazio não classifica nada", () => {
+    // é o que o hook guarda enquanto se escreve o segundo termo
+    const emEdicao = [{ id: "EAD", nome: "EAD", termos: "ead,".split(",") }];
+    expect(emEdicao[0].termos.join(",")).toBe("ead,");
+    expect(normalizarCatalogo(emEdicao)[0].termos).toEqual(["ead"]);
+    expect(modalidadeDoTexto("GRADUACAO EAD", emEdicao)).toBe("EAD");
+    expect(modalidadeDoTexto("ALUGUEIS", emEdicao)).toBe(null);
+  });
+
+  it("nome de modalidade em branco vira o id na leitura, não na tecla", () => {
+    expect(normalizarCatalogo([{ id: "EAD", nome: "", termos: [] }])[0].nome).toBe("EAD");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * O alcance e a faixa padrão viajam no perfil (versão 6).
+ * ------------------------------------------------------------------ */
+describe("alcance e faixa padrão no perfil", () => {
+  it("vão e voltam inteiros", () => {
+    const ida = montarPerfil({
+      nome: "IESB", classif: {},
+      alcanceModalidade: ["3", "5"], faixaPadraoModalidade: "PRESENCIAL",
+    });
+    expect(ida.alcanceModalidade).toEqual(["3", "5"]);
+    const { ok, perfil } = lerPerfil(JSON.stringify(ida));
+    expect(ok).toBe(true);
+    expect(perfil.alcanceModalidade).toEqual(["3", "5"]);
+    expect(perfil.faixaPadraoModalidade).toBe("PRESENCIAL");
+  });
+
+  it("faixa padrão que não existe no catálogo do perfil não passa", () => {
+    const ida = montarPerfil({ nome: "X", classif: {}, faixaPadraoModalidade: "FANTASMA" });
+    expect(ida.faixaPadraoModalidade).toBe("PRESENCIAL");
+  });
+
+  it("perfil sem os dois campos cai no padrão de hoje, não no de ontem", () => {
+    const v5 = { formato: "gerador-dre/perfil", versao: 5, nome: "Velho", contas: {} };
+    const { perfil } = lerPerfil(JSON.stringify(v5));
+    expect(perfil.alcanceModalidade).toEqual(["3"]);
+    expect(perfil.faixaPadraoModalidade).toBe("PRESENCIAL");
   });
 });

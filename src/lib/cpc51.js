@@ -35,7 +35,7 @@
  */
 
 import { GRUPOS, NOME_GRUPO } from "./grupos.js";
-import { CATALOGO_PADRAO, blocosVazios, faixasDoGrupo } from "./modalidade.js";
+import { CATALOGO_PADRAO, RESIDUAL, blocosVazios, faixasDoGrupo } from "./modalidade.js";
 import { nomeDaCategoria51, nomeDaConta, nomeDoGrupo } from "./rotulos.js";
 
 export const CATEGORIAS = [
@@ -256,7 +256,7 @@ export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe 
        valor por conta (o saldo) que já soma aqui — as duas demonstrações
        leem as mesmas contas, então Presencial no CPC 51 e Presencial na
        DRE atual têm que ser a mesma quantia, só em linhas diferentes. */
-    const m = porGrupo[chave].porModalidade[modalidadeDe(c.conta)] || porGrupo[chave].porModalidade.COMUM;
+    const m = porGrupo[chave].porModalidade[modalidadeDe(c.conta)] || porGrupo[chave].porModalidade[RESIDUAL];
     m.total += c.saldo;
     m.contas.push(item);
     cat[categoria].total += c.saldo;

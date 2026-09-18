@@ -4,7 +4,7 @@ import "./App.css";
 import { baixarCSV, baixarExcel } from "./lib/exportacao.js";
 import { baixarCSVDePara, baixarExcelCPC51, baixarNotaMPDA } from "./lib/exportacaoCPC51.js";
 import { montarDePara, porGrupo, resumoDePara } from "./lib/depara.js";
-import { catalogoPersonalizado } from "./lib/modalidade.js";
+import { alcancePersonalizado, catalogoPersonalizado } from "./lib/modalidade.js";
 import { baixarCSVDeParaCompleto, baixarExcelDePara } from "./lib/exportacaoDePara.js";
 import { baixarExcelFiscal } from "./lib/exportacaoFiscal.js";
 import { lerPlanoAcao, salvarPlanoAcao } from "./lib/planoAcao.js";
@@ -134,6 +134,7 @@ export default function App() {
     contas: fontes.contas, nomesEfetivos: fontes.nomesEfetivos,
     planos: fontes.planos, balancetes: fontes.balancetes,
     catalogoModalidades: rot.catalogo,
+    alcanceModalidade: rot.alcance, faixaPadraoModalidade: rot.faixaPadrao,
   });
   const cpc = useCPC51({
     contasResultado: cls.contasResultado, grupoDe: cls.grupoDe, dre: cls.dre,
@@ -212,6 +213,7 @@ export default function App() {
       // Os nomes também são decisão: o catálogo de modalidades e cada
       // apelido de conta, linha e categoria viajam junto.
       catalogoModalidades: rot.catalogo,
+      alcanceModalidade: rot.alcance, faixaPadraoModalidade: rot.faixaPadrao,
       rotulos: rot.rotulos,
       // Só os PARÂMETROS fiscais — regime, alíquotas, mapa de tributos.
       // Prejuízo fiscal é valor de cliente e fica fora, para o perfil
@@ -260,8 +262,10 @@ export default function App() {
       + Object.keys(cls.modalidade).length
       + rot.quantosRotulos
       + Object.keys(cpc.categoriaConta).length
-      + (catalogoPersonalizado(rot.catalogo) ? 1 : 0),
-    [cls.manuais, cls.modalidade, rot.quantosRotulos, rot.catalogo, cpc.categoriaConta]
+      + (catalogoPersonalizado(rot.catalogo) ? 1 : 0)
+      + (alcancePersonalizado(rot.alcance, rot.faixaPadrao) ? 1 : 0),
+    [cls.manuais, cls.modalidade, rot.quantosRotulos, rot.catalogo, rot.alcance,
+      rot.faixaPadrao, cpc.categoriaConta]
   );
 
   const periodo = fontes.periodo;
@@ -527,6 +531,11 @@ export default function App() {
                   removerModalidade: rot.removerModalidade,
                   moverModalidade: rot.moverModalidade,
                   restaurarCatalogo: rot.restaurarCatalogo,
+                  definirAlcance: rot.definirAlcance,
+                  definirFaixaPadrao: rot.definirFaixaPadrao,
+                  catalogoEdicao: rot.catalogoEdicao,
+                  alcanceTexto: rot.alcanceTexto,
+                  faixaPadrao: rot.faixaPadrao,
                   quantosRotulos: rot.quantosRotulos,
                   decisoes: decisoesSalvaveis,
                   onSalvarPerfil: salvarPerfil,

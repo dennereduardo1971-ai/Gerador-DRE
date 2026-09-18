@@ -47,11 +47,34 @@ const LIMITE = 90;
    o `no-control-regex` do oxlint — e o projeto trabalha com zero avisos. */
 const CONTROLE = /\p{Cc}+/gu;
 
+/** Limpeza de LEITURA e de GRAVAÇÃO EM ARQUIVO: o texto como ele vai
+ *  parar na demonstração, no perfil e na planilha. */
 export function limparRotulo(texto) {
   return String(texto ?? "")
     .replace(CONTROLE, " ")
     .replace(/\s+/g, " ")
     .trim()
+    .slice(0, LIMITE);
+}
+
+/** Limpeza de DIGITAÇÃO — a que roda a cada tecla, enquanto o campo está
+ *  sendo escrito.
+ *
+ *  ELA NÃO APARA O FIM DO TEXTO, e a diferença não é cosmética: com
+ *  `limparRotulo` na tecla, digitar "Receita " virava "Receita" antes de
+ *  o "d" de "de" chegar, o campo voltava ao valor anterior e o espaço
+ *  NUNCA aparecia — ou seja, nome de mais de uma palavra era impossível
+ *  de escrever. O mesmo vale para a vírgula que separa os termos de uma
+ *  modalidade. Normalizar o que a pessoa está digitando é sempre isto:
+ *  brigar com ela a cada tecla.
+ *
+ *  O que sai aqui é só o que não pode chegar num arquivo (caractere de
+ *  controle, que rompe linha de CSV) e o excesso de tamanho. O aparo de
+ *  verdade acontece na leitura e ao salvar o perfil — `normalizarRotulos`. */
+export function textoDigitado(texto) {
+  return String(texto ?? "")
+    .replace(CONTROLE, " ")
+    .replace(/^\s+/, "")
     .slice(0, LIMITE);
 }
 
@@ -63,7 +86,7 @@ export function limparRotulo(texto) {
  *  isso, "limpar o campo" deixaria a linha sem nome nenhum na tela. */
 export function definirRotulo(rotulos, eixo, chave, valor) {
   if (!EIXOS_ROTULO.includes(eixo)) return rotulos;
-  const limpo = limparRotulo(valor);
+  const limpo = textoDigitado(valor);
   const atual = { ...rotulos?.[eixo] };
   if (limpo) atual[chave] = limpo;
   else delete atual[chave];

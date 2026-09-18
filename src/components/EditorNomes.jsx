@@ -3,7 +3,7 @@ import { GRUPOS } from "../lib/grupos.js";
 import { CATEGORIAS } from "../lib/cpc51.js";
 import { LINHAS_ESTRUTURAIS } from "../lib/linhasDRE.js";
 import { LINHAS_ESTRUTURAIS_51 } from "../lib/linhasCPC51.js";
-import { RESIDUAL } from "../lib/modalidade.js";
+import { RESIDUAL, faixasVisiveis } from "../lib/modalidade.js";
 import { nomeDaCategoria51, nomeDoGrupo, rotuloDaLinha } from "../lib/rotulos.js";
 
 /* ONDE SE MUDA O NOME DE TUDO — menos o das contas, que se muda na linha
@@ -41,6 +41,12 @@ function CampoNome({ id, rotulo, padrao, valor, onChange }) {
 export function EditorNomes({ catalogo, rotulos, editor }) {
   const [nova, setNova] = useState("");
 
+  /* A LISTA QUE SE EDITA É A CRUA (`catalogoEdicao`), não a normalizada:
+     é ela que guarda a vírgula recém-teclada e o campo de nome vazio que
+     está prestes a ser reescrito. A normalizada é a que o app consome. */
+  const lista = faixasVisiveis(editor.catalogoEdicao || catalogo);
+  const padroes = faixasVisiveis(catalogo);
+
   const renomear = (eixo) => (chave, valor) => editor.renomear(eixo, chave, valor);
 
   function acrescentar(e) {
@@ -65,36 +71,34 @@ export function EditorNomes({ catalogo, rotulos, editor }) {
         <summary>Modalidades — as faixas dentro de cada tópico</summary>
         <p className="hint">
           Cada faixa tem um nome e os <b>termos</b> que a identificam no nome da conta do
-          plano (separados por vírgula). A última faixa é a residual: recebe o que não é de
-          modalidade nenhuma — aluguel, PIS/COFINS/ISS, depreciação — e por isso não se
-          remove, só se renomeia.
+          plano (separados por vírgula). Quem decide a faixa é o nome no plano de contas,
+          não a ordem desta lista.
         </p>
         <div className="ed-lista">
-          {catalogo.map((m, i) => (
-            <div className="ed-modalidade" key={m.id} data-residual={m.residual ? "1" : "0"}>
+          {lista.map((m, i) => (
+            <div className="ed-modalidade" key={m.id}>
               <input
                 type="text"
                 className="ed-nome"
                 value={m.nome}
-                aria-label={`Nome da modalidade ${m.nome}`}
+                placeholder={m.id}
+                aria-label={`Nome da modalidade ${m.nome || m.id}`}
                 onChange={(e) => editor.renomearModalidade(m.id, e.target.value)}
               />
               <input
                 type="text"
                 className="ed-termos"
-                value={m.termos.join(", ")}
-                placeholder={m.residual ? "recebe o que sobra — sem termos" : "termos no plano de contas"}
-                disabled={m.residual}
-                aria-label={`Termos que identificam ${m.nome}`}
+                value={m.termos.join(",")}
+                placeholder="termos no plano de contas"
+                aria-label={`Termos que identificam ${m.nome || m.id}`}
                 onChange={(e) => editor.definirTermos(m.id, e.target.value)}
               />
               <div className="ed-acoes">
-                <button className="btn ghost" type="button" disabled={m.residual || i === 0}
+                <button className="btn ghost" type="button" disabled={i === 0}
                   aria-label={`Subir ${m.nome}`} onClick={() => editor.moverModalidade(m.id, -1)}>↑</button>
-                <button className="btn ghost" type="button"
-                  disabled={m.residual || i >= catalogo.length - 2}
+                <button className="btn ghost" type="button" disabled={i >= lista.length - 1}
                   aria-label={`Descer ${m.nome}`} onClick={() => editor.moverModalidade(m.id, 1)}>↓</button>
-                <button className="btn ghost" type="button" disabled={m.id === RESIDUAL}
+                <button className="btn ghost" type="button" disabled={lista.length <= 1}
                   aria-label={`Remover ${m.nome}`} onClick={() => editor.removerModalidade(m.id)}>Remover</button>
               </div>
             </div>
@@ -113,10 +117,42 @@ export function EditorNomes({ catalogo, rotulos, editor }) {
             Voltar às modalidades padrão
           </button>
         </form>
+
+        {/* AS DUAS PERGUNTAS QUE COMPLETAM A REGRA. Elas ficam aqui, e
+            não escondidas num padrão do código, porque a resposta muda
+            de instituição para instituição — e porque a versão anterior,
+            que dividia tudo e jogava o não identificado numa faixa
+            "Comum", enchia a demonstração de faixa que ninguém queria
+            ler. */}
+        <h3 className="ed-sub">Quem se divide</h3>
+        <div className="ed-regra">
+          <label className="ed-campo">
+            <span className="ed-padrao">Dividir só as contas que começam com</span>
+            <input
+              type="text"
+              value={editor.alcanceTexto}
+              placeholder="3"
+              aria-label="Códigos de conta que se dividem em modalidades"
+              onChange={(e) => editor.definirAlcance(e.target.value)}
+            />
+          </label>
+          <label className="ed-campo">
+            <span className="ed-padrao">Conta desse alcance sem modalidade no plano entra em</span>
+            <select
+              value={editor.faixaPadrao}
+              aria-label="Faixa que recebe a conta não identificada"
+              onChange={(e) => editor.definirFaixaPadrao(e.target.value)}
+            >
+              {padroes.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              <option value={RESIDUAL}>Nenhuma — deixar fora da divisão</option>
+            </select>
+          </label>
+        </div>
         <p className="hint">
-          Remover uma modalidade não perde conta nenhuma: o que estava nela volta para a
-          faixa residual. A ordem aqui é a ordem das faixas na demonstração — ela não
-          influencia a classificação, que desempata pelo termo mais específico.
+          Separe vários por vírgula; em branco divide todas as contas de resultado. Conta
+          fora do alcance não entra em faixa nenhuma — o tópico dela continua sendo uma
+          linha só, como antes. Um tópico também não se abre quando todas as contas dele
+          caem na mesma faixa: a faixa sozinha repetiria o valor da linha de cima.
         </p>
       </details>
 
