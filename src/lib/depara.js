@@ -27,7 +27,7 @@
  */
 
 import { GRUPOS } from "./grupos.js";
-import { CATALOGO_PADRAO, RESIDUAL, nomeDaModalidade, origemModalidade } from "./modalidade.js";
+import { CATALOGO_PADRAO, RESIDUAL, dentroDoAlcance, nomeDaModalidade, origemModalidade } from "./modalidade.js";
 import { POLITICA_PADRAO, categoriaDoPlano, resolverCategoria, revisarGrupo } from "./cpc51.js";
 import { nomeDaCategoria51, nomeDaConta, nomeDoGrupo } from "./rotulos.js";
 
@@ -49,7 +49,7 @@ export const SITUACOES = [
   { id: "sem-grupo", nome: "Fora da DRE" },
   { id: "revisar", nome: "Categoria a revisar" },
   { id: "manuais", nome: "Com decisão manual" },
-  { id: "sem-modalidade", nome: "Sem modalidade (comum)" },
+  { id: "sem-modalidade", nome: "Fora da divisão por modalidade" },
   { id: "automaticas", nome: "Só no automático" },
   { id: "com-movimento", nome: "Com movimento no período" },
   { id: "sem-movimento", nome: "Sem movimento no período" },
@@ -130,7 +130,17 @@ export function montarDePara(contasResultado, {
         modalidade,
         modalidadeNome: nomeDaModalidade(modalidade, catalogo),
         modalidadeManual: !!modalidadePorConta[c.conta],
-        origemModalidade: origemModalidade(c.conta, { modalidadePorConta, sugestao: sugestaoModalidade }),
+        /* O alcance e a faixa padrão vêm do resolvedor, não por fora:
+           são a mesma decisão que acabou de resolver `modalidade` logo
+           acima, e remontá-las aqui é como a coluna passaria a explicar
+           uma decisão diferente da que a demonstração tomou. */
+        origemModalidade: origemModalidade(c.conta, {
+          modalidadePorConta, sugestao: sugestaoModalidade, catalogo,
+          alcance: modalidadeDe.alcance, faixaPadrao: modalidadeDe.faixaPadrao,
+        }),
+        /* A conta está fora da divisão? É o que explica, na tela e no
+           Excel, por que o tópico dela não abre em faixas. */
+        foraDoAlcance: !dentroDoAlcance(c.conta, modalidadeDe.alcance),
         revisar,
         semGrupo,
         pendente: semGrupo || !!revisar,
@@ -162,7 +172,7 @@ export function resumoDePara(linhas) {
     pendenteSemMovimento: 0,
     porModalidade: {},
     segregadas: 0,
-    semModalidade: 0,
+    foraDaDivisao: 0,
     manuaisModalidade: 0,
   };
   linhas.forEach((l) => {
@@ -173,7 +183,7 @@ export function resumoDePara(linhas) {
        editável, "Presencial" e "EAD" podem ter sido renomeados, e
        modalidade nova entra sem ninguém mexer aqui. */
     r.porModalidade[l.modalidade] = (r.porModalidade[l.modalidade] || 0) + 1;
-    if (l.modalidade === RESIDUAL) r.semModalidade++;
+    if (l.modalidade === RESIDUAL) r.foraDaDivisao++;
     else r.segregadas++;
     if (l.semMovimento) r.semMovimento++;
     const contar = () => { if (l.semMovimento) r.pendenteSemMovimento++; };

@@ -5,7 +5,7 @@
  * depreciação, provisões, financeiro e não operacional). */
 
 import { GRUPOS, SINAL_GRUPO, ehCredora } from "./grupos.js";
-import { CATALOGO_PADRAO, blocosVazios, faixasDoGrupo } from "./modalidade.js";
+import { CATALOGO_PADRAO, RESIDUAL, blocosVazios, faixasDoGrupo } from "./modalidade.js";
 import { escolherPlano, grupoPorPlano } from "./planoPerfil.js";
 import { PLANOS_EMBUTIDOS } from "./planos/iesb.js";
 
@@ -243,7 +243,7 @@ export function montarDRE(contasResultado, grupoDe, modalidadeDe = () => "COMUM"
        inclusive nos grupos que misturam despesa e reversão de provisão
        na mesma linha. Somar magnitude aqui reproduziria, dentro da
        faixa, o erro que `montarDRE` já evita no total. */
-    const m = bal[g].porModalidade[modalidadeDe(c.conta)] || bal[g].porModalidade.COMUM;
+    const m = bal[g].porModalidade[modalidadeDe(c.conta)] || bal[g].porModalidade[RESIDUAL];
     m.total += parcela;
     m.contas.push(item);
   });

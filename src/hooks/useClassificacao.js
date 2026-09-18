@@ -9,7 +9,7 @@ import { fazerModalidadeDe, sugerirModalidades } from "../lib/modalidade.js";
  * `grupoDe` é a resolução das duas: manual sempre vence. Importar um plano
  * de contas novo, ou trocar de balancete, nunca desfaz uma escolha manual.
  *
- * A MODALIDADE (Presencial / EAD / Comum) é o terceiro eixo e mora aqui
+ * A MODALIDADE (Presencial / EAD / Médio) é o terceiro eixo e mora aqui
  * pela mesma razão que o grupo: é decisão sobre a conta, não dado
  * importado. `modalidade` são as escolhas manuais e `sugestaoModalidade`
  * é o que o nome da conta no plano declara — `modalidadeDe` resolve as
@@ -20,7 +20,10 @@ import { fazerModalidadeDe, sugerirModalidades } from "../lib/modalidade.js";
  * coluna comparativa do CPC 51 leem dessa lista. Ela usa `grupoDe`, ou
  * seja, reclassificar uma conta corrige todas as colunas de uma vez.
  */
-export function useClassificacao({ contas, nomesEfetivos, planos, balancetes, catalogoModalidades }) {
+export function useClassificacao({
+  contas, nomesEfetivos, planos, balancetes,
+  catalogoModalidades, alcanceModalidade, faixaPadraoModalidade,
+}) {
   const [classif, setClassif] = useState({});
   const [tocadas, setTocadas] = useState({});
   const [resultadoManual, setResultadoManual] = useState({});
@@ -53,8 +56,10 @@ export function useClassificacao({ contas, nomesEfetivos, planos, balancetes, ca
      contas na hora, sem clicar em conta nenhuma. E lê o nome ORIGINAL do
      plano, nunca o apelido: renomear é aparência (ver `rotulos.js`). */
   const sugestaoModalidade = useMemo(
-    () => (contasResultado.length ? sugerirModalidades(contasResultado, nomesEfetivos, catalogoModalidades) : {}),
-    [contasResultado, nomesEfetivos, catalogoModalidades]
+    () => (contasResultado.length
+      ? sugerirModalidades(contasResultado, nomesEfetivos, catalogoModalidades, alcanceModalidade)
+      : {}),
+    [contasResultado, nomesEfetivos, catalogoModalidades, alcanceModalidade]
   );
 
   const modalidadeDe = useMemo(
@@ -62,8 +67,10 @@ export function useClassificacao({ contas, nomesEfetivos, planos, balancetes, ca
       modalidadePorConta: modalidade,
       sugestao: sugestaoModalidade,
       catalogo: catalogoModalidades,
+      alcance: alcanceModalidade,
+      faixaPadrao: faixaPadraoModalidade,
     }),
-    [modalidade, sugestaoModalidade, catalogoModalidades]
+    [modalidade, sugestaoModalidade, catalogoModalidades, alcanceModalidade, faixaPadraoModalidade]
   );
 
   const dre = useMemo(

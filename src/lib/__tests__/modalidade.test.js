@@ -7,8 +7,8 @@ import { montarDePara, resumoDePara } from "../depara.js";
 import { conciliar, deParaCPC51, POLITICA_PADRAO } from "../cpc51.js";
 import { montarWorkbookCPC51 } from "../exportacaoCPC51.js";
 import {
-  fazerModalidadeDe, faixasDoGrupo, modalidadePorNome, origemModalidade,
-  rotuloPorConta, sugerirModalidades,
+  dentroDoAlcance, fazerModalidadeDe, faixasDoGrupo, modalidadePorNome,
+  normalizarAlcance, origemModalidade, rotuloPorConta, sugerirModalidades,
 } from "../modalidade.js";
 
 /* O TERCEIRO EIXO — Presencial / EAD / Comum.
@@ -311,7 +311,7 @@ describe("o De-Para mostra a modalidade e de onde ela veio", () => {
     /* Despesa da instituição inteira é comum de verdade: marcá-la como
        trabalho a fazer encheria o placar de tarefa que não existe. */
     expect(por["4120101"].pendente).toBe(false);
-    expect(resumoDePara(linhas).semModalidade).toBe(2);
+    expect(resumoDePara(linhas).foraDaDivisao).toBe(2);
   });
 
   it("o placar conta por faixa, sem nome de modalidade cravado", () => {
@@ -368,8 +368,8 @@ describe("no Excel do CPC 51, a faixa abre nas contas da própria modalidade", (
     expect(ead.contas).toEqual(["3110102"]);
     expect(ead.contas).not.toContain("3110101");
 
-    // e a conta sem modalidade declarada cai na faixa residual, sozinha
-    const comum = blocos.find((b) => b.rotulo === "Comum / não segregado" && b.contas.length);
+    // e a conta sem modalidade declarada cai no balde residual, sozinha
+    const comum = blocos.find((b) => b.rotulo === "Fora da divisão" && b.contas.length);
     expect(comum.contas).toEqual(["3110103"]);
   });
 
@@ -392,5 +392,84 @@ describe("no Excel do CPC 51, a faixa abre nas contas da própria modalidade", (
     const blocos = await abrirAba();
     const adm = blocos.find((b) => b.rotulo === "Despesas Administrativas");
     expect(adm.contas.sort()).toEqual(["4120101", "4120102"]);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * O ALCANCE e a FAIXA PADRÃO — quem se divide, e onde cai o resto.
+ *
+ * Pedido de 18/09/2026: dividir só o grupo 3 (a receita), e mandar para
+ * Presencial o que o plano não identificar ali dentro. A faixa "Comum"
+ * deixou de ser uma das faixas da demonstração e virou o balde de quem
+ * está fora do alcance.
+ * ------------------------------------------------------------------ */
+describe("o alcance decide quem se divide", () => {
+  const ALC = ["3"];
+  const de = (extra = {}) => fazerModalidadeDe({
+    sugestao: sugerirModalidades(CONTAS, NOMES, undefined, ALC),
+    alcance: ALC, faixaPadrao: "PRESENCIAL", ...extra,
+  });
+
+  it("conta fora do alcance não recebe modalidade nem sugestão", () => {
+    // 4110102 é "DOCENTES GRADUACAO EAD": o nome diz EAD, o alcance não
+    expect(sugerirModalidades(CONTAS, NOMES, undefined, ALC)["4110102"]).toBeUndefined();
+    expect(de()("4110102")).toBe("COMUM");
+  });
+
+  it("o tópico fora do alcance volta a ser uma linha só", () => {
+    const dre = montarDRE(CONTAS, grupoDe, de());
+    expect(dre.bal.CUSTOS.dividido).toBe(false);
+    expect(dre.bal.CUSTOS.faixas).toEqual([]);
+  });
+
+  it("a conta do alcance que o plano não identifica cai na faixa padrão", () => {
+    // 3110103 é "OUTROS CURSOS" — nome sem modalidade nenhuma
+    expect(de()("3110103")).toBe("PRESENCIAL");
+    const presencial = montarDRE(CONTAS, grupoDe, de()).bal.REC_MENSALIDADES.porModalidade.PRESENCIAL;
+    expect(presencial.contas.map((c) => c.conta).sort()).toEqual(["3110101", "3110103"]);
+  });
+
+  it("com faixa padrão, nenhuma faixa 'fora da divisão' sobra na receita", () => {
+    const dre = montarDRE(CONTAS, grupoDe, de());
+    expect(dre.bal.REC_MENSALIDADES.faixas.map((f) => f.id)).toEqual(["PRESENCIAL", "EAD"]);
+  });
+
+  it("dividir continua não movendo número nenhum", () => {
+    const com = montarDRE(CONTAS, grupoDe, de());
+    const sem = montarDRE(CONTAS, grupoDe);
+    expect(com.liquido).toBeCloseTo(sem.liquido, 2);
+    const soma = com.bal.REC_MENSALIDADES.faixas.reduce((s, f) => s + f.total, 0);
+    expect(soma).toBeCloseTo(com.bal.REC_MENSALIDADES.total, 2);
+  });
+
+  it("a escolha manual vence o alcance — é a exceção declarada", () => {
+    const manual = de({ modalidadePorConta: { "4110102": "EAD" } });
+    expect(manual("4110102")).toBe("EAD");
+    expect(origemModalidade("4110102", {
+      modalidadePorConta: { "4110102": "EAD" }, alcance: ALC,
+    })).toBe("manual");
+  });
+
+  it("a origem separa 'fora do alcance' de 'sem modalidade'", () => {
+    const comum = { sugestao: sugerirModalidades(CONTAS, NOMES, undefined, ALC), alcance: ALC };
+    expect(origemModalidade("4120101", comum)).toBe("fora do alcance");
+    expect(origemModalidade("3110101", comum)).toBe("nome no plano");
+    expect(origemModalidade("3110103", comum)).toBe("sem modalidade");
+    expect(origemModalidade("3110103", { ...comum, faixaPadrao: "PRESENCIAL" })).toBe("faixa padrão");
+  });
+
+  it("faixa sozinha não vira linha: ela repetiria o valor de cima", () => {
+    // um grupo em que TODAS as contas caem na mesma faixa
+    const so = [conta("3210501", -7000)];
+    const dre = montarDRE(so, () => "DED_IMPOSTOS", de());
+    expect(dre.bal.DED_IMPOSTOS.porModalidade.PRESENCIAL.contas).toHaveLength(1);
+    expect(dre.bal.DED_IMPOSTOS.dividido).toBe(false);
+  });
+
+  it("sem alcance informado, nada se restringe — o padrão do app é do hook", () => {
+    expect(dentroDoAlcance("4120101")).toBe(true);
+    expect(dentroDoAlcance("4120101", ["3"])).toBe(false);
+    expect(dentroDoAlcance("3110101", ["3"])).toBe(true);
+    expect(normalizarAlcance(" 3 , ,3, 5 ")).toEqual(["3", "5"]);
   });
 });

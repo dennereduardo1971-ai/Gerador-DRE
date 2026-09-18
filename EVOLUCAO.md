@@ -43,7 +43,7 @@ _Atualizado em 27/08/2026._
 
 | | |
 |---|---|
-| Testes | 327 (Vitest, 15 arquivos — `modalidade.test.js` e `rotulos.test.js` entraram em 18/09/2026) |
+| Testes | 345 (Vitest, 15 arquivos — `modalidade.test.js` e `rotulos.test.js` entraram em 18/09/2026) |
 | Lint | `npx oxlint src/ fixtures/` — **zero avisos em tudo** (o ruído de `process` em `validar.mjs`, documentado desde agosto, saiu com um `overrides` no `.oxlintrc.json`) |
 | Bundle | app 420 kB (129 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
 | CSS | 33,1 kB (6,9 kB gzip) — zero classe órfã (conferido por script) |
@@ -52,10 +52,10 @@ _Atualizado em 27/08/2026._
 | Contexto por sessão | `CLAUDE.md` 402 linhas / 22 kB (era 969 / 55 kB); `EVOLUCAO.md` 346 (era 890) |
 | Abas | 11 (eram 10; a Apuração entrou em 24/08/2026) |
 | Fonte de dados | **só o balancete de verificação** — o razão contábil saiu em 24/08/2026 |
-| Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina). O script foi REESCRITO contra os balancetes e não foi executado por ninguém ainda. |
+| Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou** (ver Registro de 18/09/2026: Denner mandou o balancete de 06/2026 e o plano de contas, mas o script também precisa da DRE oficial, que não veio). O script foi REESCRITO contra os balancetes e não foi executado por ninguém ainda. |
 | Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante) conferidos em 20/08/2026, antes desta sessão. Nesta sessão, as 33 exceções de categoria do CPC 51 do IESB foram conferidas contra o Excel real de 25/08/2026 (ver Registro) — não é o `validar.mjs`, mas é a mesma disciplina: conferir contra dado real, não só contra o razão sintético. |
 | Excel conferido por lib independente | sim — em 18/09/2026 o workbook do CPC 51 foi gerado do balancete fictício e RELIDO por `exceljs`, conferindo que cada faixa abre só nas contas dela. Antes disso,  `openpyxl` releu o De-Para e a Apuração gerados por `exceljs`, e também a aba DR_CPC_51_Detalhada nova (ver Registro) |
-| App rodado no navegador | sim — em 18/09/2026, com balancete FICTÍCIO gerado para a sessão: DRE, De-Para, editor de nomes, tema escuro, 390px (zero rolagem horizontal, medido) e `@media print` conferidos por captura de tela (Playwright + Chromium do ambiente) |
+| App rodado no navegador | sim — em 18/09/2026, com balancete FICTÍCIO gerado para a sessão: DRE, De-Para, editor de nomes, tema escuro, 390px (zero rolagem horizontal, medido), `@media print` e a DIGITAÇÃO de cada campo de nome (tecla a tecla, não `fill`) conferidos por captura de tela (Playwright + Chromium do ambiente) |
 | Skills versionadas | 6 |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) — **nenhum rodou nesta sessão** |
 
@@ -76,6 +76,67 @@ arquitetura, armadilhas e um índice "quero mudar X → leia Y"; o detalhe
 de cada assunto mora num arquivo lido sob demanda.
 
 ## Registro
+
+### 18/09/2026 (3ª) — a divisão ganhou alcance, a faixa "Comum" saiu, e digitar passou a funcionar
+
+Três pedidos do Denner, na ordem em que chegaram: dividir só o **grupo 3**
+("pode deixar os outros normais"), ter só **EAD, Presencial e
+Médio/Fundamental**, e **excluir a faixa Comum/não segregado**, mandando
+para Presencial tudo do grupo 3 que caía nela.
+
+O que isso virou no código foram duas perguntas novas, editáveis e
+salvas no perfil (versão 6):
+
+- **alcance** — quais contas participam da divisão, por prefixo de código.
+  Padrão `["3"]`. Conta fora do alcance não entra em faixa nenhuma e o
+  tópico dela volta a ser uma linha só.
+- **faixa padrão** — onde cai a conta do alcance que o plano não
+  identifica. Padrão Presencial. É ela que apagou a faixa "Comum" de
+  baixo de cada tópico.
+
+A faixa residual **não foi removida**: virou balde estrutural de quem está
+fora do alcance, fora do catálogo que se edita, e só vira linha num
+tópico que misture dentro e fora. Sem ela, despesa cairia num id
+inexistente e sumiria de toda faixa. Junto entrou a regra "faixa sozinha
+não vira linha", sem a qual PIS/COFINS/ISS passaria a exibir um
+"Presencial" que afirma segregação que não houve.
+
+**Três defeitos de digitação achados por mim ao testar tecla a tecla** (na
+sessão anterior eu tinha preenchido os campos por `fill`, que não passa
+por `onChange` letra a letra e por isso não pega nada disso):
+
+1. `limparRotulo` aparava o fim do texto a cada tecla — o espaço entre
+   duas palavras nunca aparecia, e **nome de mais de uma palavra era
+   impossível de escrever**. Em TODO campo de nome do app.
+2. `definirTermos` descartava o pedaço vazio a cada tecla — a vírgula
+   sumia antes da primeira letra do segundo termo, e **não dava para
+   acrescentar um segundo termo** a uma modalidade.
+3. O campo de nome da conta tinha o nome do plano como *valor* — apagar
+   para reescrever era impossível: o valor voltava na mesma tecla e o
+   texto novo grudava no fim do antigo.
+
+A regra que saiu disso está em `CLAUDE.md` ("Campo de texto"): normalizar
+é trabalho de leitura e de gravação, nunca de tecla.
+
+**Medido nesta sessão:** 345 testes (18 novos), oxlint zero, build ok,
+app dirigido no navegador com balancete fictício (digitação tecla a tecla
+em quatro campos, alcance trocado de "3" para "3, 4" e de volta, 390px
+com zero rolagem horizontal, tema escuro) e workbook do CPC 51 gerado e
+**relido por `exceljs`** — cada faixa abrindo só nas contas dela, zero
+faixa "Comum".
+
+**Conferido contra o arquivo REAL:** Denner mandou o balancete de 06/2026
+e o plano de contas (1.081 contas). Os termos do catálogo acertam o plano
+dele: das contas de resultado do grupo 3, o nome identifica 35 como
+Presencial, 30 como EAD e 6 como Médio/Fundamental; **8 caem na faixa
+padrão** por não declararem nada (extensão/livres, duas de taxas, Prouni,
+e PIS/COFINS/ISS — estas três sem virar faixa, pela regra da faixa
+sozinha). Nenhuma conta fora do grupo 3 traz termo de modalidade, ou
+seja, o alcance não tirou divisão nenhuma do arquivo dele. Conferido
+também que nenhum total de grupo e nem o lucro líquido mudam entre o
+comportamento de ontem e o de hoje. **`fixtures/validar.mjs` continua sem
+rodar**: ele compara contra a DRE oficial, que não veio — sem ela o
+script sai com erro, e isso não é validação.
 
 ### 18/09/2026 (continuação) — nomes editáveis, catálogo de modalidades e um defeito no Excel
 

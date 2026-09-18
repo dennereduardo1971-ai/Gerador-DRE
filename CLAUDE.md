@@ -14,7 +14,7 @@ daqui ou de `.claude/docs/`, corrija a frase no mesmo commit.
 | … isto | leia |
 |---|---|
 | para onde uma conta vai (padrões, mapa por código, perfis de plano) | `.claude/docs/classificacao.md` |
-| a modalidade de ensino e o catálogo de faixas | `.claude/docs/nomes.md` |
+| a modalidade de ensino, o catálogo de faixas, quem se divide | `.claude/docs/nomes.md` |
 | renomear conta, linha, grupo ou categoria | `.claude/docs/nomes.md` |
 | a estrutura da DRE, subtotais, rótulos | `.claude/docs/dre.md` |
 | a leitura do balancete, a hierarquia, o período | `.claude/docs/balancete.md` |
@@ -87,8 +87,9 @@ src/
     planoPerfil.js           # motor de perfis de plano de contas
     planos/iesb.js           # o plano do IESB, como DADO
     linhasDRE.js             # a DRE como dados (rótulos, sinais, cascata)
-    modalidade.js            # o 3º eixo: o CATÁLOGO de modalidades (dado
-                              # editável) e quando uma linha se divide
+    modalidade.js            # o 3º eixo: o CATÁLOGO de modalidades, o
+                              # ALCANCE (quem se divide) e a FAIXA PADRÃO
+                              # (onde cai o que o plano não identifica)
     rotulos.js               # os apelidos: conta, grupo, linha, categoria
                               # — aparência, nunca classificação
     cpc51.js                 # as cinco categorias, a política, a conciliação
@@ -309,6 +310,19 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
   cada tópico dividido: com casamento por RÓTULO, o valor do primeiro
   tópico aparecia em todos os outros — número plausível, errado e sem
   aviso. → `.claude/docs/dre.md`
+- **A divisão por modalidade tem ALCANCE, e ele é o grupo 3.** Só a
+  receita se divide por padrão, porque só nela a modalidade é fato do
+  plano de contas; despesa administrativa, aluguel e depreciação nascem
+  da instituição inteira, e dividi-las exigiria rateio. O que está no
+  alcance e o plano não identifica cai na FAIXA PADRÃO (Presencial) — é
+  isso que apagou a faixa "Comum / não segregado" de baixo de cada
+  tópico. Os dois são editáveis e viajam no perfil.
+  → `.claude/docs/nomes.md`
+- **Faixa sozinha não vira linha.** Uma única faixa é, por construção, o
+  valor da linha logo acima. Repeti-la dobra a demonstração e afirma mais
+  do que se sabe: com a faixa padrão ligada, "( – ) PIS/COFINS/ISS /
+  Presencial" leria como imposto segregado quando o que houve foi o plano
+  não dizer nada.
 - **Termo de modalidade casa por PALAVRA INTEIRA, e o mais longo vence.**
   Sem isso, "presencial" casaria dentro de "SEMIPRESENCIAL" e a carga a
   distância entraria como presencial em silêncio. Pelo mesmo motivo,
@@ -331,6 +345,19 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença é o resultado do exercício, que vive nas contas 3 a 7. Nunca
   trate isso como erro de importação. → `.claude/docs/balancete.md`
+
+**Campo de texto**
+
+- **Normalizar a cada tecla briga com quem digita.** `limparRotulo` apara
+  o fim do texto: no `onChange`, "Receita " virava "Receita" antes do "d"
+  de "de" chegar, e nome de mais de uma palavra era impossível de
+  escrever. A vírgula dos `termos` sumia pelo mesmo motivo. Limpeza é
+  trabalho de LEITURA e de GRAVAÇÃO (`limparRotulo`, `normalizarCatalogo`);
+  na tecla vai só `textoDigitado`. → `.claude/docs/nomes.md`
+- **Campo de nome vale o APELIDO, e o nome de fábrica é `placeholder`.**
+  Com o padrão como valor, apagar para reescrever é impossível: o apelido
+  vazio se remove, o valor volta na mesma tecla e o texto novo gruda no
+  fim do antigo. Foi assim no nome da conta do De-Para.
 
 **CSS e acessibilidade**
 

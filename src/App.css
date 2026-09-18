@@ -1809,6 +1809,11 @@ tr[data-pendente="1"] td:first-child { box-shadow: inset 2px 0 0 var(--atencao);
 }
 .dp-nome:hover { border-color: var(--regua); }
 .dp-nome:focus { border-color: var(--marca); background: var(--papel); outline: none; }
+/* O nome que veio do plano é o `placeholder` — e aqui ele precisa ser
+   LEGÍVEL, não um cinza de campo vazio: a coluna inteira é feita dele
+   enquanto ninguém renomeou nada. Fica em tinta-2 para continuar dizendo
+   "isto é herdado, não foi você quem escreveu". */
+.dp-nome::placeholder { color: var(--tinta-2); opacity: 1; }
 .dp-original {
   display: block;
   margin-top: 2px;
@@ -1846,19 +1851,24 @@ tr[data-pendente="1"] td:first-child { box-shadow: inset 2px 0 0 var(--atencao);
   gap: 8px;
   align-items: center;
 }
-/* A faixa residual é a que recebe o que não é de modalidade nenhuma:
-   marcada pela borda, não por cor de dado (verde e vermelho aqui
-   pertencem a saldo, nunca a rótulo de processo). */
-.ed-modalidade[data-residual="1"] {
-  padding-top: 8px;
-  border-top: 1px dashed var(--regua);
-}
 .ed-acoes { display: flex; gap: 4px; }
 .ed-acoes .btn { padding: 5px 9px; font-size: 12px; }
+
+/* As duas perguntas que completam a regra (quem se divide, e onde cai o
+   que o plano não identifica). Ficam separadas da lista por uma régua
+   porque não são mais uma faixa — são a regra que governa todas. */
+.ed-regra {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px 14px;
+  margin: 8px 0 4px;
+}
+.ed-regra select, .ed-regra input { width: 100%; }
 
 @media (max-width: 640px) {
   .ed-modalidade { grid-template-columns: 1fr; }
   .ed-acoes { justify-content: flex-end; }
+  .ed-regra { grid-template-columns: 1fr; }
 }
 
 

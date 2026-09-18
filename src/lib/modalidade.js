@@ -21,19 +21,49 @@
  * DADO: o usuário cria, renomeia, reordena e remove modalidades na tela, e
  * diz quais termos do plano de contas identificam cada uma.
  *
- * A FAIXA RESIDUAL NÃO SE REMOVE. Despesa administrativa, PIS/COFINS/ISS,
- * depreciação e provisão nascem da instituição inteira: não há modalidade
- * a atribuir sem ratear, e ratear inventaria número que a contabilidade
- * não lançou. Por isso existe sempre uma última faixa (por padrão "Comum /
- * não segregado") — renomeável como qualquer outra, mas não removível. É
- * ela que mostra quanto do resultado NÃO está atribuído, e é o que impede
- * alguém de somar duas faixas achando que fechou a DRE.
+ * QUEM SE DIVIDE, E EM QUE FAIXA CAI O QUE O PLANO NÃO DIZ. Duas
+ * perguntas diferentes, e as duas são do usuário:
+ *
+ *   ALCANCE      quais contas participam da divisão, pelo começo do
+ *                código (padrão: as do grupo 3, a receita). Conta fora do
+ *                alcance não entra em faixa nenhuma, e o tópico dela
+ *                continua sendo uma linha só — é o que mantém despesa
+ *                administrativa, depreciação e provisão exatamente como
+ *                estavam antes deste eixo existir.
+ *   FAIXA PADRÃO a faixa que recebe a conta que ESTÁ no alcance e cujo
+ *                nome no plano não declara modalidade nenhuma (padrão:
+ *                Presencial). Sem ela, toda conta não identificada caía
+ *                numa faixa "Comum / não segregado" que aparecia embaixo
+ *                de cada tópico — informação que o usuário do plano do
+ *                IESB não queria ver, porque ali o não declarado É
+ *                presencial.
+ *
+ * A FAIXA RESIDUAL CONTINUA EXISTINDO, mas deixou de ser uma das faixas
+ * da demonstração: ela é o BALDE ESTRUTURAL de quem está fora do alcance.
+ * Sem ela, a conta de despesa cairia num id inexistente e sumiria de toda
+ * faixa — que é o defeito que este eixo inteiro existe para não ter. Ela
+ * não aparece no catálogo que se edita na tela, e só vira linha na
+ * demonstração quando um mesmo tópico mistura conta de dentro e de fora
+ * do alcance (aí a faixa dela é o que faz Presencial + EAD + o resto
+ * fecharem com a linha de cima).
  */
 
-/** O id da faixa residual. Fixo no código de propósito: é o destino de
- *  toda conta sem modalidade e o alvo do `?? RESIDUAL` de quem resolve
- *  uma modalidade que não existe mais no catálogo. */
+/** O id do balde de quem está FORA do alcance da divisão. O id é "COMUM"
+ *  por compatibilidade — perfis e sessões já gravados guardam contas
+ *  nele. Fixo no código de propósito: é o alvo do `?? RESIDUAL` de quem
+ *  resolve uma modalidade que não existe mais no catálogo. */
 export const RESIDUAL = "COMUM";
+
+/** As contas que participam da divisão, pelo começo do código. O padrão é
+ *  o grupo 3 — a receita — porque é onde a modalidade de ensino é um fato
+ *  do plano de contas: mensalidade, taxa, bolsa e desconto nascem de um
+ *  curso. Despesa administrativa, aluguel e depreciação nascem da
+ *  instituição inteira, e dividi-las exigiria rateio, que é número que a
+ *  contabilidade não lançou. Lista vazia = dividir todas as contas. */
+export const ALCANCE_PADRAO = ["3"];
+
+/** A faixa que recebe a conta do alcance que o plano não identifica. */
+export const FAIXA_PADRAO = "PRESENCIAL";
 
 /* O catálogo que o app traz de fábrica. `termos` é o que se procura no
  * nome da conta e no dos ancestrais — em palavra inteira, sem
@@ -60,7 +90,10 @@ export const CATALOGO_PADRAO = [
   { id: "PRESENCIAL", nome: "Presencial", termos: ["presencial"] },
   { id: "EAD", nome: "EAD", termos: ["EAD", "a distância", "semipresencial", "semi presencial"] },
   { id: "MEDIO_FUNDAMENTAL", nome: "Médio / Fundamental", termos: ["médio", "fundamental"] },
-  { id: RESIDUAL, nome: "Comum / não segregado", termos: [], residual: true },
+  /* Não é uma faixa que se escolhe: é onde fica quem está fora do
+     alcance. O nome só aparece na coluna Modalidade do De-Para e no
+     Excel, para a linha não sair em branco. */
+  { id: RESIDUAL, nome: "Fora da divisão", termos: [], residual: true },
 ];
 
 const DIACRITICO = new RegExp("[\\u0300-\\u036f]", "g");
@@ -119,6 +152,36 @@ export function normalizarCatalogo(catalogo) {
 }
 
 export const idsDoCatalogo = (catalogo = CATALOGO_PADRAO) => normalizarCatalogo(catalogo).map((m) => m.id);
+
+/** As faixas que o usuário edita e escolhe — todas menos o balde
+ *  residual. Escrito uma vez aqui porque o editor de nomes, o seletor do
+ *  De-Para e o filtro da tela precisam da MESMA lista: uma cópia que
+ *  esquecesse o `filter` devolveria "Fora da divisão" como se fosse
+ *  modalidade de ensino.
+ *
+ *  SÓ FILTRA — não normaliza. Quem chama decide se passa o catálogo já
+ *  normalizado (a tela que só lê) ou o cru (o editor, que precisa
+ *  devolver a vírgula recém-teclada exatamente como ela foi digitada).
+ *  Normalizar aqui embutia a limpeza no meio da digitação de novo, que é
+ *  o defeito que a separação existe para não ter. */
+export const faixasVisiveis = (catalogo = CATALOGO_PADRAO) =>
+  (Array.isArray(catalogo) ? catalogo : []).filter((m) => m && m.id !== RESIDUAL);
+
+/** O alcance sempre utilizável: prefixos de código, sem espaço, sem
+ *  repetição. Lista vazia significa "todas as contas" — e é isso que o
+ *  parâmetro ausente significa em cada função deste módulo, para uma
+ *  chamada sem alcance nunca restringir nada por conta própria. Quem
+ *  escolhe o padrão do app (`ALCANCE_PADRAO`) é o hook. */
+export function normalizarAlcance(alcance) {
+  const lista = Array.isArray(alcance) ? alcance : String(alcance ?? "").split(",");
+  return [...new Set(lista.map((p) => String(p ?? "").trim()).filter(Boolean))];
+}
+
+/** Esta conta participa da divisão por modalidade? */
+export function dentroDoAlcance(conta, alcance = []) {
+  const alc = normalizarAlcance(alcance);
+  return alc.length === 0 || alc.some((p) => String(conta).startsWith(p));
+}
 
 /** O nome de exibição de uma modalidade. Cai no próprio id quando a
  *  modalidade não existe mais — o que acontece de verdade quando alguém
@@ -203,10 +266,17 @@ export function modalidadePorNome(conta, nomes = {}, historico = "", catalogo = 
 /** A sugestão automática para todas as contas: só as que o plano de
  *  contas identifica entram no mapa. Conta ausente do mapa é conta sem
  *  modalidade declarada — não é "residual por engano". */
-export function sugerirModalidades(contas = [], nomes = {}, catalogo = CATALOGO_PADRAO) {
+export function sugerirModalidades(contas = [], nomes = {}, catalogo = CATALOGO_PADRAO, alcance = []) {
   const cat = normalizarCatalogo(catalogo);
+  const alc = normalizarAlcance(alcance);
   const mapa = {};
   contas.forEach((c) => {
+    /* O ALCANCE É APLICADO AQUI, na única função que lê o plano. Conta de
+       fora não recebe nem sugestão: assim a coluna Modalidade do De-Para,
+       a faixa da DRE e o Excel contam a mesma história, em vez de a tela
+       dizer "EAD pelo nome no plano" numa conta que a demonstração não
+       divide. */
+    if (!dentroDoAlcance(c.conta, alc)) return;
     const m = modalidadePorNome(c.conta, nomes, c.historico, cat);
     if (m) mapa[c.conta] = m;
   });
@@ -224,27 +294,55 @@ export function sugerirModalidades(contas = [], nomes = {}, catalogo = CATALOGO_
  *  dois parâmetros abriria a porta para alguém passar um resolvedor de um
  *  catálogo e a lista de outro, e faixas apareceriam vazias sem erro
  *  nenhum. */
-export function fazerModalidadeDe({ modalidadePorConta = {}, sugestao = {}, catalogo = CATALOGO_PADRAO } = {}) {
+export function fazerModalidadeDe({
+  modalidadePorConta = {}, sugestao = {}, catalogo = CATALOGO_PADRAO,
+  alcance = [], faixaPadrao = RESIDUAL,
+} = {}) {
   const cat = normalizarCatalogo(catalogo);
+  const alc = normalizarAlcance(alcance);
   const validos = new Set(cat.map((m) => m.id));
+  const padrao = validos.has(faixaPadrao) ? faixaPadrao : RESIDUAL;
   const de = (conta) => {
+    /* A ESCOLHA MANUAL VENCE ATÉ O ALCANCE. O alcance governa o
+       automático — é a regra de quem se divide sem ninguém olhar. Uma
+       conta de despesa que alguém abriu e marcou como EAD é o contrário
+       disso: é a exceção declarada, e desfazê-la aqui apagaria em
+       silêncio um clique deliberado. Mesma hierarquia dos outros dois
+       eixos: manual > plano > padrão. */
     const manual = modalidadePorConta[conta];
     if (manual && validos.has(manual)) return manual;
+    if (!dentroDoAlcance(conta, alc)) return RESIDUAL;
     const sugerida = sugestao[conta];
     /* Modalidade removida do catálogo depois de já ter sido escolhida:
-       a conta volta para a residual em vez de sumir num id fantasma. */
-    return sugerida && validos.has(sugerida) ? sugerida : RESIDUAL;
+       a conta cai na faixa padrão em vez de sumir num id fantasma. */
+    if (sugerida && validos.has(sugerida)) return sugerida;
+    return padrao;
   };
   de.catalogo = cat;
+  /* ALCANCE E FAIXA PADRÃO ANDAM COM O RESOLVEDOR, pelo mesmo motivo que
+     o catálogo: são a mesma decisão, e quem recebe `modalidadeDe` (o
+     De-Para, a exportação) precisa saber por que uma conta ficou de fora
+     sem remontar a regra por conta própria e errar a ordem. */
+  de.alcance = alc;
+  de.faixaPadrao = padrao;
   return de;
 }
 
 /** De onde veio a decisão — o campo que separa "alguém conferiu" de
  *  "herdou o padrão", como no De-Para dos outros dois eixos. */
-export function origemModalidade(conta, { modalidadePorConta = {}, sugestao = {}, catalogo = CATALOGO_PADRAO } = {}) {
+export function origemModalidade(conta, {
+  modalidadePorConta = {}, sugestao = {}, catalogo = CATALOGO_PADRAO,
+  alcance = [], faixaPadrao = RESIDUAL,
+} = {}) {
   const validos = new Set(normalizarCatalogo(catalogo).map((m) => m.id));
   if (modalidadePorConta[conta] && validos.has(modalidadePorConta[conta])) return "manual";
+  /* "fora do alcance" é resposta diferente de "sem modalidade": a
+     primeira diz que ninguém procurou, a segunda que se procurou e o
+     plano não disse. Sem separar as duas, a coluna do De-Para faria toda
+     despesa parecer trabalho de parametrização pendente. */
+  if (!dentroDoAlcance(conta, alcance)) return "fora do alcance";
   if (sugestao[conta] && validos.has(sugestao[conta])) return "nome no plano";
+  if (validos.has(faixaPadrao) && faixaPadrao !== RESIDUAL) return "faixa padrão";
   return "sem modalidade";
 }
 
@@ -266,16 +364,24 @@ export function blocosVazios(catalogo = CATALOGO_PADRAO) {
  *  cometeu com `abaDisponivel()` antes de centralizá-la: duas cópias da
  *  mesma condição divergem no dia em que alguém mexe numa só.
  *
- *  Um grupo só se divide quando ALGUMA conta dele tem modalidade: um
- *  grupo inteiramente residual (despesas administrativas, PIS/COFINS/ISS)
- *  continua uma linha só, sem uma faixa solitária repetindo o valor da
- *  linha de cima. */
+ *  Duas condições, e as duas existem para não desenhar uma faixa que não
+ *  informa nada:
+ *
+ *  1. ALGUMA conta do grupo tem modalidade. Um grupo inteiramente fora do
+ *     alcance (despesas administrativas, depreciação) continua uma linha
+ *     só, como era antes deste eixo existir.
+ *  2. MAIS DE UMA faixa tem conta. Uma faixa sozinha é, por construção, o
+ *     valor da linha logo acima dela — repeti-lo dobra as linhas da
+ *     demonstração e ainda AFIRMA mais do que se sabe: com a faixa padrão
+ *     ligada, "( – ) Impostos sobre Serviços / Presencial" leria como
+ *     imposto segregado quando o que houve foi o plano não dizer nada. */
 export function faixasDoGrupo(porModalidade) {
   if (!porModalidade) return [];
   const blocos = Object.values(porModalidade);
   const temModalidade = blocos.some((f) => !f.residual && f.contas.length > 0);
   if (!temModalidade) return [];
-  return blocos.filter((f) => f.contas.length > 0 || Math.abs(f.total) > 0.005);
+  const usadas = blocos.filter((f) => f.contas.length > 0 || Math.abs(f.total) > 0.005);
+  return usadas.length > 1 ? usadas : [];
 }
 
 /** Conta → nome da modalidade, dentro de um grupo já montado. É o que a
@@ -292,7 +398,14 @@ export function rotuloPorConta(porModalidade) {
 
 /** O catálogo foi mexido? Compara com o de fábrica pelo conteúdo que
  *  importa (id, nome e termos) — é o que diz se há trabalho de
- *  parametrização a salvar quando o usuário só mexeu em nome. */
+ *  parametrização a salvar quando o usuário só mexeu em nome. O alcance e
+ *  a faixa padrão respondem a mesma pergunta pelo outro lado: quem se
+ *  divide, e onde cai o que o plano não identifica. */
+export function alcancePersonalizado(alcance, faixaPadrao) {
+  const a = normalizarAlcance(alcance);
+  return a.join("|") !== ALCANCE_PADRAO.join("|") || faixaPadrao !== FAIXA_PADRAO;
+}
+
 export function catalogoPersonalizado(catalogo) {
   const resumo = (lista) =>
     JSON.stringify(normalizarCatalogo(lista).map((m) => [m.id, m.nome, [...m.termos].sort()]));

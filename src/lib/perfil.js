@@ -14,7 +14,10 @@
 
 import { GRUPOS } from "./grupos.js";
 import { IDS_CATEGORIA, POLITICA_PADRAO } from "./cpc51.js";
-import { CATALOGO_PADRAO, normalizarCatalogo } from "./modalidade.js";
+import {
+  ALCANCE_PADRAO, CATALOGO_PADRAO, FAIXA_PADRAO,
+  normalizarAlcance, normalizarCatalogo,
+} from "./modalidade.js";
 import { ROTULOS_VAZIOS, normalizarRotulos, quantosRotulos } from "./rotulos.js";
 
 /* Versão 5: o perfil leva o CATÁLOGO DE MODALIDADES (a lista que o
@@ -49,7 +52,17 @@ import { ROTULOS_VAZIOS, normalizarRotulos, quantosRotulos } from "./rotulos.js"
  * chegam vazios. Quem separou juros de mora de rendimento de aplicação
  * em janeiro não deve ter de refazer isso em fevereiro — e essa era a
  * razão de o perfil existir desde o início. */
-const VERSAO = 5;
+/* Versão 5: apelidos e catálogo de modalidades.
+ *
+ * Versão 6: o alcance da divisão (quais contas se dividem, por prefixo
+ * de código) e a faixa padrão (onde cai a conta do alcance que o plano
+ * não identifica). Perfil de versão 5 ou anterior não traz os dois e cai
+ * no PADRÃO DE HOJE — grupo 3, faixa padrão Presencial — em vez de no
+ * comportamento da época. É escolha consciente: o perfil guarda decisão
+ * de quem parametriza, e essas duas nasceram justamente porque dividir
+ * tudo e mostrar uma faixa "Comum" embaixo de cada tópico não era o que
+ * se queria ler. */
+const VERSAO = 6;
 const IDS_VALIDOS = new Set(GRUPOS.map((g) => g.id));
 const CATEGORIAS_VALIDAS = new Set(IDS_CATEGORIA);
 
@@ -59,6 +72,7 @@ const CATEGORIAS_VALIDAS = new Set(IDS_CATEGORIA);
 export function montarPerfil({
   nome, classif = {}, nomes = {}, categorias = {}, politica, medidas = [], fiscal = null,
   modalidades = {}, catalogoModalidades = CATALOGO_PADRAO, rotulos = ROTULOS_VAZIOS,
+  alcanceModalidade = ALCANCE_PADRAO, faixaPadraoModalidade = FAIXA_PADRAO,
 }) {
   const contas = {};
   for (const [conta, grupo] of Object.entries(classif)) {
@@ -87,6 +101,11 @@ export function montarPerfil({
     categorias: cats,
     modalidades: mods,
     catalogoModalidades: catalogo,
+    alcanceModalidade: normalizarAlcance(alcanceModalidade),
+    /* A faixa padrão só vale se existir no catálogo do próprio perfil:
+       um arquivo editado à mão apontando para uma faixa apagada mandaria
+       toda conta não identificada para um id fantasma. */
+    faixaPadraoModalidade: validas.has(faixaPadraoModalidade) ? faixaPadraoModalidade : FAIXA_PADRAO,
     rotulos: normalizarRotulos(rotulos),
     politica: { ...POLITICA_PADRAO, ...politica },
     medidas,
@@ -140,6 +159,14 @@ export function lerPerfil(texto) {
     else ignoradas++;
   }
 
+  /* Perfil versão 5 ou anterior: cai no padrão de hoje (ver `VERSAO`). */
+  const alcanceModalidade = dados.alcanceModalidade === undefined
+    ? [...ALCANCE_PADRAO]
+    : normalizarAlcance(dados.alcanceModalidade);
+  const faixaPadraoModalidade = validas.has(dados.faixaPadraoModalidade)
+    ? dados.faixaPadraoModalidade
+    : FAIXA_PADRAO;
+
   const rotulos = normalizarRotulos(dados.rotulos);
 
   /* Medida sem ajuste nenhum é igual ao próprio subtotal do CPC 51 — não
@@ -161,6 +188,8 @@ export function lerPerfil(texto) {
       categorias,
       modalidades,
       catalogoModalidades,
+      alcanceModalidade,
+      faixaPadraoModalidade,
       rotulos,
       /* Quantos apelidos vieram — o número que a tela mostra ao aplicar,
          porque "perfil carregado" sem dizer o que ele trouxe é exatamente
