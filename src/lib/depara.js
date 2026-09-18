@@ -1,9 +1,10 @@
 /* O De-Para — a tabela de parametrização do plano de contas.
  *
  * O QUE É: uma linha por conta de resultado, dizendo de onde ela vem
- * (código e descrição no plano do cliente) e para onde ela vai nos dois
- * eixos que o app conhece — o GRUPO da DRE atual e a CATEGORIA do
- * CPC 51 —, com a origem de cada decisão registrada ao lado.
+ * (código e descrição no plano do cliente) e para onde ela vai nos três
+ * eixos que o app conhece — o GRUPO da DRE atual, a CATEGORIA do
+ * CPC 51 e a MODALIDADE de ensino (Presencial / EAD / Comum) —, com a
+ * origem de cada decisão registrada ao lado.
  *
  * POR QUE UM MÓDULO PRÓPRIO, se `classify.js` já decide o grupo e
  * `cpc51.js` já decide a categoria: porque a pergunta "para onde vai
@@ -26,6 +27,7 @@
  */
 
 import { NOME_GRUPO, GRUPOS } from "./grupos.js";
+import { NOME_MODALIDADE, origemModalidade } from "./modalidade.js";
 import { NOME_CATEGORIA, POLITICA_PADRAO, categoriaDoPlano, resolverCategoria, revisarGrupo } from "./cpc51.js";
 
 /** Descrição legível de uma conta: o nome oficial do plano de contas
@@ -47,6 +49,7 @@ export const SITUACOES = [
   { id: "sem-grupo", nome: "Fora da DRE" },
   { id: "revisar", nome: "Categoria a revisar" },
   { id: "manuais", nome: "Com decisão manual" },
+  { id: "sem-modalidade", nome: "Sem modalidade (comum)" },
   { id: "automaticas", nome: "Só no automático" },
   { id: "com-movimento", nome: "Com movimento no período" },
   { id: "sem-movimento", nome: "Sem movimento no período" },
@@ -68,6 +71,9 @@ export function montarDePara(contasResultado, {
   politica = POLITICA_PADRAO,
   nomes = {},
   plano = null,
+  modalidadeDe = () => "COMUM",
+  modalidadePorConta = {},
+  sugestaoModalidade = {},
 } = {}) {
   return contasResultado
     .map((c) => {
@@ -81,6 +87,7 @@ export function montarDePara(contasResultado, {
           ? null
           : revisarGrupo(grupo, politica);
       const semGrupo = grupo === "IGNORAR";
+      const modalidade = modalidadeDe(c.conta);
       return {
         conta: c.conta,
         descricao: descricaoDaConta(c, nomes),
@@ -102,6 +109,16 @@ export function montarDePara(contasResultado, {
         categoriaNome: categoria ? NOME_CATEGORIA[categoria] : "Não entra na DRE",
         categoriaManual,
         origemCategoria: categoriaManual ? "manual" : categoriaDoPlanoAtivo ? "plano" : "padrão do grupo",
+        /* O terceiro eixo. "Comum" NÃO é pendência: a despesa
+           administrativa da instituição inteira é comum de verdade, e
+           marcá-la como falta de trabalho encheria o placar de tarefa
+           que não existe. Por isso a modalidade não entra em
+           `pendente` — ela tem filtro próprio, para quem quiser varrer
+           as comuns atrás de uma que deveria estar segregada. */
+        modalidade,
+        modalidadeNome: NOME_MODALIDADE[modalidade] || modalidade,
+        modalidadeManual: !!modalidadePorConta[c.conta],
+        origemModalidade: origemModalidade(c.conta, { modalidadePorConta, sugestao: sugestaoModalidade }),
         revisar,
         semGrupo,
         pendente: semGrupo || !!revisar,
@@ -131,10 +148,18 @@ export function resumoDePara(linhas) {
     completude: 0,
     semMovimento: 0,
     pendenteSemMovimento: 0,
+    presencial: 0,
+    ead: 0,
+    comum: 0,
+    manuaisModalidade: 0,
   };
   linhas.forEach((l) => {
     if (l.grupoManual) r.manuaisGrupo++;
     if (l.categoriaManual) r.manuaisCategoria++;
+    if (l.modalidadeManual) r.manuaisModalidade++;
+    if (l.modalidade === "PRESENCIAL") r.presencial++;
+    else if (l.modalidade === "EAD") r.ead++;
+    else r.comum++;
     if (l.semMovimento) r.semMovimento++;
     const contar = () => { if (l.semMovimento) r.pendenteSemMovimento++; };
     if (l.semGrupo) { r.semGrupo++; r.valorSemGrupo += Math.abs(l.saldo); contar(); return; }
@@ -180,7 +205,9 @@ export function porGrupo(linhas) {
  *  então quem só lembra do texto do lançamento também acha. O histórico
  *  inteiro não entra: são até 20 mil caracteres por conta, e varrê-los a
  *  cada tecla digitada travaria a tabela num plano de contas grande. */
-export function filtrarDePara(linhas, { busca = "", grupo = "todos", categoria = "todas", situacao = "todas" } = {}) {
+export function filtrarDePara(linhas, {
+  busca = "", grupo = "todos", categoria = "todas", situacao = "todas", modalidade = "todas",
+} = {}) {
   const q = busca.trim().toLowerCase();
   return linhas.filter((l) => {
     if (grupo !== "todos" && l.grupo !== grupo) return false;
@@ -188,6 +215,8 @@ export function filtrarDePara(linhas, { busca = "", grupo = "todos", categoria =
       const atual = l.categoria || "SEM_CATEGORIA";
       if (atual !== categoria) return false;
     }
+    if (modalidade !== "todas" && l.modalidade !== modalidade) return false;
+    if (situacao === "sem-modalidade" && l.modalidade !== "COMUM") return false;
     if (situacao === "pendentes" && !l.pendente) return false;
     if (situacao === "sem-grupo" && !l.semGrupo) return false;
     if (situacao === "revisar" && !l.revisar) return false;

@@ -47,3 +47,21 @@ Cinco decisões que não devem ser desfeitas:
 Qualquer parametrização nova do caminho para ERP copia esse formato:
 origem, destino, origem da decisão, e um placar de quanto falta.
 
+
+## O terceiro eixo na tabela
+
+Além de grupo da DRE e categoria do CPC 51, cada linha traz a
+**modalidade** (Presencial / EAD / Comum) e a origem dela — "manual",
+"nome no plano" ou "sem modalidade". O seletor tem a mesma mecânica do
+de categoria: vazio significa "siga o nome do plano de contas", e o
+texto da opção mostra qual é esse padrão.
+
+**Comum não é pendência.** A despesa administrativa da instituição
+inteira é comum de verdade; contá-la como trabalho a fazer encheria o
+placar de tarefa que não existe. Por isso a modalidade não entra em
+`pendente` — ela tem filtro próprio ("Sem modalidade (comum)"), para
+quem quiser varrer as comuns atrás de uma que deveria estar segregada.
+
+As colunas da exportação são derivadas de `COLUNAS` / `COLUNAS_RESUMO`,
+nunca de índice cravado: a coluna de Modalidade entrou no meio do
+resumo e um `6` fixo passaria a formatar a célula de texto ao lado.

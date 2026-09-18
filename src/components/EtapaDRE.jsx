@@ -39,8 +39,14 @@ export function EtapaDRE({
 
         {itens.map((it, i) => {
           if (it.t === "secao") return <Secao key={`s${i}`} nome={it.lbl} val={it.val} base={base} />;
+          /* As contas penduram embaixo da MODALIDADE quando a linha está
+             dividida, e embaixo da própria linha quando não está. Se
+             ficassem nos dois lugares, o mesmo saldo apareceria duas
+             vezes na tela expandida — e quem confere somando a coluna
+             pararia de confiar nela. */
+          const detalharAqui = it.t === "mod" || (it.t === "l" && !dre.bal[it.id]?.dividido);
           return (
-            <Fragment key={`${it.t}${i}`}>
+            <Fragment key={it.chave || `${it.t}${i}`}>
               <Linha
                 lbl={it.lbl}
                 val={it.val}
@@ -51,7 +57,10 @@ export function EtapaDRE({
                 fim={it.fim}
                 nivel={it.nivel}
               />
-              {it.id && <Detalhe dre={dre} id={it.id} nomes={nomes} base={base} mostrar={detalhado} />}
+              {it.id && detalharAqui && (
+                <Detalhe dre={dre} id={it.id} mod={it.mod || null} nomes={nomes}
+                  base={base} mostrar={detalhado} />
+              )}
             </Fragment>
           );
         })}
@@ -79,6 +88,9 @@ export function EtapaDRE({
         <div className="foot">
           A barra de cada linha mostra quanto da receita ainda restava naquele ponto da
           demonstração — verde soma, vermelho subtrai, índigo é o saldo acumulado.<br />
+          Linhas recuadas abrem o tópico em <b>Presencial</b>, <b>EAD</b> e{" "}
+          <b>Comum / não segregado</b>: as três somam exatamente o valor do tópico. "Comum" é
+          o que nasce da instituição inteira e não se atribui a uma modalidade sem ratear.<br />
           Análise vertical calculada sobre a receita operacional líquida.<br />
           {resumo
             ? <>Balancete de {resumo.nContas} contas ·{" "}

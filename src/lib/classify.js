@@ -5,6 +5,7 @@
  * depreciação, provisões, financeiro e não operacional). */
 
 import { GRUPOS, SINAL_GRUPO, ehCredora } from "./grupos.js";
+import { blocosVazios, faixasDoGrupo } from "./modalidade.js";
 import { escolherPlano, grupoPorPlano } from "./planoPerfil.js";
 import { PLANOS_EMBUTIDOS } from "./planos/iesb.js";
 
@@ -214,17 +215,42 @@ export function agruparPorDigito(contas) {
  * vez de compensá-lo (confirmado comparando com a DRE real: em meses com
  * reversão de PCLD maior que a provisão nova, a linha vira positiva). Cada
  * conta individual dentro do grupo continua exibida em módulo (`val`), só
- * o total agregado usa o valor líquido. */
-export function montarDRE(contasResultado, grupoDe) {
+ * o total agregado usa o valor líquido.
+ *
+ * `modalidadeDe` é o TERCEIRO EIXO (`modalidade.js`): cada grupo sai
+ * também quebrado em Presencial / EAD / Comum, em `porModalidade`. O
+ * parâmetro tem padrão ("tudo comum") porque a quebra é opcional — sem
+ * plano de contas que declare modalidade, a DRE é exatamente a de antes,
+ * linha por linha. */
+export function montarDRE(contasResultado, grupoDe, modalidadeDe = () => "COMUM") {
   const bal = {};
-  GRUPOS.forEach((g) => (bal[g.id] = { total: 0, contas: [] }));
+  GRUPOS.forEach((g) => (bal[g.id] = { total: 0, contas: [], porModalidade: blocosVazios() }));
   contasResultado.forEach((c) => {
     const g = grupoDe(c.conta);
     const val = Math.abs(c.saldo);
-    bal[g].total += c.saldo * (SINAL_GRUPO[g] ?? 1);
-    bal[g].contas.push({ ...c, val });
+    const parcela = c.saldo * (SINAL_GRUPO[g] ?? 1);
+    const item = { ...c, val };
+    bal[g].total += parcela;
+    bal[g].contas.push(item);
+    /* A MODALIDADE SOMA A MESMA PARCELA DO TOTAL DO GRUPO, não o módulo
+       nem o saldo cru. É isso — e só isso — que faz Presencial + EAD +
+       Comum fecharem exatamente com a linha da DRE impressa acima delas,
+       inclusive nos grupos que misturam despesa e reversão de provisão
+       na mesma linha. Somar magnitude aqui reproduziria, dentro da
+       faixa, o erro que `montarDRE` já evita no total. */
+    const m = bal[g].porModalidade[modalidadeDe(c.conta)] || bal[g].porModalidade.COMUM;
+    m.total += parcela;
+    m.contas.push(item);
   });
-  Object.values(bal).forEach((b) => b.contas.sort((a, z) => z.val - a.val));
+  Object.values(bal).forEach((b) => {
+    b.contas.sort((a, z) => z.val - a.val);
+    Object.values(b.porModalidade).forEach((m) => m.contas.sort((a, z) => z.val - a.val));
+    /* `dividido` é a resposta de "esta linha se abre em modalidades?",
+       calculada uma vez aqui e lida pela tela, pela exportação e pelo
+       CPC 51 — ver `faixasDoGrupo`, que é quem define a regra. */
+    b.faixas = faixasDoGrupo(b.porModalidade);
+    b.dividido = b.faixas.length > 0;
+  });
 
   const v = (id) => bal[id].total;
   const receitaBruta = v("REC_MENSALIDADES") + v("REC_TAXAS");

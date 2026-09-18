@@ -33,12 +33,16 @@ conta e valor de débito/crédito em colunas separadas.
    As classificações feitas à mão podem ser salvas num **perfil** (arquivo
    JSON) e recarregadas no mês seguinte, em vez de refazer tudo.
 4. **DRE** — demonstração final, com opção de salvar no histórico local.
+   Cada tópico que mistura modalidades abre, logo abaixo, em
+   **Presencial**, **EAD** e **Comum / não segregado** — as três somam
+   exatamente o valor do tópico, e nada é rateado (ver abaixo).
 
 E, em paralelo ao fluxo:
 
 - **De-Para** — uma linha por conta de resultado dizendo para onde ela
-  vai nos DOIS eixos ao mesmo tempo (o grupo da DRE atual e a categoria
-  do CPC 51), com a **origem de cada decisão** registrada ao lado. É o
+  vai nos TRÊS eixos ao mesmo tempo (o grupo da DRE atual, a categoria
+  do CPC 51 e a modalidade de ensino), com a **origem de cada decisão**
+  registrada ao lado. É o
   entregável que a auditoria pede e a especificação que a TI carrega no
   ERP. Sai em Excel, com o resumo por grupo abrindo nas contas que o
   formam.
@@ -51,6 +55,27 @@ E, em paralelo ao fluxo:
 - **CPC 51** — a mesma DRE na estrutura que passa a valer em 2027, com a
   prova de que o lucro líquido não muda, e um plano de ação com o
   cronograma de implementação (ver seção abaixo).
+
+## Presencial e EAD dentro da mesma DRE
+
+Cada linha de grupo pode abrir em até três faixas — Presencial, EAD e
+Comum / não segregado — na tela, na impressão, no Excel, no CSV, na
+Comparativa e na demonstração do CPC 51.
+
+- **De onde vem a modalidade:** do nome da conta no plano de contas e,
+  se ele não disser nada, do nome da conta-síntese acima dela (a mais
+  próxima vence). "Semipresencial" e "a distância" contam como EAD.
+  Qualquer conta pode ser corrigida à mão no De-Para, e a correção viaja
+  no perfil.
+- **"Comum" é resposta, não pendência:** aluguel, PIS/COFINS/ISS,
+  depreciação e provisão nascem da instituição inteira. O app **não
+  rateia** as comuns entre as modalidades — isso criaria número que a
+  contabilidade não lançou, e a DRE viraria relatório gerencial.
+- **Dividir não muda número nenhum:** as faixas somam exatamente a linha
+  que abriram, e nenhum subtotal, seção ou o lucro líquido se move com a
+  divisão ligada. Há teste travando isso (`modalidade.test.js`).
+- **Só se divide o tópico que tem modalidade:** um grupo inteiramente
+  comum continua uma linha só.
 
 ## CPC 51 — a DRE que entra em 2027
 
@@ -264,13 +289,14 @@ src/
     classify.js        # sugestão automática de classificação e montagem da DRE
     grupos.js          # os grupos da DRE e o sinal de cada um
     linhasDRE.js       # a estrutura da DRE como dados (rótulos, sinais, cascata)
+    modalidade.js      # o terceiro eixo: Presencial / EAD / Comum e a quebra de cada linha
     balancete.js       # balancete de verificação hierárquico: monta a DRE sozinho
     cpc51.js           # as cinco categorias do CPC 51, a política de julgamento e a conciliação
     linhasCPC51.js     # a demonstração do CPC 51 como dados (mesma forma de linhasDRE.js)
     mpda.js            # medidas de desempenho definidas pela administração + minuta da nota
     cronograma51.js    # o cronograma de implementação (10 fases, 49 passos) como dado
     planoAcao.js       # andamento do plano de ação (localStorage)
-    depara.js          # a tabela de parametrização: conta → grupo da DRE + categoria do CPC 51
+    depara.js          # a tabela de parametrização: conta → grupo da DRE + categoria do CPC 51 + modalidade
     exportacao.js      # exportação da DRE em CSV e Excel
     exportacaoDePara.js# o De-Para completo em CSV e Excel (resumo por grupo expansível)
     exportacaoCPC51.js # Excel de seis abas, De-Para em CSV e a nota de MPDA em texto

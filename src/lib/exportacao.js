@@ -10,6 +10,7 @@
 
 import { GRUPOS, SINAL_GRUPO } from "./classify.js";
 import { montarLinhas } from "./linhasDRE.js";
+import { rotuloPorConta } from "./modalidade.js";
 import {
   aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
   escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook,
@@ -66,7 +67,12 @@ export function cabecalho({ empresa, cnpj, periodo, titulo }) {
 export function matrizLinhas(itens, base) {
   const b = base || 1;
   return itens.map((it) => ({
-    lbl: it.lbl,
+    /* A faixa de modalidade entra RECUADA no arquivo. Na tela o recuo é
+       CSS; aqui é o próprio texto, porque planilha não tem hierarquia:
+       "Presencial" solto entre duas linhas da DRE parece uma linha da
+       demonstração, e quem soma a coluna conta o mesmo dinheiro duas
+       vezes. */
+    lbl: it.t === "mod" ? `    ${it.lbl}` : it.lbl,
     val: it.val,
     av: it.val == null ? null : it.val / b,
     t: it.t,
@@ -76,6 +82,12 @@ export function matrizLinhas(itens, base) {
        escreve, e o que ela não carrega o Excel não tem de onde tirar. */
     cat: it.cat ?? null,
     cod: it.cod ?? null,
+    /* `chave` identifica a linha sem depender do rótulo. A comparativa
+       casa as colunas por ela desde que existe a quebra por modalidade:
+       "Presencial" se repete em cada tópico dividido, e um casamento por
+       RÓTULO punha o valor do primeiro tópico em todos os outros. */
+    chave: it.chave ?? it.lbl,
+    mod: it.mod ?? null,
   }));
 }
 
@@ -106,15 +118,16 @@ export function baixarCSV(ctx) {
     ...matrizDRE(dre).map((l) => [l.lbl, dec(l.val), l.av == null ? "" : (l.av * 100).toFixed(1)]),
     [],
     ["CONTAS POR GRUPO"],
-    ["Grupo", "Conta", "Descrição", "Valor"],
+    ["Grupo", "Modalidade", "Conta", "Descrição", "Valor"],
   ];
 
   // Valor com sinal, na mesma orientação do total do grupo — igual à tela.
   GRUPOS.forEach((g) => {
     if (g.id === "IGNORAR") return;
     const sinal = SINAL_GRUPO[g.id] ?? 1;
+    const modalidade = rotuloPorConta(dre.bal[g.id].porModalidade);
     dre.bal[g.id].contas.forEach((c) =>
-      linhas.push([g.nome, c.conta, nomes[c.conta] || "", dec(c.saldo * sinal)])
+      linhas.push([g.nome, modalidade[c.conta] || "", c.conta, nomes[c.conta] || "", dec(c.saldo * sinal)])
     );
   });
 
@@ -156,24 +169,30 @@ export async function baixarExcel(ctx) {
 
   // --- Aba de contas por grupo ---
   const wsDet = wb.addWorksheet("Contas por grupo");
-  definirLarguras(wsDet, [32, 14, 42, 16]);
-  const cabDet = escreverCabecalhoTabela(wsDet, ["Grupo", "Conta", "Descrição", "Valor"]);
+  definirLarguras(wsDet, [32, 20, 14, 42, 16]);
+  const COLS_DET = ["Grupo", "Modalidade", "Conta", "Descrição", "Valor"];
+  const cabDet = escreverCabecalhoTabela(wsDet, COLS_DET);
+  /* A modalidade é COLUNA aqui, não aba separada: com ela ao lado do
+     grupo, "quanto do custo é EAD?" é um filtro em cima da tabela que o
+     contador já usa — e continua sendo a mesma tabela que soma com a
+     DRE da primeira aba. */
   GRUPOS.forEach((g) => {
     if (g.id === "IGNORAR") return;
     const sinal = SINAL_GRUPO[g.id] ?? 1;
+    const modalidade = rotuloPorConta(dre.bal[g.id].porModalidade);
     dre.bal[g.id].contas.forEach((c) => {
-      const row = wsDet.addRow([g.nome, c.conta, nomes[c.conta] || "", c.saldo * sinal]);
-      row.getCell(4).numFmt = FORMATO_MOEDA;
+      const row = wsDet.addRow([g.nome, modalidade[c.conta] || "", c.conta, nomes[c.conta] || "", c.saldo * sinal]);
+      row.getCell(COLS_DET.length).numFmt = FORMATO_MOEDA;
     });
   });
-  aplicarZebra(wsDet, cabDet.number + 1, wsDet.rowCount, 4);
-  wsDet.autoFilter = { from: { row: cabDet.number, column: 1 }, to: { row: wsDet.rowCount, column: 4 } };
+  aplicarZebra(wsDet, cabDet.number + 1, wsDet.rowCount, COLS_DET.length);
+  wsDet.autoFilter = { from: { row: cabDet.number, column: 1 }, to: { row: wsDet.rowCount, column: COLS_DET.length } };
 
   // --- Aba comparativa (só se houver mais de uma competência) ---
   if (dresPorCompetencia.length > 1) {
     const colunas = dresPorCompetencia.map((d) => ({
       titulo: d.rotulo,
-      valores: new Map(matrizDRE(d.dre).map((l) => [l.lbl, l.val])),
+      valores: new Map(matrizDRE(d.dre).map((l) => [l.chave, l.val])),
     }));
     // Esqueleto da última competência: seções condicionais aparecem
     // conforme o mês tiver movimento, e o mês mais recente representa
@@ -183,7 +202,7 @@ export async function baixarExcel(ctx) {
     definirLarguras(wsComp, [48, ...colunas.map(() => 16)]);
     const cabComp = escreverCabecalhoTabela(wsComp, ["Linha", ...colunas.map((c) => c.titulo)]);
     esqueleto.forEach((l) => {
-      const row = wsComp.addRow([l.lbl, ...colunas.map((c) => c.valores.get(l.lbl) ?? null)]);
+      const row = wsComp.addRow([l.lbl, ...colunas.map((c) => c.valores.get(l.chave) ?? null)]);
       for (let c = 2; c <= colunas.length + 1; c++) row.getCell(c).numFmt = FORMATO_MOEDA;
       if (l.t === "secao" || l.t === "sub" || l.t === "final") marcarSubtotal(wsComp, row.number, colunas.length + 1);
     });

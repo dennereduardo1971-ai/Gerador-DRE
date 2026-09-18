@@ -43,19 +43,19 @@ _Atualizado em 27/08/2026._
 
 | | |
 |---|---|
-| Testes | 268 (Vitest, 13 arquivos) |
+| Testes | 298 (Vitest, 14 arquivos — `modalidade.test.js` entrou em 18/09/2026) |
 | Lint | `npx oxlint src/ fixtures/` — **zero avisos em tudo** (o ruído de `process` em `validar.mjs`, documentado desde agosto, saiu com um `overrides` no `.oxlintrc.json`) |
-| Bundle | app 402 kB (124 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
-| CSS | 31,3 kB (6,6 kB gzip) — zero classe órfã (conferido por script) |
-| Código | ~9.000 linhas de JS/JSX em `src/` (fora `__tests__/`) |
-| Maiores arquivos | `App.jsx` (562), `balancete.js` (517), `cpc51.js` (479), `fiscal.js` (473) |
+| Bundle | app 408 kB (126 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
+| CSS | 32,0 kB (6,7 kB gzip) — zero classe órfã (conferido por script) |
+| Código | ~9.400 linhas de JS/JSX em `src/` (fora `__tests__/`) |
+| Maiores arquivos | `App.jsx` (571), `balancete.js` (517), `cpc51.js` (494), `fiscal.js` (473) |
 | Contexto por sessão | `CLAUDE.md` 402 linhas / 22 kB (era 969 / 55 kB); `EVOLUCAO.md` 346 (era 890) |
 | Abas | 11 (eram 10; a Apuração entrou em 24/08/2026) |
 | Fonte de dados | **só o balancete de verificação** — o razão contábil saiu em 24/08/2026 |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina). O script foi REESCRITO contra os balancetes e não foi executado por ninguém ainda. |
 | Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante) conferidos em 20/08/2026, antes desta sessão. Nesta sessão, as 33 exceções de categoria do CPC 51 do IESB foram conferidas contra o Excel real de 25/08/2026 (ver Registro) — não é o `validar.mjs`, mas é a mesma disciplina: conferir contra dado real, não só contra o razão sintético. |
 | Excel conferido por lib independente | sim — `openpyxl` releu o De-Para e a Apuração gerados por `exceljs`, e também a aba DR_CPC_51_Detalhada nova (ver Registro) |
-| App rodado no navegador | sim — 8 abas renderizam sem erro, sem rolagem horizontal a 390px, sem interativo sem nome acessível |
+| App rodado no navegador | sim — em 18/09/2026, com balancete FICTÍCIO gerado para a sessão: DRE, De-Para, tema escuro, 390px e `@media print` conferidos por captura de tela (Playwright + Chromium do ambiente) |
 | Skills versionadas | 6 |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) — **nenhum rodou nesta sessão** |
 
@@ -76,6 +76,61 @@ arquitetura, armadilhas e um índice "quero mudar X → leia Y"; o detalhe
 de cada assunto mora num arquivo lido sob demanda.
 
 ## Registro
+
+### 18/09/2026 — a DRE se abre em Presencial / EAD / Comum
+
+Denner pediu para dividir as contas dentro de cada tópico da DRE por
+modalidade de ensino ("( + ) Receita Bruta com Mensalidades" abrindo em
+Presencial e EAD), porque hoje os tópicos misturam as duas e a leitura
+fica difícil. Entrevistei antes de escrever código: ele escolheu
+sub-linhas dentro do tópico (não colunas), detecção pelo NOME da conta no
+plano com correção manual no De-Para, uma terceira faixa "Comum / não
+segregado" para o que não se separa — e a divisão valendo também no
+Excel/CSV, no De-Para, na Comparativa e no CPC 51.
+
+**Decisão estrutural: um TERCEIRO EIXO, não grupos novos.** `modalidade.js`
+faz para a modalidade o que `cpc51.js` já fazia para a categoria — a
+mesma conta tem grupo, categoria e modalidade, e a soma das modalidades
+de um grupo é, por construção, o total do grupo. Criar
+`REC_MENSALIDADES_EAD` em `GRUPOS` teria quebrado a hierarquia de
+subtotais validada centavo a centavo.
+
+O que foi feito:
+
+- `modalidade.js` novo (176 linhas): padrões, leitura hierárquica do
+  plano (a conta mais PRÓXIMA vence, ao contrário do classificador de
+  grupo, que concatena), `fazerModalidadeDe` (manual > nome > Comum) e
+  `faixasDoGrupo`, que é a regra única de "esta linha se divide?".
+- `montarDRE` e `montarDRE51` passaram a devolver `porModalidade` e
+  `faixas` por grupo; `linhasDRE.js` e `linhasCPC51.js` emitem linhas do
+  tipo `mod`.
+- Cada linha ganhou `chave` (`grupo` ou `grupo|modalidade`). A
+  Comparativa e a coluna comparativa do CPC 51 casavam colunas por
+  RÓTULO — com faixas, "Presencial" se repete em vários tópicos e o
+  valor do primeiro vazaria para todos os outros. Erro silencioso: o
+  número existe e parece plausível.
+- De-Para com coluna, filtro, origem da decisão e selo no placar; o
+  perfil subiu para a versão 4 levando a modalidade manual junto.
+- Excel e CSV: faixa recuada na DRE, coluna "Modalidade" nas contas por
+  grupo e no De-Para (com a origem).
+
+**Medido nesta sessão:** Vitest 298/298 (30 testes novos); `npx oxlint
+src/` zero avisos; `npm run build` ok (app 408 kB, +6 kB; CSS +0,7 kB);
+app rodado no navegador com balancete FICTÍCIO — DRE, detalhe aberto,
+De-Para, tema escuro, 390px e impressão conferidos por captura.
+
+**NÃO validado:** `node fixtures/validar.mjs` não rodou — esta máquina
+não tem os arquivos reais (gitignorados). O que os testes garantem é que
+a divisão não mexe em número nenhum (subtotais, seções e lucro líquido
+idênticos com e sem a quebra); o que só o arquivo real mostra é se o
+plano do IESB nomeia as contas de um jeito que a leitura por nome
+acerta. **Vale abrir o balancete de verdade e olhar a coluna Modalidade
+do De-Para antes de confiar na divisão.**
+
+**Ficou de fora, de propósito:** rateio das comuns por participação na
+receita (inventaria número que a contabilidade não lançou — seria
+gerencial, não DRE) e mapa de modalidade por CÓDIGO no perfil do plano
+(`planos/iesb.js`); o nome + correção manual resolve sem exigir build.
 
 ### 27/08/2026 (continuação) — o plano do IESB ganha exceção de categoria do CPC 51
 

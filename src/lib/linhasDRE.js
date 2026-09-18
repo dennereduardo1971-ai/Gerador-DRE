@@ -7,6 +7,14 @@
  * renderizar nada, e a DRE comparativa (N competências em colunas)
  * reaproveita exatamente a mesma estrutura de linhas — sem risco de a
  * versão de uma coluna e a de doze divergirem em rótulo ou sinal.
+ *
+ * TRÊS TIPOS DE LINHA MOVEM O SALDO E UM NÃO MOVE. `l` (linha comum),
+ * `sub` e `final` são a demonstração; `mod` é a quebra da linha de cima
+ * em Presencial / EAD / Comum (ver `modalidade.js`). A faixa `mod` é
+ * DETALHE de uma linha que já foi somada, então ela não entra na
+ * cascata nem no total da seção — somá-la contaria o mesmo dinheiro
+ * duas vezes. `totalizarSecoes` e `aplicarCascata` sabem disso, e é a
+ * única coisa que um tipo de linha novo precisa acertar aqui.
  */
 
 /** Monta a lista de linhas da demonstração como dados, não como JSX
@@ -18,49 +26,67 @@
  *  mesmos de antes — só mudou o formato. */
 export function montarLinhas(dre) {
   const b = dre.bal;
+
+  /* Uma linha da DRE e, logo abaixo, as faixas de modalidade dela —
+     quando o grupo tem alguma conta com modalidade declarada.
+     `orientacao` é o sinal com que a linha é APRESENTADA (receita soma,
+     dedução e despesa aparecem negativas): as faixas usam exatamente o
+     mesmo, senão a soma delas não bateria com o número impresso acima. */
+  const linha = (id, lbl, orientacao = 1) => {
+    const g = b[id];
+    const saida = [{ t: "l", lbl, val: orientacao * g.total, id, chave: id }];
+    (g.faixas || []).forEach((f) =>
+      saida.push({
+        t: "mod", lbl: f.nome, val: orientacao * f.total,
+        id, mod: f.id, chave: `${id}|${f.id}`,
+      })
+    );
+    return saida;
+  };
+
   const itens = [
     { t: "secao", lbl: "Receita Operacional Bruta" },
-    { t: "l", lbl: "( + ) Receita Bruta com Mensalidades", val: b.REC_MENSALIDADES.total, id: "REC_MENSALIDADES" },
-    { t: "l", lbl: "( + ) Receita com Taxas", val: b.REC_TAXAS.total, id: "REC_TAXAS" },
+    ...linha("REC_MENSALIDADES", "( + ) Receita Bruta com Mensalidades"),
+    ...linha("REC_TAXAS", "( + ) Receita com Taxas"),
     { t: "sub", lbl: "( = ) Receita Bruta de Serviços", val: dre.receitaBruta },
 
     { t: "secao", lbl: "Deduções à Receita Operacional" },
-    { t: "l", lbl: "( – ) Bolsas / Resoluções", val: -b.DED_BOLSAS.total, id: "DED_BOLSAS" },
-    { t: "l", lbl: "( – ) Prouni", val: -b.DED_PROUNI.total, id: "DED_PROUNI" },
-    { t: "l", lbl: "( – ) Mensalidades Devolvidas", val: -b.DED_DEVOLUCOES.total, id: "DED_DEVOLUCOES" },
-    { t: "l", lbl: "( – ) Descontos / Cancelamentos", val: -b.DED_DESCONTOS.total, id: "DED_DESCONTOS" },
-    { t: "l", lbl: "( – ) PIS / COFINS / ISS", val: -b.DED_IMPOSTOS.total, id: "DED_IMPOSTOS" },
+    ...linha("DED_BOLSAS", "( – ) Bolsas / Resoluções", -1),
+    ...linha("DED_PROUNI", "( – ) Prouni", -1),
+    ...linha("DED_DEVOLUCOES", "( – ) Mensalidades Devolvidas", -1),
+    ...linha("DED_DESCONTOS", "( – ) Descontos / Cancelamentos", -1),
+    ...linha("DED_IMPOSTOS", "( – ) PIS / COFINS / ISS", -1),
     { t: "sub", lbl: "Receita Operacional Líquida", val: dre.receitaLiq },
   ];
 
   if (b.CUSTOS.contas.length > 0) {
-    itens.push({ t: "l", lbl: "( – ) Custos dos Serviços", val: -b.CUSTOS.total, id: "CUSTOS" });
+    itens.push(...linha("CUSTOS", "( – ) Custos dos Serviços", -1));
     itens.push({ t: "sub", lbl: "( = ) Resultado Operacional Bruto", val: dre.resultadoOperBruto });
   }
 
   itens.push({ t: "secao", lbl: "Despesas Operacionais" });
-  itens.push({ t: "l", lbl: "Despesas com Pessoal (Fopag)", val: -b.DESP_FOPAG.total, id: "DESP_FOPAG" });
-  itens.push({ t: "l", lbl: "Despesas Administrativas", val: -b.DESP_ADM.total, id: "DESP_ADM" });
+  itens.push(...linha("DESP_FOPAG", "Despesas com Pessoal (Fopag)", -1));
+  itens.push(...linha("DESP_ADM", "Despesas Administrativas", -1));
   if (b.DEPRECIACAO.contas.length > 0)
-    itens.push({ t: "l", lbl: "Depreciação / Amortização", val: -b.DEPRECIACAO.total, id: "DEPRECIACAO" });
+    itens.push(...linha("DEPRECIACAO", "Depreciação / Amortização", -1));
   if (b.PROVISOES_CONTINGENCIAS.contas.length > 0)
-    itens.push({ t: "l", lbl: "Provisões / Reversões Contingências", val: -b.PROVISOES_CONTINGENCIAS.total, id: "PROVISOES_CONTINGENCIAS" });
+    itens.push(...linha("PROVISOES_CONTINGENCIAS", "Provisões / Reversões Contingências", -1));
   if (b.PROVISOES_PCLD.contas.length > 0)
-    itens.push({ t: "l", lbl: "Provisões / Reversões PCLD", val: -b.PROVISOES_PCLD.total, id: "PROVISOES_PCLD" });
+    itens.push(...linha("PROVISOES_PCLD", "Provisões / Reversões PCLD", -1));
 
   itens.push({ t: "secao", lbl: "Receita / Despesas Financeiras" });
-  itens.push({ t: "l", lbl: "( + ) Receitas Financeiras", val: b.REC_FIN.total, id: "REC_FIN" });
-  itens.push({ t: "l", lbl: "( – ) Despesas Financeiras", val: -b.DESP_FIN.total, id: "DESP_FIN" });
+  itens.push(...linha("REC_FIN", "( + ) Receitas Financeiras"));
+  itens.push(...linha("DESP_FIN", "( – ) Despesas Financeiras", -1));
   itens.push({ t: "sub", lbl: "Resultado Operacional", val: dre.resultadoOper });
 
   if (b.OUTRAS_REC.contas.length > 0 || b.OUTRAS_DESP.contas.length > 0) {
     itens.push({ t: "secao", lbl: "Receitas / Despesas Não Operacionais" });
-    itens.push({ t: "l", lbl: "( + ) Receitas Não Operacionais", val: b.OUTRAS_REC.total, id: "OUTRAS_REC" });
-    itens.push({ t: "l", lbl: "( – ) Despesas Não Operacionais", val: -b.OUTRAS_DESP.total, id: "OUTRAS_DESP" });
+    itens.push(...linha("OUTRAS_REC", "( + ) Receitas Não Operacionais"));
+    itens.push(...linha("OUTRAS_DESP", "( – ) Despesas Não Operacionais", -1));
   }
 
   itens.push({ t: "sub", lbl: "Lucro Antes do Imposto de Renda e Cont. Social", val: dre.antesIR });
-  itens.push({ t: "l", lbl: "( – ) IRPJ e CSLL", val: -b.IRPJ_CSLL.total, id: "IRPJ_CSLL" });
+  itens.push(...linha("IRPJ_CSLL", "( – ) IRPJ e CSLL", -1));
   itens.push({ t: "final", lbl: "Lucro Líquido do Exercício", val: dre.liquido });
 
   totalizarSecoes(itens);
@@ -74,7 +100,17 @@ export function totalizarSecoes(itens) {
   for (let i = 0; i < itens.length; i++) {
     if (itens[i].t !== "secao") continue;
     let soma = 0;
-    for (let j = i + 1; j < itens.length && itens[j].t === "l"; j++) soma += itens[j].val;
+    /* A faixa de modalidade é DETALHE da linha logo acima, não uma linha
+       nova: ela se pula (`continue`), não se soma nem interrompe o
+       bloco. Com `while (t === "l")`, como era antes de existir a
+       quebra por modalidade, a primeira faixa cortava a seção e o total
+       do título passava a mostrar só a primeira linha. */
+    for (let j = i + 1; j < itens.length; j++) {
+      const t = itens[j].t;
+      if (t === "mod") continue;
+      if (t !== "l") break;
+      soma += itens[j].val;
+    }
     itens[i].val = soma;
   }
   return itens;
@@ -92,6 +128,8 @@ export function aplicarCascata(itens) {
   let acumulado = 0;
   const pontos = [0];
   for (const it of itens) {
+    // `mod` não move o saldo corrente: o dinheiro dela já andou na
+    // linha de cima. Cai fora dos dois ramos de propósito.
     if (it.t === "l") {
       it.inicio = acumulado;
       acumulado += it.val;

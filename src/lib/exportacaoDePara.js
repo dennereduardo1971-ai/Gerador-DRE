@@ -3,8 +3,8 @@
  * Difere do `baixarCSVDePara` de `exportacaoCPC51.js` de propósito:
  * aquele é o entregável da Fase 2 (conta → categoria do CPC 51, para a
  * auditoria); este é o arquivo de PARAMETRIZAÇÃO (conta → grupo da DRE
- * → categoria, com a origem de cada decisão), que é o que a TI carrega
- * no ERP na Fase 4. Mesma tabela de origem (`montarDePara`), dois
+ * → categoria → modalidade, com a origem de cada decisão), que é o que
+ * a TI carrega no ERP na Fase 4. Mesma tabela de origem (`montarDePara`), dois
  * recortes com públicos diferentes.
  *
  * As duas saídas leem `montarDePara` — a mesma função que desenha a
@@ -23,9 +23,10 @@ import {
    não teve saldo é exatamente o que ele precisa levar — mas quem confere
    o mês fechado precisa poder separar as duas de relance, sem cruzar com
    a coluna de saldo. */
-const COLUNAS = [
+export const COLUNAS = [
   "Conta", "Descrição", "Grupo na DRE", "Origem do grupo",
-  "Categoria CPC 51", "Origem da categoria", "Situação", "Movimento no período", "Saldo",
+  "Categoria CPC 51", "Origem da categoria", "Modalidade", "Origem da modalidade",
+  "Situação", "Movimento no período", "Saldo",
 ];
 
 const nomeArquivo = (empresa, ext) =>
@@ -43,8 +44,8 @@ export function situacaoDaLinha(l) {
 
 const linhaMatriz = (l) => [
   l.conta, l.descricao, l.grupoNome, l.origemGrupo,
-  l.categoriaNome, l.origemCategoria, situacaoDaLinha(l),
-  l.semMovimento ? "sem movimento" : "com movimento", l.saldo,
+  l.categoriaNome, l.origemCategoria, l.modalidadeNome, l.origemModalidade,
+  situacaoDaLinha(l), l.semMovimento ? "sem movimento" : "com movimento", l.saldo,
 ];
 
 /* NÚMERO GERADO POR NÓS NÃO PASSA PELO NEUTRALIZADOR DE FÓRMULA.
@@ -72,7 +73,7 @@ export function linhaCSV(l) {
 
 export function baixarCSVDeParaCompleto(linhas, ctx = {}) {
   const cab = [
-    ...cabecalho({ ...ctx, titulo: "DE-PARA — PLANO DE CONTAS x DRE x CPC 51" }),
+    ...cabecalho({ ...ctx, titulo: "DE-PARA — PLANO DE CONTAS x DRE x CPC 51 x MODALIDADE" }),
     COLUNAS,
   ].map((l) => l.map(celulaTexto).join(";"));
 
@@ -88,15 +89,21 @@ export function baixarCSVDeParaCompleto(linhas, ctx = {}) {
  * MESMA coluna das parcelas recolhidas debaixo dele, então abrir o grupo
  * e conferir se a composição fecha é olhar uma coluna só, sem cruzar
  * tabela nenhuma — que é para isso que a expansão existe. */
-const COLUNAS_RESUMO = [
-  "Grupo na DRE", "Conta", "Descrição", "Categoria CPC 51",
+export const COLUNAS_RESUMO = [
+  "Grupo na DRE", "Conta", "Descrição", "Categoria CPC 51", "Modalidade",
   "Situação", "Saldo", "Contas", "A revisar",
 ];
 
-const linhaGrupo = (g) => [g.nome, null, null, null, null, g.total, g.n, g.aRevisar];
+const linhaGrupo = (g) => [g.nome, null, null, null, null, null, g.total, g.n, g.aRevisar];
 const linhaConta = (l) => [
-  null, l.conta, l.descricao, l.categoriaNome, situacaoDaLinha(l), l.saldo,
+  null, l.conta, l.descricao, l.categoriaNome, l.modalidadeNome, situacaoDaLinha(l), l.saldo,
 ];
+
+/* A coluna do Saldo no resumo. Era `6` cravado em três lugares e virou
+   índice derivado do cabeçalho pelo mesmo motivo que `COL_SALDO` no
+   De-Para: a coluna de Modalidade entrou no meio e empurraria o formato
+   de moeda para a célula de texto ao lado, sem quebrar nada visível. */
+const COL_SALDO_RESUMO = COLUNAS_RESUMO.indexOf("Saldo") + 1;
 
 /** A tabela por destino com as contas de cada grupo penduradas embaixo,
  *  recolhidas — o mesmo "clique no grupo para ver as contas" que a tela
@@ -120,13 +127,13 @@ function escreverResumoPorGrupo(ws, grupos) {
   escreverCabecalhoTabela(ws, COLUNAS_RESUMO, { congelar: false });
   grupos.forEach((g) => {
     const rowGrupo = ws.addRow(linhaGrupo(g));
-    rowGrupo.getCell(6).numFmt = FORMATO_MOEDA;
+    rowGrupo.getCell(COL_SALDO_RESUMO).numFmt = FORMATO_MOEDA;
     marcarSubtotal(ws, rowGrupo.number, COLUNAS_RESUMO.length);
 
     const primeira = ws.rowCount + 1;
     g.contas.forEach((l) => {
       const row = ws.addRow(linhaConta(l));
-      row.getCell(6).numFmt = FORMATO_MOEDA;
+      row.getCell(COL_SALDO_RESUMO).numFmt = FORMATO_MOEDA;
       row.outlineLevel = 1;
       row.hidden = true;
     });
@@ -144,7 +151,7 @@ export async function montarWorkbookDePara(linhas, resumo, grupos, ctx = {}) {
   wb.created = new Date();
 
   const ws = wb.addWorksheet("De-Para");
-  definirLarguras(ws, [16, 48, 32, 15, 26, 18, 14, 20, 16]);
+  definirLarguras(ws, [16, 48, 32, 15, 26, 18, 20, 18, 14, 20, 16]);
   const cabTabela = escreverCabecalhoTabela(ws, COLUNAS);
   /* O Saldo é a ÚLTIMA coluna, e o formato de moeda se ancora nisso em
      vez de num índice cravado. Uma coluna nova no meio já empurrou o
@@ -159,7 +166,7 @@ export async function montarWorkbookDePara(linhas, resumo, grupos, ctx = {}) {
   ws.autoFilter = { from: { row: cabTabela.number, column: 1 }, to: { row: ws.rowCount, column: COLUNAS.length } };
 
   const wsRes = wb.addWorksheet("Resumo");
-  definirLarguras(wsRes, [34, 14, 46, 20, 14, 18, 10, 10]);
+  definirLarguras(wsRes, [34, 14, 46, 20, 20, 14, 18, 10, 10]);
   escreverTitulo(wsRes, "DE-PARA — RESUMO DA PARAMETRIZAÇÃO", COLUNAS_RESUMO.length);
   escreverMeta(wsRes, [ctx.empresa || "Empresa"]);
   linhaEmBranco(wsRes);
@@ -170,6 +177,9 @@ export async function montarWorkbookDePara(linhas, resumo, grupos, ctx = {}) {
     ["Categoria ainda a revisar", resumo.aRevisar],
     ["Decisões manuais de grupo", resumo.manuaisGrupo],
     ["Decisões manuais de categoria", resumo.manuaisCategoria],
+    ["Contas em Presencial", resumo.presencial || 0],
+    ["Contas em EAD", resumo.ead || 0],
+    ["Contas comuns às duas modalidades", resumo.comum || 0],
     ["Contas sem movimento no período", resumo.semMovimento || 0],
   ].forEach((l) => escreverMeta(wsRes, l));
   linhaEmBranco(wsRes);
