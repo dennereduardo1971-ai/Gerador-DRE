@@ -307,17 +307,18 @@ describe("o De-Para mostra a modalidade e de onde ela veio", () => {
     expect(por["4120101"].origemModalidade).toBe("sem modalidade");
   });
 
-  it("comum NÃO conta como pendência de parametrização", () => {
+  it("a faixa residual NÃO conta como pendência de parametrização", () => {
     /* Despesa da instituição inteira é comum de verdade: marcá-la como
        trabalho a fazer encheria o placar de tarefa que não existe. */
     expect(por["4120101"].pendente).toBe(false);
-    expect(resumoDePara(linhas).comum).toBe(2);
+    expect(resumoDePara(linhas).semModalidade).toBe(2);
   });
 
-  it("o placar conta as contas segregadas", () => {
+  it("o placar conta por faixa, sem nome de modalidade cravado", () => {
     const r = resumoDePara(linhas);
-    expect(r.presencial).toBe(2);
-    expect(r.ead).toBe(3); // as duas do plano + a corrigida à mão
+    expect(r.porModalidade.PRESENCIAL).toBe(2);
+    expect(r.porModalidade.EAD).toBe(3); // as duas do plano + a corrigida à mão
+    expect(r.segregadas).toBe(5);
     expect(r.manuaisModalidade).toBe(1);
   });
 });

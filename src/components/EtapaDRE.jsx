@@ -4,11 +4,11 @@ import { Linha, Secao, Detalhe, Cabecalho } from "./LinhaDRE.jsx";
 import { montarLinhas } from "../lib/linhasDRE.js";
 
 export function EtapaDRE({
-  dre, empresa, cnpj, periodo, resumo,
+  dre, empresa, cnpj, periodo, resumo, rotulos = null,
   nomes, detalhado, onToggleDetalhado, onBaixarCSV, onBaixarExcel, prova, onSalvarHistorico,
 }) {
   const base = dre.receitaLiq || 1;
-  const { itens, escala } = montarLinhas(dre);
+  const { itens, escala } = montarLinhas(dre, rotulos);
 
   return (
     <>
@@ -59,7 +59,7 @@ export function EtapaDRE({
               />
               {it.id && detalharAqui && (
                 <Detalhe dre={dre} id={it.id} mod={it.mod || null} nomes={nomes}
-                  base={base} mostrar={detalhado} />
+                  rotulos={rotulos} base={base} mostrar={detalhado} />
               )}
             </Fragment>
           );
@@ -88,9 +88,9 @@ export function EtapaDRE({
         <div className="foot">
           A barra de cada linha mostra quanto da receita ainda restava naquele ponto da
           demonstração — verde soma, vermelho subtrai, índigo é o saldo acumulado.<br />
-          Linhas recuadas abrem o tópico em <b>Presencial</b>, <b>EAD</b> e{" "}
-          <b>Comum / não segregado</b>: as três somam exatamente o valor do tópico. "Comum" é
-          o que nasce da instituição inteira e não se atribui a uma modalidade sem ratear.<br />
+          As linhas recuadas abrem o tópico por modalidade e somam exatamente o valor dele —
+          a última faixa é a residual, o que nasce da instituição inteira e não se atribui a
+          uma modalidade sem ratear. Os nomes das faixas se mudam no De-Para.<br />
           Análise vertical calculada sobre a receita operacional líquida.<br />
           {resumo
             ? <>Balancete de {resumo.nContas} contas ·{" "}

@@ -17,24 +17,59 @@
  * única coisa que um tipo de linha novo precisa acertar aqui.
  */
 
+import { nomeDoGrupo, rotuloDaLinha } from "./rotulos.js";
+
+/* AS LINHAS ESTRUTURAIS — seções e subtotais, que não pertencem a grupo
+ * nenhum e por isso precisam de id próprio para poderem ser renomeadas
+ * (`rotulos.js`). O id é a CHAVE: ele viaja na sessão e no perfil, então
+ * mudar um id aqui apaga o apelido que alguém já tinha dado àquela linha.
+ *
+ * As linhas de GRUPO não estão nesta lista de propósito: o nome delas é o
+ * nome do próprio grupo (`nomeDoGrupo`), e é o mesmo texto que aparece no
+ * De-Para e nas exportações. Renomear "Bolsas / Resoluções" num lugar e
+ * não no outro é como o arquivo entregue passa a divergir da tela. */
+export const LINHAS_ESTRUTURAIS = [
+  { id: "SEC_RECEITA_BRUTA", padrao: "Receita Operacional Bruta" },
+  { id: "SUB_RECEITA_BRUTA", padrao: "( = ) Receita Bruta de Serviços" },
+  { id: "SEC_DEDUCOES", padrao: "Deduções à Receita Operacional" },
+  { id: "SUB_RECEITA_LIQUIDA", padrao: "Receita Operacional Líquida" },
+  { id: "SUB_RESULTADO_BRUTO", padrao: "( = ) Resultado Operacional Bruto" },
+  { id: "SEC_DESPESAS", padrao: "Despesas Operacionais" },
+  { id: "SEC_FINANCEIRO", padrao: "Receita / Despesas Financeiras" },
+  { id: "SUB_RESULTADO_OPER", padrao: "Resultado Operacional" },
+  { id: "SEC_NAO_OPER", padrao: "Receitas / Despesas Não Operacionais" },
+  { id: "SUB_ANTES_IR", padrao: "Lucro Antes do Imposto de Renda e Cont. Social" },
+  { id: "FINAL_LIQUIDO", padrao: "Lucro Líquido do Exercício" },
+];
+
+const PADRAO_LINHA = Object.fromEntries(LINHAS_ESTRUTURAIS.map((l) => [l.id, l.padrao]));
+
 /** Monta a lista de linhas da demonstração como dados, não como JSX
  *  solto. Isso existe por causa do canal: cada linha precisa saber onde
  *  o saldo corrente estava antes dela e onde ficou depois, e isso só dá
  *  pra calcular percorrendo a demonstração em ordem.
  *
- *  Os rótulos, os sinais e as condições de exibição são exatamente os
- *  mesmos de antes — só mudou o formato. */
-export function montarLinhas(dre) {
+ *  `rotulos` são os apelidos do usuário (`rotulos.js`). Sem eles, os
+ *  rótulos, os sinais e as condições de exibição são exatamente os
+ *  mesmos de sempre — há teste travando essa igualdade. */
+export function montarLinhas(dre, rotulos = null) {
   const b = dre.bal;
+
+  /* O PREFIXO É DA LINHA, O NOME É DO GRUPO. "( + ) " e "( – ) " dizem o
+     que a linha faz na cascata — são estrutura da demonstração, não nome,
+     e por isso não entram no que se pode renomear. Colar o prefixo no
+     nome editável deixaria o usuário apagar o sinal da própria DRE. */
+  const nomeG = (id) => nomeDoGrupo(id, rotulos);
+  const estrutural = (id, t, val) => ({ t, id, chave: id, lbl: rotuloDaLinha(id, PADRAO_LINHA[id], rotulos), val });
 
   /* Uma linha da DRE e, logo abaixo, as faixas de modalidade dela —
      quando o grupo tem alguma conta com modalidade declarada.
      `orientacao` é o sinal com que a linha é APRESENTADA (receita soma,
      dedução e despesa aparecem negativas): as faixas usam exatamente o
      mesmo, senão a soma delas não bateria com o número impresso acima. */
-  const linha = (id, lbl, orientacao = 1) => {
+  const linha = (id, prefixo, orientacao = 1) => {
     const g = b[id];
-    const saida = [{ t: "l", lbl, val: orientacao * g.total, id, chave: id }];
+    const saida = [{ t: "l", lbl: prefixo + nomeG(id), val: orientacao * g.total, id, chave: id }];
     (g.faixas || []).forEach((f) =>
       saida.push({
         t: "mod", lbl: f.nome, val: orientacao * f.total,
@@ -45,49 +80,46 @@ export function montarLinhas(dre) {
   };
 
   const itens = [
-    { t: "secao", lbl: "Receita Operacional Bruta" },
-    ...linha("REC_MENSALIDADES", "( + ) Receita Bruta com Mensalidades"),
-    ...linha("REC_TAXAS", "( + ) Receita com Taxas"),
-    { t: "sub", lbl: "( = ) Receita Bruta de Serviços", val: dre.receitaBruta },
+    estrutural("SEC_RECEITA_BRUTA", "secao"),
+    ...linha("REC_MENSALIDADES", "( + ) "),
+    ...linha("REC_TAXAS", "( + ) "),
+    estrutural("SUB_RECEITA_BRUTA", "sub", dre.receitaBruta),
 
-    { t: "secao", lbl: "Deduções à Receita Operacional" },
-    ...linha("DED_BOLSAS", "( – ) Bolsas / Resoluções", -1),
-    ...linha("DED_PROUNI", "( – ) Prouni", -1),
-    ...linha("DED_DEVOLUCOES", "( – ) Mensalidades Devolvidas", -1),
-    ...linha("DED_DESCONTOS", "( – ) Descontos / Cancelamentos", -1),
-    ...linha("DED_IMPOSTOS", "( – ) PIS / COFINS / ISS", -1),
-    { t: "sub", lbl: "Receita Operacional Líquida", val: dre.receitaLiq },
+    estrutural("SEC_DEDUCOES", "secao"),
+    ...linha("DED_BOLSAS", "( – ) ", -1),
+    ...linha("DED_PROUNI", "( – ) ", -1),
+    ...linha("DED_DEVOLUCOES", "( – ) ", -1),
+    ...linha("DED_DESCONTOS", "( – ) ", -1),
+    ...linha("DED_IMPOSTOS", "( – ) ", -1),
+    estrutural("SUB_RECEITA_LIQUIDA", "sub", dre.receitaLiq),
   ];
 
   if (b.CUSTOS.contas.length > 0) {
-    itens.push(...linha("CUSTOS", "( – ) Custos dos Serviços", -1));
-    itens.push({ t: "sub", lbl: "( = ) Resultado Operacional Bruto", val: dre.resultadoOperBruto });
+    itens.push(...linha("CUSTOS", "( – ) ", -1));
+    itens.push(estrutural("SUB_RESULTADO_BRUTO", "sub", dre.resultadoOperBruto));
   }
 
-  itens.push({ t: "secao", lbl: "Despesas Operacionais" });
-  itens.push(...linha("DESP_FOPAG", "Despesas com Pessoal (Fopag)", -1));
-  itens.push(...linha("DESP_ADM", "Despesas Administrativas", -1));
-  if (b.DEPRECIACAO.contas.length > 0)
-    itens.push(...linha("DEPRECIACAO", "Depreciação / Amortização", -1));
-  if (b.PROVISOES_CONTINGENCIAS.contas.length > 0)
-    itens.push(...linha("PROVISOES_CONTINGENCIAS", "Provisões / Reversões Contingências", -1));
-  if (b.PROVISOES_PCLD.contas.length > 0)
-    itens.push(...linha("PROVISOES_PCLD", "Provisões / Reversões PCLD", -1));
+  itens.push(estrutural("SEC_DESPESAS", "secao"));
+  itens.push(...linha("DESP_FOPAG", "", -1));
+  itens.push(...linha("DESP_ADM", "", -1));
+  if (b.DEPRECIACAO.contas.length > 0) itens.push(...linha("DEPRECIACAO", "", -1));
+  if (b.PROVISOES_CONTINGENCIAS.contas.length > 0) itens.push(...linha("PROVISOES_CONTINGENCIAS", "", -1));
+  if (b.PROVISOES_PCLD.contas.length > 0) itens.push(...linha("PROVISOES_PCLD", "", -1));
 
-  itens.push({ t: "secao", lbl: "Receita / Despesas Financeiras" });
-  itens.push(...linha("REC_FIN", "( + ) Receitas Financeiras"));
-  itens.push(...linha("DESP_FIN", "( – ) Despesas Financeiras", -1));
-  itens.push({ t: "sub", lbl: "Resultado Operacional", val: dre.resultadoOper });
+  itens.push(estrutural("SEC_FINANCEIRO", "secao"));
+  itens.push(...linha("REC_FIN", "( + ) "));
+  itens.push(...linha("DESP_FIN", "( – ) ", -1));
+  itens.push(estrutural("SUB_RESULTADO_OPER", "sub", dre.resultadoOper));
 
   if (b.OUTRAS_REC.contas.length > 0 || b.OUTRAS_DESP.contas.length > 0) {
-    itens.push({ t: "secao", lbl: "Receitas / Despesas Não Operacionais" });
-    itens.push(...linha("OUTRAS_REC", "( + ) Receitas Não Operacionais"));
-    itens.push(...linha("OUTRAS_DESP", "( – ) Despesas Não Operacionais", -1));
+    itens.push(estrutural("SEC_NAO_OPER", "secao"));
+    itens.push(...linha("OUTRAS_REC", "( + ) "));
+    itens.push(...linha("OUTRAS_DESP", "( – ) ", -1));
   }
 
-  itens.push({ t: "sub", lbl: "Lucro Antes do Imposto de Renda e Cont. Social", val: dre.antesIR });
-  itens.push(...linha("IRPJ_CSLL", "( – ) IRPJ e CSLL", -1));
-  itens.push({ t: "final", lbl: "Lucro Líquido do Exercício", val: dre.liquido });
+  itens.push(estrutural("SUB_ANTES_IR", "sub", dre.antesIR));
+  itens.push(...linha("IRPJ_CSLL", "( – ) ", -1));
+  itens.push(estrutural("FINAL_LIQUIDO", "final", dre.liquido));
 
   totalizarSecoes(itens);
   return { itens, escala: aplicarCascata(itens) };

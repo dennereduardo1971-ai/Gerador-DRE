@@ -26,17 +26,17 @@
  * justamente por essa diferença.
  */
 
-import { NOME_GRUPO, GRUPOS } from "./grupos.js";
-import { NOME_MODALIDADE, origemModalidade } from "./modalidade.js";
-import { NOME_CATEGORIA, POLITICA_PADRAO, categoriaDoPlano, resolverCategoria, revisarGrupo } from "./cpc51.js";
+import { GRUPOS } from "./grupos.js";
+import { CATALOGO_PADRAO, RESIDUAL, nomeDaModalidade, origemModalidade } from "./modalidade.js";
+import { POLITICA_PADRAO, categoriaDoPlano, resolverCategoria, revisarGrupo } from "./cpc51.js";
+import { nomeDaCategoria51, nomeDaConta, nomeDoGrupo } from "./rotulos.js";
 
-/** Descrição legível de uma conta: o nome oficial do plano de contas
- *  quando existe, senão o começo do histórico dos lançamentos. É a mesma
- *  regra das outras telas — escrita uma vez aqui para as três não
- *  divergirem no dia em que uma delas mudar o limite de caracteres. */
-export function descricaoDaConta(c, nomes = {}) {
-  if (nomes[c.conta]) return nomes[c.conta];
-  return (c.historico || "").trim().split(",")[0].slice(0, 48);
+/** Descrição legível de uma conta. A regra inteira mora em
+ *  `rotulos.nomeDaConta` (apelido do usuário > nome do plano > histórico);
+ *  isto aqui é só o atalho que recebe a CONTA em vez do código, porque é
+ *  assim que as telas e as exportações já chamavam. */
+export function descricaoDaConta(c, nomes = {}, rotulos = null) {
+  return nomeDaConta(c.conta, nomes, rotulos, c.historico);
 }
 
 /* As situações são o filtro de trabalho da tela: cada uma responde a uma
@@ -74,6 +74,12 @@ export function montarDePara(contasResultado, {
   modalidadeDe = () => "COMUM",
   modalidadePorConta = {},
   sugestaoModalidade = {},
+  /* O catálogo vem junto do resolvedor (`modalidadeDe.catalogo`) quando
+     ele existe: são a mesma decisão, e passar os dois por caminhos
+     diferentes deixaria a tabela nomear uma faixa que o resolvedor não
+     conhece. */
+  catalogo = modalidadeDe.catalogo || CATALOGO_PADRAO,
+  rotulos = null,
 } = {}) {
   return contasResultado
     .map((c) => {
@@ -90,7 +96,13 @@ export function montarDePara(contasResultado, {
       const modalidade = modalidadeDe(c.conta);
       return {
         conta: c.conta,
-        descricao: descricaoDaConta(c, nomes),
+        descricao: descricaoDaConta(c, nomes, rotulos),
+        /* O nome que veio do plano, ao lado do que está sendo exibido: é
+           o que deixa o usuário renomear sem perder de vista o que o
+           sistema contábil chama aquela conta — e é por ele, não pelo
+           apelido, que a classificação automática continua decidindo. */
+        descricaoOriginal: nomes[c.conta] || "",
+        apelido: rotulos?.contas?.[c.conta] || "",
         saldo: c.saldo,
         deb: c.deb || 0,
         cre: c.cre || 0,
@@ -102,11 +114,11 @@ export function montarDePara(contasResultado, {
            duas, e a tela deixa esconder estas. */
         semMovimento: !!c.semMovimento,
         grupo,
-        grupoNome: NOME_GRUPO[grupo] || grupo,
+        grupoNome: nomeDoGrupo(grupo, rotulos),
         grupoManual,
         origemGrupo: grupoManual ? "manual" : "sugerido",
         categoria,
-        categoriaNome: categoria ? NOME_CATEGORIA[categoria] : "Não entra na DRE",
+        categoriaNome: categoria ? nomeDaCategoria51(categoria, rotulos) : "Não entra na DRE",
         categoriaManual,
         origemCategoria: categoriaManual ? "manual" : categoriaDoPlanoAtivo ? "plano" : "padrão do grupo",
         /* O terceiro eixo. "Comum" NÃO é pendência: a despesa
@@ -116,7 +128,7 @@ export function montarDePara(contasResultado, {
            `pendente` — ela tem filtro próprio, para quem quiser varrer
            as comuns atrás de uma que deveria estar segregada. */
         modalidade,
-        modalidadeNome: NOME_MODALIDADE[modalidade] || modalidade,
+        modalidadeNome: nomeDaModalidade(modalidade, catalogo),
         modalidadeManual: !!modalidadePorConta[c.conta],
         origemModalidade: origemModalidade(c.conta, { modalidadePorConta, sugestao: sugestaoModalidade }),
         revisar,
@@ -148,18 +160,21 @@ export function resumoDePara(linhas) {
     completude: 0,
     semMovimento: 0,
     pendenteSemMovimento: 0,
-    presencial: 0,
-    ead: 0,
-    comum: 0,
+    porModalidade: {},
+    segregadas: 0,
+    semModalidade: 0,
     manuaisModalidade: 0,
   };
   linhas.forEach((l) => {
     if (l.grupoManual) r.manuaisGrupo++;
     if (l.categoriaManual) r.manuaisCategoria++;
     if (l.modalidadeManual) r.manuaisModalidade++;
-    if (l.modalidade === "PRESENCIAL") r.presencial++;
-    else if (l.modalidade === "EAD") r.ead++;
-    else r.comum++;
+    /* O placar conta por FAIXA, não por nome cravado: com o catálogo
+       editável, "Presencial" e "EAD" podem ter sido renomeados, e
+       modalidade nova entra sem ninguém mexer aqui. */
+    r.porModalidade[l.modalidade] = (r.porModalidade[l.modalidade] || 0) + 1;
+    if (l.modalidade === RESIDUAL) r.semModalidade++;
+    else r.segregadas++;
     if (l.semMovimento) r.semMovimento++;
     const contar = () => { if (l.semMovimento) r.pendenteSemMovimento++; };
     if (l.semGrupo) { r.semGrupo++; r.valorSemGrupo += Math.abs(l.saldo); contar(); return; }
@@ -216,7 +231,7 @@ export function filtrarDePara(linhas, {
       if (atual !== categoria) return false;
     }
     if (modalidade !== "todas" && l.modalidade !== modalidade) return false;
-    if (situacao === "sem-modalidade" && l.modalidade !== "COMUM") return false;
+    if (situacao === "sem-modalidade" && l.modalidade !== RESIDUAL) return false;
     if (situacao === "pendentes" && !l.pendente) return false;
     if (situacao === "sem-grupo" && !l.semGrupo) return false;
     if (situacao === "revisar" && !l.revisar) return false;

@@ -24,11 +24,15 @@ seguro que reescrever a hierarquia de subtotais.
 
 ## A quebra por modalidade (Presencial / EAD / Comum)
 
-Cada linha de grupo pode abrir, logo abaixo dela, em até três **faixas**:
-Presencial, EAD e Comum / não segregado. A regra vive em
-`modalidade.js` (`faixasDoGrupo`) e vale igual na DRE atual e na
-demonstração do CPC 51 — uma cópia da condição em cada lugar divergiria
-no dia em que alguém mexesse numa só.
+Cada linha de grupo pode abrir, logo abaixo dela, em **faixas**: as
+modalidades do catálogo do usuário (de fábrica, Presencial, EAD e
+Médio / Fundamental) mais a residual, que recebe o que não é de
+modalidade nenhuma. A regra vive em `modalidade.js` (`faixasDoGrupo`) e
+vale igual na DRE atual e na demonstração do CPC 51 — uma cópia da
+condição em cada lugar divergiria no dia em que alguém mexesse numa só.
+
+O catálogo é editável na tela (`.claude/docs/nomes.md`): "três faixas"
+não é mais um número do código, e nada aqui deve voltar a supor que seja.
 
 O que não se pode desfazer aqui:
 
@@ -45,7 +49,10 @@ O que não se pode desfazer aqui:
   reproduziria, um nível abaixo, o erro que o total já evita.
 - **Só se divide o grupo que tem alguma conta com modalidade.** Despesa
   administrativa, PIS/COFINS/ISS e depreciação continuam uma linha só —
-  uma faixa "Comum" sozinha repetiria o valor da linha de cima.
+  uma faixa residual sozinha repetiria o valor da linha de cima.
+- **O rótulo da linha é `prefixo + nome do grupo`.** O nome vem de
+  `nomeDoGrupo` (renomeável); o prefixo `( + )` / `( – )` é estrutura da
+  cascata e não se edita.
 - **Nada é rateado.** "Comum" é um fato contábil (nasce da instituição
   inteira), não uma lacuna a preencher. Distribuir as comuns por
   participação na receita produziria número que a contabilidade não

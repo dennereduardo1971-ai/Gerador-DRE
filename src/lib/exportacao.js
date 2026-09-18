@@ -11,6 +11,7 @@
 import { GRUPOS, SINAL_GRUPO } from "./classify.js";
 import { montarLinhas } from "./linhasDRE.js";
 import { rotuloPorConta } from "./modalidade.js";
+import { nomeDaConta, nomeDoGrupo } from "./rotulos.js";
 import {
   aplicarZebra, definirLarguras, escreverCabecalhoTabela, escreverMeta,
   escreverTitulo, linhaEmBranco, marcarSubtotal, baixarWorkbook,
@@ -91,8 +92,8 @@ export function matrizLinhas(itens, base) {
   }));
 }
 
-export function matrizDRE(dre) {
-  return matrizLinhas(montarLinhas(dre).itens, dre.receitaLiq || 1);
+export function matrizDRE(dre, rotulos = null) {
+  return matrizLinhas(montarLinhas(dre, rotulos).itens, dre.receitaLiq || 1);
 }
 
 export function baixar(conteudo, nome, tipo) {
@@ -111,11 +112,11 @@ const nomeArquivo = (empresa, ext) =>
  *  abre sem pedir nada ao usuário. BOM no início para o acento não sair
  *  quebrado. */
 export function baixarCSV(ctx) {
-  const { dre, empresa, nomes } = ctx;
+  const { dre, empresa, nomes, rotulos = null } = ctx;
   const linhas = [
     ...cabecalho(ctx),
     ["Linha", "Valor", "AV %"],
-    ...matrizDRE(dre).map((l) => [l.lbl, dec(l.val), l.av == null ? "" : (l.av * 100).toFixed(1)]),
+    ...matrizDRE(dre, rotulos).map((l) => [l.lbl, dec(l.val), l.av == null ? "" : (l.av * 100).toFixed(1)]),
     [],
     ["CONTAS POR GRUPO"],
     ["Grupo", "Modalidade", "Conta", "Descrição", "Valor"],
@@ -127,7 +128,10 @@ export function baixarCSV(ctx) {
     const sinal = SINAL_GRUPO[g.id] ?? 1;
     const modalidade = rotuloPorConta(dre.bal[g.id].porModalidade);
     dre.bal[g.id].contas.forEach((c) =>
-      linhas.push([g.nome, modalidade[c.conta] || "", c.conta, nomes[c.conta] || "", dec(c.saldo * sinal)])
+      linhas.push([
+        nomeDoGrupo(g.id, rotulos), modalidade[c.conta] || "", c.conta,
+        nomeDaConta(c.conta, nomes, rotulos, c.historico), dec(c.saldo * sinal),
+      ])
     );
   });
 
@@ -146,7 +150,7 @@ export function baixarCSV(ctx) {
  *  `exceljs` em vez de `xlsx` aqui. */
 export async function baixarExcel(ctx) {
   const ExcelJS = (await import("exceljs")).default;
-  const { dre, empresa, nomes, dresPorCompetencia = [] } = ctx;
+  const { dre, empresa, nomes, dresPorCompetencia = [], rotulos = null } = ctx;
   const wb = new ExcelJS.Workbook();
   wb.creator = "Gerador de DRE";
   wb.created = new Date();
@@ -158,7 +162,7 @@ export async function baixarExcel(ctx) {
   cabecalho(ctx).slice(1).forEach((l) => { if (l.length) escreverMeta(ws, l); else linhaEmBranco(ws); });
   const cabTabela = escreverCabecalhoTabela(ws, ["Linha", "Valor", "AV %"]);
 
-  const linhas = matrizDRE(dre);
+  const linhas = matrizDRE(dre, rotulos);
   linhas.forEach((l) => {
     const row = ws.addRow([l.lbl, l.val ?? null, l.av ?? null]);
     row.getCell(2).numFmt = FORMATO_MOEDA;
@@ -181,7 +185,10 @@ export async function baixarExcel(ctx) {
     const sinal = SINAL_GRUPO[g.id] ?? 1;
     const modalidade = rotuloPorConta(dre.bal[g.id].porModalidade);
     dre.bal[g.id].contas.forEach((c) => {
-      const row = wsDet.addRow([g.nome, modalidade[c.conta] || "", c.conta, nomes[c.conta] || "", c.saldo * sinal]);
+      const row = wsDet.addRow([
+        nomeDoGrupo(g.id, rotulos), modalidade[c.conta] || "", c.conta,
+        nomeDaConta(c.conta, nomes, rotulos, c.historico), c.saldo * sinal,
+      ]);
       row.getCell(COLS_DET.length).numFmt = FORMATO_MOEDA;
     });
   });
@@ -192,12 +199,12 @@ export async function baixarExcel(ctx) {
   if (dresPorCompetencia.length > 1) {
     const colunas = dresPorCompetencia.map((d) => ({
       titulo: d.rotulo,
-      valores: new Map(matrizDRE(d.dre).map((l) => [l.chave, l.val])),
+      valores: new Map(matrizDRE(d.dre, rotulos).map((l) => [l.chave, l.val])),
     }));
     // Esqueleto da última competência: seções condicionais aparecem
     // conforme o mês tiver movimento, e o mês mais recente representa
     // melhor a estrutura corrente.
-    const esqueleto = matrizDRE(dresPorCompetencia[dresPorCompetencia.length - 1].dre);
+    const esqueleto = matrizDRE(dresPorCompetencia[dresPorCompetencia.length - 1].dre, rotulos);
     const wsComp = wb.addWorksheet("Comparativa");
     definirLarguras(wsComp, [48, ...colunas.map(() => 16)]);
     const cabComp = escreverCabecalhoTabela(wsComp, ["Linha", ...colunas.map((c) => c.titulo)]);

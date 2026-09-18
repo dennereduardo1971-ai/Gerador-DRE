@@ -177,6 +177,11 @@ errada de um jeito difícil de perceber.
 
 ## O terceiro eixo: modalidade de ensino
 
+> A lista de modalidades virou **catálogo editável** em 18/09/2026, e os
+> nomes de tudo passaram a ser editáveis junto. A doutrina completa está
+> em `.claude/docs/nomes.md`; o que fica aqui é a parte que toca a
+> CLASSIFICAÇÃO.
+
 `modalidade.js` responde "de qual modalidade esta conta nasce?" —
 Presencial, EAD ou Comum. É eixo PARALELO ao grupo, pelo mesmo
 argumento que já valia para a categoria do CPC 51: criar
@@ -196,18 +201,20 @@ mais próxima VENCE, em vez de todos os nomes virarem um texto só. Uma
 folha "TURMA PRESENCIAL" dentro de uma síntese "POS EAD" é a exceção
 que o plano quis declarar — concatenando, EAD ganharia sempre.
 
-Sobre os padrões (`PAT_EAD`, `PAT_PRESENCIAL`):
+Sobre os termos de cada modalidade (hoje dado do catálogo, não `PAT_*`):
 
-- **EAD é testado antes**, e `PAT_PRESENCIAL` começa com `\b`. Sem as
-  duas coisas, "GRADUACAO SEMIPRESENCIAL" casaria com `/PRESENCIAL/` e
-  a carga a distância entraria como presencial em silêncio.
-- **Semipresencial cai em EAD** — julgamento contábil, não gramática.
-  Se a instituição tratar diferente, corrige-se a conta no De-Para, e a
-  origem passa a ser "manual".
-- **"online", "digital" e "virtual" ficam de fora**: casariam com
-  "MARKETING DIGITAL" e "COMPRAS ONLINE", que são despesa da
-  instituição inteira. Um padrão que aponta tudo não aponta nada, e o
-  erro apareceria como EAD inflado — difícil de perceber.
+- **Casam por palavra inteira, e o mais longo vence.** Sem palavra
+  inteira, "presencial" casaria dentro de "SEMIPRESENCIAL" e a carga a
+  distância entraria como presencial em silêncio.
+- **Semipresencial vem em EAD** — julgamento contábil, não gramática.
+  Se a instituição tratar diferente, muda-se o termo na tela: o catálogo
+  é editável e não exige build.
+- **"online", "digital" e "virtual" ficam de fora** do padrão de fábrica:
+  casariam com "MARKETING DIGITAL" e "COMPRAS ONLINE", que são despesa da
+  instituição inteira. Um termo que aponta tudo não aponta nada, e o erro
+  apareceria como EAD inflado — difícil de perceber.
+- **O apelido do usuário não entra nessa leitura.** A sugestão lê o nome
+  do PLANO; renomear é aparência (ver `.claude/docs/nomes.md`).
 
 `modalidadePorNome` devolve `null` quando o plano não declara nada.
 **`null` não é "COMUM"**: quem transforma ausência em faixa comum é

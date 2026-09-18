@@ -25,6 +25,30 @@
 
 import { aplicarCascata, totalizarSecoes } from "./linhasDRE.js";
 import { IDS_CATEGORIA } from "./cpc51.js";
+import { nomeDoGrupo, rotuloDaLinha } from "./rotulos.js";
+
+/* As linhas estruturais desta demonstração — os títulos de bloco e os
+ * subtotais —, com id próprio para poderem ser renomeadas (`rotulos.js`).
+ *
+ * Renomear aqui é mais delicado que na DRE atual: "Resultado Operacional"
+ * e "Resultado antes do financiamento e dos tributos sobre o lucro" são
+ * os DOIS SUBTOTAIS OBRIGATÓRIOS da norma, e a auditoria procura por
+ * esses termos. O app deixa mudar — quem assina é quem decide —, mas o
+ * padrão é o texto da norma, e voltar a ele é apagar o apelido. */
+export const LINHAS_ESTRUTURAIS_51 = [
+  { id: "SEC51_OPERACIONAL", padrao: "Receitas e despesas operacionais" },
+  { id: "SUB51_OPERACIONAL", padrao: "( = ) Resultado Operacional" },
+  { id: "SEC51_INVESTIMENTO", padrao: "Investimento" },
+  { id: "SUB51_ANTES_FIN_TRIB", padrao: "( = ) Resultado antes do financiamento e dos tributos sobre o lucro" },
+  { id: "SEC51_FINANCIAMENTO", padrao: "Financiamento" },
+  { id: "SUB51_ANTES_TRIB", padrao: "( = ) Resultado antes dos tributos sobre o lucro" },
+  { id: "SEC51_TRIBUTOS", padrao: "Tributos sobre o lucro" },
+  { id: "SUB51_CONTINUADAS", padrao: "( = ) Resultado das operações continuadas" },
+  { id: "SEC51_DESCONTINUADAS", padrao: "Operações descontinuadas" },
+  { id: "FINAL51_LIQUIDO", padrao: "( = ) Resultado Líquido do Período" },
+];
+
+const PADRAO_51 = Object.fromEntries(LINHAS_ESTRUTURAIS_51.map((l) => [l.id, l.padrao]));
 
 /* O CÓDIGO DA LINHA (`1.1`, `2.3`...) — o que o modelo de DRE do CPC 51
    que o cliente usa como base traz na segunda coluna, para a nota
@@ -40,16 +64,21 @@ import { IDS_CATEGORIA } from "./cpc51.js";
  * que anda por código de conta). */
 const codigo = (catId, i) => `${IDS_CATEGORIA.indexOf(catId) + 1}.${i + 1}`;
 
-export function montarLinhas51(dre51) {
+export function montarLinhas51(dre51, rotulos = null) {
   const itens = [];
+  const rot = (id) => rotuloDaLinha(id, PADRAO_51[id], rotulos);
 
-  const bloco = (catId, titulo) => {
+  const bloco = (catId, idTitulo) => {
     const c = dre51.cat[catId];
     if (!c || !c.grupos.length) return;
-    itens.push({ t: "secao", lbl: titulo, cat: catId });
+    itens.push({ t: "secao", lbl: rot(idTitulo), cat: catId, id: idTitulo, chave: idTitulo });
     c.grupos.forEach((g, i) => {
       itens.push({
-        t: "l", lbl: g.nome, val: g.total, id: g.id, cat: catId,
+        /* O nome do grupo é o MESMO das duas demonstrações e do De-Para
+           (`nomeDoGrupo`): renomear "Bolsas / Resoluções" na DRE atual e
+           essa linha continuar com o nome antigo faria as duas
+           demonstrações parecerem falar de coisas diferentes. */
+        t: "l", lbl: nomeDoGrupo(g.id, rotulos), val: g.total, id: g.id, cat: catId,
         cod: codigo(catId, i), chave: `${catId}|${g.id}`,
       });
       /* A quebra por modalidade (Presencial / EAD / Comum) é a mesma da
@@ -67,29 +96,27 @@ export function montarLinhas51(dre51) {
     });
   };
 
-  bloco("OPERACIONAL", "Receitas e despesas operacionais");
-  itens.push({ t: "sub", lbl: "( = ) Resultado Operacional", val: dre51.operacional, cat: "OPERACIONAL" });
+  const subtotal = (id, val, cat) => ({ t: "sub", lbl: rot(id), val, cat, id, chave: id });
 
-  bloco("INVESTIMENTO", "Investimento");
-  itens.push({
-    t: "sub",
-    lbl: "( = ) Resultado antes do financiamento e dos tributos sobre o lucro",
-    val: dre51.antesFinTributos,
-  });
+  bloco("OPERACIONAL", "SEC51_OPERACIONAL");
+  itens.push(subtotal("SUB51_OPERACIONAL", dre51.operacional, "OPERACIONAL"));
 
-  bloco("FINANCIAMENTO", "Financiamento");
-  itens.push({ t: "sub", lbl: "( = ) Resultado antes dos tributos sobre o lucro", val: dre51.antesTributos });
+  bloco("INVESTIMENTO", "SEC51_INVESTIMENTO");
+  itens.push(subtotal("SUB51_ANTES_FIN_TRIB", dre51.antesFinTributos));
 
-  bloco("TRIBUTOS", "Tributos sobre o lucro");
-  itens.push({ t: "sub", lbl: "( = ) Resultado das operações continuadas", val: dre51.continuadas });
+  bloco("FINANCIAMENTO", "SEC51_FINANCIAMENTO");
+  itens.push(subtotal("SUB51_ANTES_TRIB", dre51.antesTributos));
+
+  bloco("TRIBUTOS", "SEC51_TRIBUTOS");
+  itens.push(subtotal("SUB51_CONTINUADAS", dre51.continuadas));
 
   /* Só entra quando existe. Aqui a ausência da linha não esconde
      obrigação nenhuma: uma empresa sem operação descontinuada não tem o
      que apresentar, e o resultado das continuadas já é o líquido. */
   if (dre51.cat.DESCONTINUADAS.grupos.length) {
-    bloco("DESCONTINUADAS", "Operações descontinuadas");
+    bloco("DESCONTINUADAS", "SEC51_DESCONTINUADAS");
   }
-  itens.push({ t: "final", lbl: "( = ) Resultado Líquido do Período", val: dre51.liquido });
+  itens.push({ t: "final", lbl: rot("FINAL51_LIQUIDO"), val: dre51.liquido, id: "FINAL51_LIQUIDO", chave: "FINAL51_LIQUIDO" });
 
   totalizarSecoes(itens);
   return { itens, escala: aplicarCascata(itens) };
@@ -116,13 +143,13 @@ export function montarLinhas51(dre51) {
  * repetiria o valor de um grupo em todos os outros. Um mês sem
  * determinado grupo simplesmente não tem aquela linha, e a célula fica
  * vazia em vez de deslocar a coluna inteira. */
-export function comparativo51(dres51PorPeriodo = [], periodoAtivo) {
+export function comparativo51(dres51PorPeriodo = [], periodoAtivo, rotulos = null) {
   if (!periodoAtivo) return null;
   const i = dres51PorPeriodo.findIndex((d) => d.competencia === periodoAtivo);
   if (i <= 0) return null;
   const anterior = dres51PorPeriodo[i - 1];
   const valores = {};
-  montarLinhas51(anterior.dre51).itens.forEach((it) => {
+  montarLinhas51(anterior.dre51, rotulos).itens.forEach((it) => {
     if (it.val != null) valores[it.chave ?? it.lbl] = it.val;
   });
   return { competencia: anterior.competencia, rotulo: anterior.rotulo, valores };

@@ -74,7 +74,7 @@ describe("perfil — as decisões do CPC 51 viajam junto", () => {
   });
 
   it("guarda categoria por conta, política e medidas — e nenhum valor", () => {
-    expect(perfil.versao).toBe(4);
+    expect(perfil.versao).toBe(5);
     expect(perfil.categorias).toEqual({ "4210201": "OPERACIONAL" }); // categoria inválida fora
     expect(perfil.politica.investirEhAtividadePrincipal).toBe(true);
     expect(perfil.politica.financiarClientesEhAtividadePrincipal).toBe(false);
@@ -121,7 +121,7 @@ describe("perfil versão 3 — os parâmetros fiscais viajam, os valores não", 
 
   it("guarda regime, alíquotas e o mapa de tributos", () => {
     const p = montarPerfil({ nome: "IESB", classif: {}, fiscal });
-    expect(p.versao).toBe(4);
+    expect(p.versao).toBe(5);
     expect(p.fiscal.params.regime).toBe("REAL_NAO_CUMULATIVO");
     expect(p.fiscal.params.prouni.aderente).toBe(true);
     expect(p.fiscal.mapaTributos["3210502"]).toBe("COFINS");

@@ -23,7 +23,7 @@ import { useMemo, useState } from "react";
 import { brl, pct } from "../lib/formato.js";
 import { GRUPOS } from "../lib/grupos.js";
 import { CATEGORIAS, NOME_CATEGORIA } from "../lib/cpc51.js";
-import { MODALIDADES, NOME_CURTO_MODALIDADE } from "../lib/modalidade.js";
+import { EditorNomes } from "./EditorNomes.jsx";
 import { SITUACOES, filtrarDePara, porGrupo, resumoDePara } from "../lib/depara.js";
 import { situacaoDaLinha } from "../lib/exportacaoDePara.js";
 
@@ -40,7 +40,7 @@ const TETO = 400;
 const TOM_SITUACAO = { "A revisar": "edit" };
 
 export function DePara({
-  linhas, empresa, cnpj,
+  linhas, empresa, cnpj, catalogo = [], rotulos = null, editor = null,
   onClassificar, onCategoriaConta, onModalidade, onLimparCategorias, onBaixarCSV, onBaixarExcel,
 }) {
   const [busca, setBusca] = useState("");
@@ -92,6 +92,8 @@ export function DePara({
         </details>
       </div>
 
+      {editor && <EditorNomes catalogo={catalogo} rotulos={rotulos} editor={editor} />}
+
       {/* 1. Quanto falta. */}
       <div className="checks">
         <div className="check">
@@ -118,9 +120,13 @@ export function DePara({
             que é a pergunta que a divisão da tela levanta. */}
         <div className="check">
           <div className="k">Segregadas por modalidade</div>
-          <div className="v">{resumo.presencial + resumo.ead}</div>
-          <div className="sub">{resumo.presencial} presencial, {resumo.ead} EAD,{" "}
-            {resumo.comum} comuns aos dois. {resumo.manuaisModalidade} decididas à mão.</div>
+          <div className="v">{resumo.segregadas}</div>
+          <div className="sub">
+            {catalogo.filter((m) => !m.residual).map((m) => (
+              <span key={m.id}>{resumo.porModalidade[m.id] || 0} em {m.nome}. </span>
+            ))}
+            {resumo.semModalidade} sem modalidade. {resumo.manuaisModalidade} decididas à mão.
+          </div>
         </div>
         <div className="check" data-tone={resumo.semGrupo ? "bad" : "ok"}>
           <div className="k">Fora da DRE</div>
@@ -178,7 +184,7 @@ export function DePara({
             <label htmlFor="dp-modalidade">Modalidade</label>
             <select id="dp-modalidade" value={modalidade} onChange={(e) => setModalidade(e.target.value)}>
               <option value="todas">Todas as modalidades</option>
-              {MODALIDADES.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              {catalogo.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
             </select>
           </div>
           <div>
@@ -225,8 +231,28 @@ export function DePara({
                   <tr key={l.conta} data-pendente={l.pendente ? "1" : "0"}
                     data-zerada={l.semMovimento ? "1" : "0"}>
                     <td className="code" data-rotulo="Conta">{l.conta}</td>
+                    {/* O NOME DA CONTA É EDITÁVEL AQUI, e o nome do plano
+                        fica embaixo quando os dois diferem: renomear sem
+                        ver o original é como se perde a ligação com o
+                        sistema contábil, que é por onde a conferência
+                        anda. Campo vazio volta ao nome do plano.
+
+                        E renomear é SÓ APARÊNCIA: a classificação
+                        automática continua lendo o nome original (ver
+                        `rotulos.js`), senão encurtar um nome moveria a
+                        conta de grupo ou de faixa sem ninguém pedir. */}
                     <td className="desc" data-rotulo="Descrição">
-                      {l.descricao}
+                      <input
+                        type="text"
+                        className="dp-nome"
+                        value={l.apelido || l.descricao}
+                        placeholder={l.descricaoOriginal || l.conta}
+                        aria-label={`Nome da conta ${l.conta}`}
+                        onChange={(e) => editor?.renomear("contas", l.conta, e.target.value)}
+                      />
+                      {l.apelido && l.descricaoOriginal && (
+                        <span className="dp-original">no plano: {l.descricaoOriginal}</span>
+                      )}
                       {l.semMovimento && <span className="selo-zerada">sem movimento</span>}
                       {l.revisar && <span className="dp-motivo">{l.revisar}</span>}
                     </td>
@@ -258,10 +284,8 @@ export function DePara({
                       <select value={l.modalidadeManual ? l.modalidade : ""}
                         aria-label={`Modalidade de ensino da conta ${l.conta}`}
                         onChange={(e) => onModalidade(l.conta, e.target.value)}>
-                        <option value="">
-                          Padrão: {NOME_CURTO_MODALIDADE[l.modalidade]}
-                        </option>
-                        {MODALIDADES.map((m) => <option key={m.id} value={m.id}>{m.curto}</option>)}
+                        <option value="">Padrão: {l.modalidadeNome}</option>
+                        {catalogo.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
                       </select>
                     </td>
                     <td data-rotulo="Situação">

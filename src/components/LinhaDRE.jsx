@@ -1,5 +1,6 @@
 import { brl, pct } from "../lib/formato.js";
 import { SINAL_GRUPO } from "../lib/classify.js";
+import { nomeDaConta } from "../lib/rotulos.js";
 import { Canal } from "./Eixo.jsx";
 
 /** Mostra uma linha da DRE. `val` já deve vir no sinal contábil real da
@@ -77,7 +78,7 @@ const LIMITE_DETALHE = 40;
  *  que somavam diferente do número da própria linha e, com razão, parava
  *  de confiar na tela. Aqui a conta que anda contra a natureza do grupo
  *  aparece com o sinal invertido, e a soma fecha. */
-export function Detalhe({ dre, id, nomes, base, mostrar, mod = null }) {
+export function Detalhe({ dre, id, nomes, base, mostrar, mod = null, rotulos = null }) {
   if (!mostrar) return null;
   const grupo = dre.bal[id];
   /* Com `mod`, as contas são as daquela faixa — é o que faz o detalhe
@@ -96,7 +97,7 @@ export function Detalhe({ dre, id, nomes, base, mostrar, mod = null }) {
             key={id + (mod || "") + c.conta}>
             <div className="lbl">
               <span className="code">{c.conta}</span>{" "}
-              {nomes[c.conta] || (c.historico.trim().split(",")[0] || "").slice(0, 42)}
+              {nomeDaConta(c.conta, nomes, rotulos, c.historico)}
             </div>
             <div className="canal" />
             <div className={"val " + (valor < 0 ? "neg" : "")}>

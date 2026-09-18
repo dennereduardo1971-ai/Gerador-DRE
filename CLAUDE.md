@@ -14,7 +14,8 @@ daqui ou de `.claude/docs/`, corrija a frase no mesmo commit.
 | … isto | leia |
 |---|---|
 | para onde uma conta vai (padrões, mapa por código, perfis de plano) | `.claude/docs/classificacao.md` |
-| a modalidade de ensino (Presencial / EAD / Comum) | `.claude/docs/classificacao.md` + `.claude/docs/dre.md` |
+| a modalidade de ensino e o catálogo de faixas | `.claude/docs/nomes.md` |
+| renomear conta, linha, grupo ou categoria | `.claude/docs/nomes.md` |
 | a estrutura da DRE, subtotais, rótulos | `.claude/docs/dre.md` |
 | a leitura do balancete, a hierarquia, o período | `.claude/docs/balancete.md` |
 | a demonstração do CPC 51, MPDA, cronograma | `.claude/docs/cpc51.md` |
@@ -86,8 +87,10 @@ src/
     planoPerfil.js           # motor de perfis de plano de contas
     planos/iesb.js           # o plano do IESB, como DADO
     linhasDRE.js             # a DRE como dados (rótulos, sinais, cascata)
-    modalidade.js            # o 3º eixo: Presencial / EAD / Comum, e a
-                              # regra única de quando uma linha se divide
+    modalidade.js            # o 3º eixo: o CATÁLOGO de modalidades (dado
+                              # editável) e quando uma linha se divide
+    rotulos.js               # os apelidos: conta, grupo, linha, categoria
+                              # — aparência, nunca classificação
     cpc51.js                 # as cinco categorias, a política, a conciliação
     linhasCPC51.js           # a demonstração do CPC 51 como dados
     mpda.js                  # medidas de desempenho da administração
@@ -114,11 +117,13 @@ src/
     Eixo.jsx                 # Canal e Balanca — o eixo visual compartilhado
     Icones.jsx               # SVG inline em currentColor (sem biblioteca)
     Inicio.jsx               # "o que eu faço agora?"
+    EditorNomes.jsx          # painel de nomes e catálogo, dentro do De-Para
   hooks/                     # O ESTADO, fatiado por assunto
     useSessao.js             # restaurar/gravar a sessão, a trava de carga
     useFontes.js             # os balancetes carregados, contas, nomes, plano
     useClassificacao.js      # classif/tocadas/sugestão/DRE/prova/perfis
                               # + a modalidade (manual > nome do plano)
+    useRotulos.js            # os apelidos e o catálogo de modalidades
     useCPC51.js              # política, categorias, MPDA, conciliação
     useFiscal.js             # parâmetros, ajustes do LALUR, apuração
   App.jsx                    # o CASCO: navegação (SECOES), topo de contexto,
@@ -164,6 +169,11 @@ divisão por modalidade sem tela nova: grupo da DRE, categoria do CPC 51 e
 modalidade de ensino são propriedades da mesma conta, resolvidas cada uma
 por "manual > plano/nome > padrão", e todas as telas leem as três. Eixo
 novo não vira aba; vira coluna no De-Para.
+
+**Nome é a quarta camada, e não é eixo.** Renomear conta, grupo, linha ou
+categoria (`rotulos.js`) muda o que se lê — nunca para onde a conta vai
+nem quanto ela vale. A classificação continua lendo o nome ORIGINAL do
+plano. → `.claude/docs/nomes.md`
 
 São **onze abas no total**, e esse número é para ser defendido. Já foram
 quatorze; o corte de 20/08/2026 tirou Painel, Balanço e Arquivos e fundiu
@@ -299,11 +309,25 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
   cada tópico dividido: com casamento por RÓTULO, o valor do primeiro
   tópico aparecia em todos os outros — número plausível, errado e sem
   aviso. → `.claude/docs/dre.md`
-- **`\bPRESENCIAL` com fronteira de palavra, e EAD testado antes.** Sem
-  as duas coisas, "SEMIPRESENCIAL" bate com `/PRESENCIAL/` e a carga a
-  distância entra como presencial em silêncio. Pelo mesmo motivo,
-  "online", "digital" e "virtual" NÃO são padrões de EAD: casariam com
-  "MARKETING DIGITAL". → `.claude/docs/classificacao.md`
+- **Termo de modalidade casa por PALAVRA INTEIRA, e o mais longo vence.**
+  Sem isso, "presencial" casaria dentro de "SEMIPRESENCIAL" e a carga a
+  distância entraria como presencial em silêncio. Pelo mesmo motivo,
+  "online", "digital" e "virtual" não são termos de EAD: casariam com
+  "MARKETING DIGITAL". → `.claude/docs/nomes.md`
+- **Renomear NÃO reclassifica.** `sugerirClassificacao` e
+  `modalidadePorNome` leem o nome do plano, não o apelido. Se lessem o
+  apelido, encurtar um nome moveria a conta de grupo ou de faixa sem
+  ninguém pedir. → `.claude/docs/nomes.md`
+- **O catálogo de modalidades anda com o resolvedor** (`modalidadeDe.catalogo`).
+  `montarDRE`/`montarDRE51` montam os blocos a partir dele; blocos de um
+  catálogo com resolvedor de outro fazem a faixa renomeada aparecer com o
+  nome antigo — ou sumir. → `.claude/docs/nomes.md`
+- **Ao abrir uma faixa (na tela ou no Excel), mostre as contas DELA.** A
+  faixa carrega o id do GRUPO, então `grupos.find(g => g.id === l.id)`
+  devolve o grupo inteiro: foi assim que o Excel do CPC 51 listou contas
+  de EAD dentro de Presencial, com o total certo e a composição errada.
+  Filtre por `l.mod`, e não liste no tópico o que as faixas já listam.
+  → `.claude/docs/exportacao.md`
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença é o resultado do exercício, que vive nas contas 3 a 7. Nunca
   trate isso como erro de importação. → `.claude/docs/balancete.md`

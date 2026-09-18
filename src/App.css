@@ -1789,6 +1789,79 @@ tr[data-pendente="1"] td:first-child { box-shadow: inset 2px 0 0 var(--atencao);
 .dp-tabela .dp-modalidade select { min-width: 132px; }
 .dp-tabela .desc { min-width: 160px; }
 
+/* O NOME DA CONTA, EDITÁVEL NA PRÓPRIA LINHA.
+ *
+ * Campo de texto que não parece campo até receber foco: a tabela tem
+ * centenas de linhas, e uma caixa desenhada em cada uma viraria um
+ * formulário gigante em vez de uma tabela de conferência. A borda
+ * aparece no hover e no foco — que é quando ela responde "isto aqui dá
+ * para editar". */
+.dp-nome {
+  width: 100%;
+  min-width: 150px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+.dp-nome:hover { border-color: var(--regua); }
+.dp-nome:focus { border-color: var(--marca); background: var(--papel); outline: none; }
+.dp-original {
+  display: block;
+  margin-top: 2px;
+  padding-left: 6px;
+  font-size: 11px;
+  color: var(--tinta-2);
+}
+
+/* O PAINEL DE NOMES (`EditorNomes`) — cadastro, não leitura.
+ *
+ * Grade que se adapta: em 390px vira uma coluna só, sem rolagem
+ * horizontal, que é o piso deste projeto. Os campos mostram o nome de
+ * fábrica como `placeholder`, então apagar o conteúdo devolve o padrão
+ * sem precisar de botão por linha. */
+.ed-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px 14px;
+  margin: 10px 0 4px;
+}
+.ed-campo { display: flex; flex-direction: column; gap: 3px; }
+.ed-padrao {
+  font-size: 11px;
+  color: var(--tinta-2);
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.ed-campo input { width: 100%; }
+.ed-sub { margin: 14px 0 0; font-size: 13px; }
+
+.ed-lista { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.ed-modalidade {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 2fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+/* A faixa residual é a que recebe o que não é de modalidade nenhuma:
+   marcada pela borda, não por cor de dado (verde e vermelho aqui
+   pertencem a saldo, nunca a rótulo de processo). */
+.ed-modalidade[data-residual="1"] {
+  padding-top: 8px;
+  border-top: 1px dashed var(--regua);
+}
+.ed-acoes { display: flex; gap: 4px; }
+.ed-acoes .btn { padding: 5px 9px; font-size: 12px; }
+
+@media (max-width: 640px) {
+  .ed-modalidade { grid-template-columns: 1fr; }
+  .ed-acoes { justify-content: flex-end; }
+}
+
+
 .dp-motivo {
   display: block;
   margin-top: 4px;

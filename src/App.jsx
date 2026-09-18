@@ -15,6 +15,7 @@ import { baixarPerfil, montarPerfil } from "./lib/perfil.js";
 import { useSessao } from "./hooks/useSessao.js";
 import { useFontes } from "./hooks/useFontes.js";
 import { useClassificacao } from "./hooks/useClassificacao.js";
+import { useRotulos } from "./hooks/useRotulos.js";
 import { useCPC51 } from "./hooks/useCPC51.js";
 import { useFiscal } from "./hooks/useFiscal.js";
 
@@ -124,15 +125,20 @@ export default function App() {
      arquivo saiu de 945 para pouco mais de 400 linhas, e é o que faz mexer
      no CPC 51 não exigir ler a importação de arquivo. */
   const fontes = useFontes();
+  /* Os NOMES vêm antes da classificação de propósito: o catálogo de
+     modalidades é dono deste hook, e é ele que `useClassificacao` usa
+     para resolver a modalidade de cada conta. Uma decisão, um dono. */
+  const rot = useRotulos();
   const cls = useClassificacao({
     contas: fontes.contas, nomesEfetivos: fontes.nomesEfetivos,
     planos: fontes.planos, balancetes: fontes.balancetes,
+    catalogoModalidades: rot.catalogo,
   });
   const cpc = useCPC51({
     contasResultado: cls.contasResultado, grupoDe: cls.grupoDe, dre: cls.dre,
     nomesEfetivos: fontes.nomesEfetivos, aba,
     dresPorBalancete: cls.dresPorBalancete, periodoAtivo: fontes.emFoco?.chave,
-    plano: fontes.planoAtivo, modalidadeDe: cls.modalidadeDe,
+    plano: fontes.planoAtivo, modalidadeDe: cls.modalidadeDe, rotulos: rot.rotulos,
   });
   /* A apuração lê a MESMA DRE que a aba Demonstração mostra. É por isso
      que reclassificar uma conta em Classificar refaz o imposto na hora —
@@ -146,7 +152,7 @@ export default function App() {
     limpar: () => { setEmpresa(""); setCnpj(""); },
   };
 
-  const sessao = useSessao([fontes.sessao, cls.sessao, cpc.sessao, fisc.sessao, identidade]);
+  const sessao = useSessao([fontes.sessao, cls.sessao, cpc.sessao, fisc.sessao, rot.sessao, identidade]);
 
   /* Volta sempre para o Início ao restaurar: é ele que diz, em uma linha,
      qual arquivo está aberto e o que ficou pendente da última vez. */
@@ -202,6 +208,10 @@ export default function App() {
       // grupo e a categoria. O que o nome do plano já declara não entra —
       // é redescoberto a cada balancete.
       modalidades: cls.modalidade,
+      // Os nomes também são decisão: o catálogo de modalidades e cada
+      // apelido de conta, linha e categoria viajam junto.
+      catalogoModalidades: rot.catalogo,
+      rotulos: rot.rotulos,
       // Só os PARÂMETROS fiscais — regime, alíquotas, mapa de tributos.
       // Prejuízo fiscal é valor de cliente e fica fora, para o perfil
       // continuar podendo ser versionado e compartilhado.
@@ -210,6 +220,9 @@ export default function App() {
   }
 
   function aplicarPerfil(perfil) {
+    // Os nomes primeiro: o catálogo precisa existir antes de as contas
+    // serem distribuídas nas faixas dele.
+    rot.aplicarPerfil(perfil);
     cls.aplicarPerfil(perfil);
     cpc.aplicarPerfil(perfil);
     fisc.aplicarPerfil(perfil);
@@ -227,18 +240,20 @@ export default function App() {
       grupoDe: cls.grupoDe, tocadas: cls.tocadas, categoriaPorConta: cpc.categoriaConta,
       politica: cpc.politica, nomes: fontes.nomesEfetivos, plano: fontes.planoAtivo,
       modalidadeDe: cls.modalidadeDe, modalidadePorConta: cls.modalidade,
-      sugestaoModalidade: cls.sugestaoModalidade,
+      sugestaoModalidade: cls.sugestaoModalidade, catalogo: rot.catalogo, rotulos: rot.rotulos,
     }),
     [
       cls.contasResultado, cls.grupoDe, cls.tocadas, cpc.categoriaConta, cpc.politica,
       fontes.nomesEfetivos, fontes.planoAtivo, cls.modalidadeDe, cls.modalidade,
-      cls.sugestaoModalidade,
+      cls.sugestaoModalidade, rot.catalogo, rot.rotulos,
     ]
   );
   const placarDePara = useMemo(() => resumoDePara(deParaLinhas), [deParaLinhas]);
 
   const periodo = fontes.periodo;
-  const ctxArquivo = { empresa, cnpj, periodo, nomes: fontes.nomesEfetivos };
+  /* `rotulos` viaja em TODO contexto de exportação: o arquivo entregue
+     tem que sair com os mesmos nomes da tela conferida. */
+  const ctxArquivo = { empresa, cnpj, periodo, nomes: fontes.nomesEfetivos, rotulos: rot.rotulos };
   const ctxExport51 = {
     ...ctxArquivo, dre: cls.dre, dre51: cpc.dre51, conciliacao: cpc.conciliacao,
     dePara: cpc.dePara, medidas: cpc.medidas, politica: cpc.politica,
@@ -469,7 +484,7 @@ export default function App() {
             {aba === "dre" && temDados && (
               <EtapaDRE
                 dre={cls.dre} empresa={empresa} cnpj={cnpj} periodo={periodo}
-                nomes={fontes.nomesEfetivos} resumo={fontes.resumo}
+                nomes={fontes.nomesEfetivos} rotulos={rot.rotulos} resumo={fontes.resumo}
                 detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
                 onBaixarCSV={() => baixarCSV({ ...ctxArquivo, dre: cls.dre })}
                 onBaixarExcel={() => baixarExcel({ ...ctxArquivo, dre: cls.dre, dresPorCompetencia: cls.dresPorBalancete })}
@@ -488,6 +503,17 @@ export default function App() {
                 onCategoriaConta={cpc.definirCategoria}
                 onModalidade={cls.definirModalidade}
                 onLimparCategorias={cpc.limparCategorias}
+                catalogo={rot.catalogo} rotulos={rot.rotulos} nomes={fontes.nomesEfetivos}
+                editor={{
+                  renomear: rot.renomear, restaurarNomes: rot.restaurarNomes,
+                  adicionarModalidade: rot.adicionarModalidade,
+                  renomearModalidade: rot.renomearModalidade,
+                  definirTermos: rot.definirTermos,
+                  removerModalidade: rot.removerModalidade,
+                  moverModalidade: rot.moverModalidade,
+                  restaurarCatalogo: rot.restaurarCatalogo,
+                  quantosRotulos: rot.quantosRotulos,
+                }}
                 onBaixarCSV={() => baixarCSVDeParaCompleto(deParaLinhas, ctxArquivo)}
                 onBaixarExcel={() => baixarExcelDePara(deParaLinhas, placarDePara, porGrupo(deParaLinhas), ctxArquivo)}
               />
@@ -512,7 +538,7 @@ export default function App() {
             )}
 
             {aba === "comparativo" && temDados && (
-              <EtapaComparativo dresPorCompetencia={cls.dresPorBalancete} />
+              <EtapaComparativo dresPorCompetencia={cls.dresPorBalancete} rotulos={rot.rotulos} />
             )}
 
             {aba === "cpc51" && temDados && (
@@ -520,7 +546,8 @@ export default function App() {
                 dre={cls.dre} dre51={cpc.dre51} conciliacao={cpc.conciliacao} mistas={cpc.mistas}
                 cobertura={cpc.cobertura} politica={cpc.politica} categoriaPorConta={cpc.categoriaConta}
                 contasResultado={cls.contasResultado} grupoDe={cls.grupoDe} categoriaDe={cpc.categoriaDe}
-                nomes={fontes.nomesEfetivos} empresa={empresa} cnpj={cnpj} periodo={periodo}
+                nomes={fontes.nomesEfetivos} rotulos={rot.rotulos}
+                empresa={empresa} cnpj={cnpj} periodo={periodo}
                 detalhado={detalhado} onToggleDetalhado={() => setDetalhado(!detalhado)}
                 medidas={cpc.medidas}
                 onPolitica={cpc.setPolitica}
