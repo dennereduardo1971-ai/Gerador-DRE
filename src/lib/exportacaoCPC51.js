@@ -174,7 +174,21 @@ export async function montarWorkbookCPC51(ctx) {
       marcarSubtotal(wsDet, row.number, COLS_DET.length);
       return;
     }
-    const contas = dre51.cat[l.cat]?.grupos.find((g) => g.id === l.id)?.contas || [];
+    /* A FAIXA DE MODALIDADE ABRE NAS CONTAS DELA, NÃO NAS DO GRUPO.
+       `l.id` é o id do GRUPO tanto na linha do tópico quanto na faixa
+       (Presencial / EAD / ...), então buscar só por ele fazia o `+` da
+       faixa abrir a lista inteira do grupo: dentro de "Presencial"
+       apareciam as contas de EAD, e vice-versa. O total da faixa sempre
+       esteve certo — era a composição que não fechava com ele, que é o
+       tipo de erro que faz um contador parar de confiar no arquivo.
+
+       Pelo mesmo motivo o tópico DIVIDIDO não abre mais em conta
+       nenhuma: quem lista as contas dele são as faixas logo abaixo, e
+       listar nos dois lugares mostraria o mesmo saldo duas vezes. */
+    const grupo = dre51.cat[l.cat]?.grupos.find((g) => g.id === l.id);
+    if (!grupo) return;
+    if (l.t === "l" && grupo.dividido) return;
+    const contas = (l.mod ? grupo.porModalidade[l.mod]?.contas : grupo.contas) || [];
     if (!contas.length) return;
     marcarSubtotal(wsDet, row.number, COLS_DET.length); // o tópico é o "cabeçalho" das contas abaixo
     const primeira = wsDet.rowCount + 1;
