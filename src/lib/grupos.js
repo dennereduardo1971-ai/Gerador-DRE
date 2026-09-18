@@ -21,8 +21,13 @@ export const GRUPOS = [
   { id: "DEPRECIACAO", nome: "Depreciação / Amortização", sinal: -1 },
   { id: "PROVISOES_CONTINGENCIAS", nome: "Provisões / Reversões Contingências", sinal: -1 },
   { id: "PROVISOES_PCLD", nome: "Provisões / Reversões PCLD", sinal: -1 },
-  { id: "REC_FIN", nome: "Receitas Financeiras", sinal: 1 },
-  { id: "DESP_FIN", nome: "Despesas Financeiras", sinal: -1 },
+  /* "vinculadas às operações" é o nome que a instituição usa na DRE que
+     assina: diz que este financeiro nasce da operação de ensino, e não de
+     estrutura de capital — que é exatamente a separação que o CPC 51 vai
+     exigir em 2027 (ver `cpc51.js`). Como todo nome deste app, é
+     renomeável na tela sem commit; aqui está só o de fábrica. */
+  { id: "REC_FIN", nome: "Receitas Financeiras vinculadas às operações", sinal: 1 },
+  { id: "DESP_FIN", nome: "Despesas Financeiras vinculadas às operações", sinal: -1 },
   { id: "OUTRAS_REC", nome: "Receitas Não Operacionais", sinal: 1 },
   { id: "OUTRAS_DESP", nome: "Despesas Não Operacionais", sinal: -1 },
   { id: "IRPJ_CSLL", nome: "IRPJ e CSLL", sinal: -1 },

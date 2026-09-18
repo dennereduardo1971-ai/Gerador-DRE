@@ -104,8 +104,13 @@ const ROTULO_GRUPO = {
   "CUSTOS DOS SERVIÇOS VENDIDOS": "CUSTOS",
   "Despesas com Fopag": "DESP_FOPAG",
   "Despesas Administrativas": "DESP_ADM",
+  /* Os rótulos são os da DRE OFICIAL, não os do app: é a planilha dela
+     que este mapa lê. As duas grafias entram porque a linha do financeiro
+     aparece nos dois jeitos conforme a versão do arquivo. */
   "Despesas Financeiras": "DESP_FIN",
   "Receitas Financeiras": "REC_FIN",
+  "Despesas Financeiras vinculadas às operações": "DESP_FIN",
+  "Receitas Financeiras vinculadas às operações": "REC_FIN",
 };
 const alvoPorMes = {};
 for (const [comp, col] of Object.entries(COL_MES)) {

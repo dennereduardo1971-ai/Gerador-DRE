@@ -319,8 +319,8 @@ describe("o código da linha e a categoria de cada linha", () => {
 
     // operacional é a 1ª categoria da norma; investimento a 2ª, e assim por diante
     expect(cods["Receita Bruta com Mensalidades"]).toBe("1.1");
-    expect(cods["Receitas Financeiras"]).toBe("2.1");
-    expect(cods["Despesas Financeiras"]).toBe("3.1");
+    expect(cods["Receitas Financeiras vinculadas às operações"]).toBe("2.1");
+    expect(cods["Despesas Financeiras vinculadas às operações"]).toBe("3.1");
     expect(cods["IRPJ e CSLL"]).toBe("4.1");
     // dentro do bloco a numeração é contígua e na ordem da demonstração
     const operacionais = itens.filter((i) => i.cod && i.cat === "OPERACIONAL").map((i) => i.cod);

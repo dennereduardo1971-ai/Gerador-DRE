@@ -125,6 +125,14 @@ com zero rolagem horizontal, tema escuro) e workbook do CPC 51 gerado e
 **relido por `exceljs`** — cada faixa abrindo só nas contas dela, zero
 faixa "Comum".
 
+**Renomeadas de fábrica:** "Receitas Financeiras" e "Despesas
+Financeiras" passaram a "… vinculadas às operações" em `grupos.js`, a
+pedido do Denner — é o nome da DRE que a instituição assina, e diz que
+este financeiro nasce da operação de ensino, não de estrutura de capital
+(a mesma separação que o CPC 51 vai exigir). `validar.mjs` passou a
+aceitar as DUAS grafias na leitura da DRE oficial, para não zerar essas
+duas linhas se a planilha vier com a redação nova.
+
 **Conferido contra o arquivo REAL:** Denner mandou o balancete de 06/2026
 e o plano de contas (1.081 contas). Os termos do catálogo acertam o plano
 dele: das contas de resultado do grupo 3, o nome identifica 35 como

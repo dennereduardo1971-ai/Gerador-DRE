@@ -8,6 +8,7 @@ Receita Líquida = Receita Bruta − Deduções (Bolsas + Prouni + Devoluções 
 Resultado Operacional Bruto = Receita Líquida − Custos
 Despesas Operacionais = Fopag + Administrativas + Depreciação + Provisões
 Resultado Financeiro = Receitas Financeiras − Despesas Financeiras
+(as duas se chamam "… vinculadas às operações" de fábrica — ver `NOME_GRUPO`)
 Resultado Operacional = Resultado Operacional Bruto − Despesas Operacionais + Resultado Financeiro
 Não Operacional = Outras Receitas − Outras Despesas
 Antes do IR = Resultado Operacional + Não Operacional
