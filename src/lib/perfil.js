@@ -14,9 +14,20 @@
 
 import { GRUPOS } from "./grupos.js";
 import { IDS_CATEGORIA, POLITICA_PADRAO } from "./cpc51.js";
-import { IDS_MODALIDADE } from "./modalidade.js";
+import { CATALOGO_PADRAO, normalizarCatalogo } from "./modalidade.js";
+import { ROTULOS_VAZIOS, normalizarRotulos, quantosRotulos } from "./rotulos.js";
 
-/* Versão 4: o perfil leva também a MODALIDADE decidida à mão (Presencial
+/* Versão 5: o perfil leva o CATÁLOGO DE MODALIDADES (a lista que o
+ * usuário criou: nomes e termos de cada faixa) e os APELIDOS — o nome que
+ * ele deu a cada conta, a cada linha da DRE e a cada categoria do CPC 51.
+ *
+ * Continua valendo a regra que existe desde a primeira versão: só
+ * DECISÃO e TEXTO, nenhum valor. O perfil segue podendo ser versionado no
+ * Git, mandado por e-mail ou anexado numa conversa sem carregar número de
+ * cliente nenhum — e é assim que o trabalho de renomear 200 contas deixa
+ * de ser descartável.
+ *
+ * Versão 4: o perfil leva também a MODALIDADE decidida à mão (Presencial
  * / EAD / Comum). Continua sendo decisão, não valor — a mesma razão de
  * o arquivo poder ser versionado e mandado por e-mail. Só entram as
  * contas corrigidas na mão: o que o nome do plano de contas já declara
@@ -38,17 +49,16 @@ import { IDS_MODALIDADE } from "./modalidade.js";
  * chegam vazios. Quem separou juros de mora de rendimento de aplicação
  * em janeiro não deve ter de refazer isso em fevereiro — e essa era a
  * razão de o perfil existir desde o início. */
-const VERSAO = 4;
+const VERSAO = 5;
 const IDS_VALIDOS = new Set(GRUPOS.map((g) => g.id));
 const CATEGORIAS_VALIDAS = new Set(IDS_CATEGORIA);
-const MODALIDADES_VALIDAS = new Set(IDS_MODALIDADE);
 
 /** Monta o objeto do perfil a partir do estado atual da classificação.
  *  `classif` são as escolhas manuais; `nomes`, o plano de contas
  *  importado. Só entram contas com grupo reconhecido. */
 export function montarPerfil({
   nome, classif = {}, nomes = {}, categorias = {}, politica, medidas = [], fiscal = null,
-  modalidades = {},
+  modalidades = {}, catalogoModalidades = CATALOGO_PADRAO, rotulos = ROTULOS_VAZIOS,
 }) {
   const contas = {};
   for (const [conta, grupo] of Object.entries(classif)) {
@@ -58,9 +68,14 @@ export function montarPerfil({
   for (const [conta, categoria] of Object.entries(categorias)) {
     if (CATEGORIAS_VALIDAS.has(categoria)) cats[conta] = categoria;
   }
+  /* A modalidade decidida à mão é validada contra o CATÁLOGO do próprio
+     perfil, não contra uma lista fixa: quem criou "Técnico" e classificou
+     30 contas nele não pode perder as 30 ao salvar. */
+  const catalogo = normalizarCatalogo(catalogoModalidades);
+  const validas = new Set(catalogo.map((m) => m.id));
   const mods = {};
   for (const [conta, modalidade] of Object.entries(modalidades)) {
-    if (MODALIDADES_VALIDAS.has(modalidade)) mods[conta] = modalidade;
+    if (validas.has(modalidade)) mods[conta] = modalidade;
   }
   return {
     formato: "gerador-dre/perfil",
@@ -71,6 +86,8 @@ export function montarPerfil({
     nomes,
     categorias: cats,
     modalidades: mods,
+    catalogoModalidades: catalogo,
+    rotulos: normalizarRotulos(rotulos),
     politica: { ...POLITICA_PADRAO, ...politica },
     medidas,
     /* Só decisão, nunca valor. `fiscal.params` e `fiscal.mapaTributos`
@@ -110,11 +127,20 @@ export function lerPerfil(texto) {
     else ignoradas++;
   }
 
+  /* Perfil versão 4 ou anterior não traz catálogo: cai no padrão, que é
+     onde as modalidades daquela época (Presencial, EAD, residual) moram —
+     as decisões continuam válidas. */
+  const catalogoModalidades = normalizarCatalogo(
+    dados.catalogoModalidades?.length ? dados.catalogoModalidades : CATALOGO_PADRAO
+  );
+  const validas = new Set(catalogoModalidades.map((m) => m.id));
   const modalidades = {};
   for (const [conta, modalidade] of Object.entries(dados.modalidades || {})) {
-    if (MODALIDADES_VALIDAS.has(modalidade)) modalidades[conta] = modalidade;
+    if (validas.has(modalidade)) modalidades[conta] = modalidade;
     else ignoradas++;
   }
+
+  const rotulos = normalizarRotulos(dados.rotulos);
 
   /* Medida sem ajuste nenhum é igual ao próprio subtotal do CPC 51 — não
      é MPDA. Entra a validação estrutural mínima aqui, na leitura do
@@ -134,6 +160,12 @@ export function lerPerfil(texto) {
       nomes: dados.nomes && typeof dados.nomes === "object" ? dados.nomes : {},
       categorias,
       modalidades,
+      catalogoModalidades,
+      rotulos,
+      /* Quantos apelidos vieram — o número que a tela mostra ao aplicar,
+         porque "perfil carregado" sem dizer o que ele trouxe é exatamente
+         o que faz alguém aplicar o arquivo errado sem perceber. */
+      quantosRotulos: quantosRotulos(rotulos),
       politica: dados.politica && typeof dados.politica === "object" ? dados.politica : null,
       medidas,
     },

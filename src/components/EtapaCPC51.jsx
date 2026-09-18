@@ -18,6 +18,7 @@ import { Fragment } from "react";
 import { brl, pct } from "../lib/formato.js";
 import { Cabecalho, Linha, Secao } from "./LinhaDRE.jsx";
 import { montarLinhas51 } from "../lib/linhasCPC51.js";
+import { nomeDaConta } from "../lib/rotulos.js";
 import { CATEGORIAS } from "../lib/cpc51.js";
 import { FASES, diasPara } from "../lib/cronograma51.js";
 import { CategoriasCPC51 } from "./CategoriasCPC51.jsx";
@@ -27,7 +28,7 @@ import { MedidasMPDA } from "./MedidasMPDA.jsx";
  *  `Detalhe` da DRE tradicional porque lá o valor é multiplicado pelo
  *  sinal do grupo; aqui o valor JÁ é o saldo com sinal contábil, e
  *  multiplicar de novo inverteria despesa e receita. */
-function DetalheCategoria({ grupo, nomes, base, mostrar, mod = null }) {
+function DetalheCategoria({ grupo, nomes, base, mostrar, mod = null, rotulos = null }) {
   if (!mostrar) return null;
   const contas = mod ? grupo.porModalidade[mod].contas : grupo.contas;
   return contas.slice(0, 25).map((c) => (
@@ -35,7 +36,7 @@ function DetalheCategoria({ grupo, nomes, base, mostrar, mod = null }) {
       key={grupo.id + (mod || "") + c.conta}>
       <div className="lbl">
         <span className="code">{c.conta}</span>{" "}
-        {nomes[c.conta] || (c.historico || "").trim().split(",")[0].slice(0, 42)}
+        {nomeDaConta(c.conta, nomes, rotulos, c.historico)}
       </div>
       <div className="canal" />
       <div className={"val " + (c.val < 0 ? "neg" : "")}>
@@ -48,13 +49,13 @@ function DetalheCategoria({ grupo, nomes, base, mostrar, mod = null }) {
 
 export function EtapaCPC51({
   dre, dre51, conciliacao, mistas, cobertura, politica, categoriaPorConta,
-  contasResultado, grupoDe, categoriaDe, nomes, empresa, cnpj, periodo,
+  contasResultado, grupoDe, categoriaDe, nomes, rotulos = null, empresa, cnpj, periodo,
   detalhado, onToggleDetalhado, medidas, onPolitica, onCategoriaConta, onLimparCategorias,
   onAdicionarMedida, onRemoverMedida, onAjusteMedida, onRemoverAjuste,
   onBaixarExcel, onBaixarDePara, onBaixarNota, onIrAoPlano,
 }) {
   const base = dre.receitaLiq || 1;
-  const { itens, escala } = montarLinhas51(dre51);
+  const { itens, escala } = montarLinhas51(dre51, rotulos);
   const gruposPorId = {};
   Object.values(dre51.cat).forEach((c) => c.grupos.forEach((g) => (gruposPorId[`${c.id}|${g.id}`] = g)));
 
@@ -140,7 +141,7 @@ export function EtapaCPC51({
                 escala={escala} inicio={it.inicio} fim={it.fim} nivel={it.nivel} />
               {grupo && detalharAqui && (
                 <DetalheCategoria grupo={grupo} mod={it.mod || null} nomes={nomes}
-                  base={base} mostrar={detalhado} />
+                  rotulos={rotulos} base={base} mostrar={detalhado} />
               )}
             </Fragment>
           );

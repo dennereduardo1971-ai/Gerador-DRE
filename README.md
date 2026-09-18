@@ -56,12 +56,35 @@ E, em paralelo ao fluxo:
   prova de que o lucro líquido não muda, e um plano de ação com o
   cronograma de implementação (ver seção abaixo).
 
+## Nomes: tudo que está escrito, você muda
+
+Nome de conta, nome de linha da DRE, nome de seção, de subtotal, das
+categorias do CPC 51 e das modalidades — tudo é editável na aba
+**De-Para** (o nome da conta na própria linha; o resto no painel
+"Nomes", no topo). O que você digita aparece na tela, na impressão, no
+Excel e no CSV.
+
+Duas regras:
+
+- **Renomear é aparência.** A classificação automática continua lendo o
+  nome original do plano de contas, então encurtar um nome nunca move a
+  conta de grupo nem de modalidade.
+- **Valor não se edita.** O número vem do balancete; não há campo para
+  digitá-lo, e não deve haver.
+
+As edições viajam no **perfil** salvo na etapa Classificar — junto das
+decisões de classificação, e sem nenhum valor dentro.
+
 ## Presencial e EAD dentro da mesma DRE
 
 Cada linha de grupo pode abrir em até três faixas — Presencial, EAD e
 Comum / não segregado — na tela, na impressão, no Excel, no CSV, na
 Comparativa e na demonstração do CPC 51.
 
+- **As modalidades são suas.** De fábrica vêm Presencial, EAD e
+  Médio / Fundamental, mais a faixa residual — mas você cria, renomeia,
+  reordena e remove faixas no De-Para, e escreve os termos que
+  identificam cada uma no nome da conta.
 - **De onde vem a modalidade:** do nome da conta no plano de contas e,
   se ele não disser nada, do nome da conta-síntese acima dela (a mais
   próxima vence). "Semipresencial" e "a distância" contam como EAD.
@@ -289,7 +312,8 @@ src/
     classify.js        # sugestão automática de classificação e montagem da DRE
     grupos.js          # os grupos da DRE e o sinal de cada um
     linhasDRE.js       # a estrutura da DRE como dados (rótulos, sinais, cascata)
-    modalidade.js      # o terceiro eixo: Presencial / EAD / Comum e a quebra de cada linha
+    modalidade.js      # o terceiro eixo: o catálogo de modalidades e a quebra de cada linha
+    rotulos.js         # os apelidos: conta, grupo, linha e categoria — aparência, nunca classificação
     balancete.js       # balancete de verificação hierárquico: monta a DRE sozinho
     cpc51.js           # as cinco categorias do CPC 51, a política de julgamento e a conciliação
     linhasCPC51.js     # a demonstração do CPC 51 como dados (mesma forma de linhasDRE.js)

@@ -7,7 +7,7 @@ import { lerPlano } from "../lib/planoPerfil.js";
 export function EtapaClassificar({
   grupos1, digitosResultado, resultadoManual, onResultadoManual,
   contasResultado, grupoDe, tocadas, nomes, busca, onBusca,
-  onClassificar, onImportarPlano, onGerarDRE, onLimparManuais, manuais = 0,
+  onClassificar, onImportarPlano, onGerarDRE, onLimparManuais, manuais = 0, decisoes = 0,
   avisoPerfil, onAvisoPerfil, onSalvarPerfil, onAplicarPerfil, onAplicarPlano, planoAtivo,
 }) {
   const [buscaLocal, setBuscaLocal] = useState(busca);
@@ -95,8 +95,14 @@ export function EtapaClassificar({
                histórico. Confira grupo por grupo antes de gerar a DRE.</>}
         </p>
         <div className="row">
-          <button className="btn ghost" onClick={onSalvarPerfil} disabled={!manuais}>
-            Salvar perfil{manuais ? ` (${manuais} contas)` : ""}
+          {/* O perfil leva MAIS que reclassificação: modalidade decidida
+              à mão, apelidos e o catálogo de modalidades. Enquanto este
+              botão olhava só `manuais`, quem tinha renomeado 200 contas e
+              não mexido em grupo nenhum não conseguia baixar o próprio
+              trabalho — e o perfil é justamente o caminho de levar isso
+              para o mês seguinte ou para outra pessoa. */}
+          <button className="btn ghost" onClick={onSalvarPerfil} disabled={!decisoes}>
+            Salvar perfil{decisoes ? ` (${decisoes} decisões)` : ""}
           </button>
           <button className="btn ghost" onClick={() => perfilRef.current?.click()}>
             Carregar perfil

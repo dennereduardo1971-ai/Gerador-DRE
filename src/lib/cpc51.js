@@ -35,7 +35,8 @@
  */
 
 import { GRUPOS, NOME_GRUPO } from "./grupos.js";
-import { blocosVazios, faixasDoGrupo } from "./modalidade.js";
+import { CATALOGO_PADRAO, blocosVazios, faixasDoGrupo } from "./modalidade.js";
+import { nomeDaCategoria51, nomeDaConta, nomeDoGrupo } from "./rotulos.js";
 
 export const CATEGORIAS = [
   {
@@ -226,6 +227,8 @@ const ordemGrupo = Object.fromEntries(GRUPOS.map((g, i) => [g.id, i]));
  *  essa soma direta que garante que o lucro líquido seja idêntico ao da
  *  estrutura atual. */
 export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe = () => "COMUM") {
+  // Mesmo catálogo da DRE atual, pela mesma razão — ver `montarDRE`.
+  const catalogo = modalidadeDe.catalogo || CATALOGO_PADRAO;
   const cat = {};
   CATEGORIAS.forEach((c) => (cat[c.id] = { id: c.id, nome: c.nome, total: 0, grupos: [] }));
   const porGrupo = {}; // categoria|grupo -> bloco
@@ -242,7 +245,7 @@ export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe 
     if (!porGrupo[chave]) {
       porGrupo[chave] = {
         id: grupo, nome: NOME_GRUPO[grupo] || grupo, total: 0, contas: [],
-        porModalidade: blocosVazios(),
+        porModalidade: blocosVazios(catalogo),
       };
       cat[categoria].grupos.push(porGrupo[chave]);
     }
@@ -431,7 +434,7 @@ export function contasMistas(contasResultado, { grupoDe, categoriaDe, sugestaoTe
  *  A coluna `origem` é o que transforma a planilha em documento de
  *  auditoria: sem ela, ninguém sabe se aquela categoria foi escolhida
  *  por alguém ou herdada do padrão do grupo. */
-export function deParaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO, nomes = {}, plano = null }) {
+export function deParaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, politica = POLITICA_PADRAO, nomes = {}, plano = null, rotulos = null }) {
   return contasResultado
     .map((c) => {
       const grupo = grupoDe(c.conta);
@@ -440,11 +443,11 @@ export function deParaCPC51(contasResultado, { grupoDe, categoriaPorConta = {}, 
       const origem = manual ? "decisão manual" : categoriaDoPlano(plano, c.conta) ? "definição do plano" : "padrão do grupo";
       return {
         conta: c.conta,
-        descricao: nomes[c.conta] || "",
+        descricao: nomeDaConta(c.conta, nomes, rotulos, c.historico),
         grupo,
-        grupoNome: NOME_GRUPO[grupo] || grupo,
+        grupoNome: nomeDoGrupo(grupo, rotulos),
         categoria,
-        categoriaNome: categoria ? NOME_CATEGORIA[categoria] : "Não entra na DRE",
+        categoriaNome: categoria ? nomeDaCategoria51(categoria, rotulos) : "Não entra na DRE",
         origem,
         saldo: c.saldo,
       };

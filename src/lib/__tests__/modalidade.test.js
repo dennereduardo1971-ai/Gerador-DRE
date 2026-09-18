@@ -4,6 +4,8 @@ import { montarLinhas } from "../linhasDRE.js";
 import { fazerCategoriaDe, montarDRE51 } from "../cpc51.js";
 import { montarLinhas51 } from "../linhasCPC51.js";
 import { montarDePara, resumoDePara } from "../depara.js";
+import { conciliar, deParaCPC51, POLITICA_PADRAO } from "../cpc51.js";
+import { montarWorkbookCPC51 } from "../exportacaoCPC51.js";
 import {
   fazerModalidadeDe, faixasDoGrupo, modalidadePorNome, origemModalidade,
   rotuloPorConta, sugerirModalidades,
@@ -305,17 +307,90 @@ describe("o De-Para mostra a modalidade e de onde ela veio", () => {
     expect(por["4120101"].origemModalidade).toBe("sem modalidade");
   });
 
-  it("comum NÃO conta como pendência de parametrização", () => {
+  it("a faixa residual NÃO conta como pendência de parametrização", () => {
     /* Despesa da instituição inteira é comum de verdade: marcá-la como
        trabalho a fazer encheria o placar de tarefa que não existe. */
     expect(por["4120101"].pendente).toBe(false);
-    expect(resumoDePara(linhas).comum).toBe(2);
+    expect(resumoDePara(linhas).semModalidade).toBe(2);
   });
 
-  it("o placar conta as contas segregadas", () => {
+  it("o placar conta por faixa, sem nome de modalidade cravado", () => {
     const r = resumoDePara(linhas);
-    expect(r.presencial).toBe(2);
-    expect(r.ead).toBe(3); // as duas do plano + a corrigida à mão
+    expect(r.porModalidade.PRESENCIAL).toBe(2);
+    expect(r.porModalidade.EAD).toBe(3); // as duas do plano + a corrigida à mão
+    expect(r.segregadas).toBe(5);
     expect(r.manuaisModalidade).toBe(1);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * O Excel detalhado — abrir a faixa tem que mostrar as contas DELA.
+ * ------------------------------------------------------------------ */
+describe("no Excel do CPC 51, a faixa abre nas contas da própria modalidade", () => {
+  const categoriaDe = fazerCategoriaDe({ grupoDe });
+
+  const abrirAba = async () => {
+    const dre = dreCom();
+    const dre51 = montarDRE51(CONTAS, grupoDe, categoriaDe, modalidadeDe);
+    const wb = await montarWorkbookCPC51({
+      dre, dre51,
+      conciliacao: conciliar(dre, dre51, CONTAS, grupoDe, categoriaDe),
+      dePara: deParaCPC51(CONTAS, { grupoDe, categoriaPorConta: {}, politica: POLITICA_PADRAO, nomes: NOMES }),
+      medidas: [], politica: POLITICA_PADRAO, empresa: "Exemplo",
+      periodo: "junho de 2026", nomes: NOMES,
+    });
+    const ws = wb.getWorksheet("DR_CPC_51_Detalhada");
+
+    /* Reconstrói a árvore como o Excel a desenha: cada linha de nível 0
+       é um tópico ou uma faixa, e as de nível 1 penduradas embaixo são
+       as contas que o `+` dela abre. */
+    const blocos = [];
+    ws.eachRow((row) => {
+      const nivel = row.outlineLevel || 0;
+      if (nivel === 1) {
+        if (blocos.length) blocos[blocos.length - 1].contas.push(String(row.getCell(2).value));
+        return;
+      }
+      blocos.push({ rotulo: String(row.getCell(3).value), valor: row.getCell(4).value, contas: [] });
+    });
+    return blocos;
+  };
+
+  it("dentro de Presencial não aparece conta de EAD — o defeito de 18/09/2026", async () => {
+    /* O total da faixa sempre esteve certo; era a lista aberta pelo `+`
+       que trazia o grupo inteiro, porque a faixa carrega o id do GRUPO.
+       Quem confere somando a coluna via a composição estourar o total. */
+    const blocos = await abrirAba();
+    const presencial = blocos.find((b) => b.rotulo === "Presencial" && b.contas.length);
+    expect(presencial.contas).toEqual(["3110101"]);
+
+    const ead = blocos.find((b) => b.rotulo === "EAD" && b.contas.length);
+    expect(ead.contas).toEqual(["3110102"]);
+    expect(ead.contas).not.toContain("3110101");
+
+    // e a conta sem modalidade declarada cai na faixa residual, sozinha
+    const comum = blocos.find((b) => b.rotulo === "Comum / não segregado" && b.contas.length);
+    expect(comum.contas).toEqual(["3110103"]);
+  });
+
+  it("as contas abertas somam exatamente o valor da faixa", async () => {
+    const blocos = await abrirAba();
+    const saldos = Object.fromEntries(CONTAS.map((c) => [c.conta, c.saldo]));
+    blocos.filter((b) => b.contas.length).forEach((b) => {
+      const soma = b.contas.reduce((s, conta) => s + (saldos[conta] ?? 0), 0);
+      expect(soma).toBeCloseTo(b.valor, 2);
+    });
+  });
+
+  it("o tópico dividido não repete as contas que as faixas já listaram", async () => {
+    const blocos = await abrirAba();
+    const topico = blocos.find((b) => b.rotulo === "Receita Bruta com Mensalidades");
+    expect(topico.contas).toEqual([]);
+  });
+
+  it("tópico sem divisão continua abrindo nas contas dele", async () => {
+    const blocos = await abrirAba();
+    const adm = blocos.find((b) => b.rotulo === "Despesas Administrativas");
+    expect(adm.contas.sort()).toEqual(["4120101", "4120102"]);
   });
 });

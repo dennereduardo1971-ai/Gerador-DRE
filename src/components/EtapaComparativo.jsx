@@ -44,14 +44,14 @@ const LINHAS_TOPO = [
  * tópicos: um Map por rótulo guardaria só a última e repetiria o valor
  * dela em todas as outras — erro silencioso, porque o número existe e
  * parece plausível. `chave` é `<grupo>` ou `<grupo>|<modalidade>`. */
-function valoresPorLinha(dre) {
-  const { itens } = montarLinhas(dre);
+function valoresPorLinha(dre, rotulos) {
+  const { itens } = montarLinhas(dre, rotulos);
   const mapa = new Map();
   itens.forEach((it) => mapa.set(it.chave ?? it.lbl, it.val));
   return mapa;
 }
 
-export function EtapaComparativo({ dresPorCompetencia }) {
+export function EtapaComparativo({ dresPorCompetencia, rotulos = null }) {
   if (dresPorCompetencia.length < 2) {
     return (
       <div className="empty">
@@ -69,11 +69,11 @@ export function EtapaComparativo({ dresPorCompetencia }) {
 
   const colunas = dresPorCompetencia.map((d) => ({
     competencia: d.competencia,
-    valores: valoresPorLinha(d.dre),
+    valores: valoresPorLinha(d.dre, rotulos),
     base: d.dre.receitaLiq || 1,
   }));
 
-  const { itens } = montarLinhas(dresPorCompetencia[dresPorCompetencia.length - 1].dre);
+  const { itens } = montarLinhas(dresPorCompetencia[dresPorCompetencia.length - 1].dre, rotulos);
   const linhas = itens.filter((it) => it.t !== "cab");
 
   return (
@@ -123,7 +123,7 @@ export function EtapaComparativo({ dresPorCompetencia }) {
       <p className="hint">
         Uma coluna por competência. O percentual é a análise vertical do próprio mês — dá para
         comparar estrutura, não só tamanho. As linhas recuadas são a quebra do tópico acima
-        em Presencial, EAD e comum — elas somam o tópico, não se somam a ele.
+        por modalidade — elas somam o tópico, não se somam a ele.
       </p>
       <div className="scroll">
         <table className="tabela-larga dre-comparativa">

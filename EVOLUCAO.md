@@ -43,19 +43,19 @@ _Atualizado em 27/08/2026._
 
 | | |
 |---|---|
-| Testes | 298 (Vitest, 14 arquivos — `modalidade.test.js` entrou em 18/09/2026) |
+| Testes | 327 (Vitest, 15 arquivos — `modalidade.test.js` e `rotulos.test.js` entraram em 18/09/2026) |
 | Lint | `npx oxlint src/ fixtures/` — **zero avisos em tudo** (o ruído de `process` em `validar.mjs`, documentado desde agosto, saiu com um `overrides` no `.oxlintrc.json`) |
-| Bundle | app 408 kB (126 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
-| CSS | 32,0 kB (6,7 kB gzip) — zero classe órfã (conferido por script) |
-| Código | ~9.400 linhas de JS/JSX em `src/` (fora `__tests__/`) |
+| Bundle | app 420 kB (129 kB gzip) + `xlsx` 424 kB (leitura) + `exceljs` 930 kB/256 kB gzip (escrita) — os dois em chunk sob demanda |
+| CSS | 33,1 kB (6,9 kB gzip) — zero classe órfã (conferido por script) |
+| Código | ~10.100 linhas de JS/JSX em `src/` (fora `__tests__/`) |
 | Maiores arquivos | `App.jsx` (571), `balancete.js` (517), `cpc51.js` (494), `fiscal.js` (473) |
 | Contexto por sessão | `CLAUDE.md` 402 linhas / 22 kB (era 969 / 55 kB); `EVOLUCAO.md` 346 (era 890) |
 | Abas | 11 (eram 10; a Apuração entrou em 24/08/2026) |
 | Fonte de dados | **só o balancete de verificação** — o razão contábil saiu em 24/08/2026 |
 | Validação contra DRE real | `node fixtures/validar.mjs` — **não rodou nesta sessão** (arquivos reais gitignorados nesta máquina). O script foi REESCRITO contra os balancetes e não foi executado por ninguém ainda. |
 | Validação contra balancetes reais | 6 arquivos (fev–jun/2026 + 1 variante) conferidos em 20/08/2026, antes desta sessão. Nesta sessão, as 33 exceções de categoria do CPC 51 do IESB foram conferidas contra o Excel real de 25/08/2026 (ver Registro) — não é o `validar.mjs`, mas é a mesma disciplina: conferir contra dado real, não só contra o razão sintético. |
-| Excel conferido por lib independente | sim — `openpyxl` releu o De-Para e a Apuração gerados por `exceljs`, e também a aba DR_CPC_51_Detalhada nova (ver Registro) |
-| App rodado no navegador | sim — em 18/09/2026, com balancete FICTÍCIO gerado para a sessão: DRE, De-Para, tema escuro, 390px e `@media print` conferidos por captura de tela (Playwright + Chromium do ambiente) |
+| Excel conferido por lib independente | sim — em 18/09/2026 o workbook do CPC 51 foi gerado do balancete fictício e RELIDO por `exceljs`, conferindo que cada faixa abre só nas contas dela. Antes disso,  `openpyxl` releu o De-Para e a Apuração gerados por `exceljs`, e também a aba DR_CPC_51_Detalhada nova (ver Registro) |
+| App rodado no navegador | sim — em 18/09/2026, com balancete FICTÍCIO gerado para a sessão: DRE, De-Para, editor de nomes, tema escuro, 390px (zero rolagem horizontal, medido) e `@media print` conferidos por captura de tela (Playwright + Chromium do ambiente) |
 | Skills versionadas | 6 |
 | Agentes | 3 (`auditor-contabil`, `revisor-visual`, `arquiteto-erp`) — **nenhum rodou nesta sessão** |
 
@@ -76,6 +76,79 @@ arquitetura, armadilhas e um índice "quero mudar X → leia Y"; o detalhe
 de cada assunto mora num arquivo lido sob demanda.
 
 ## Registro
+
+### 18/09/2026 (continuação) — nomes editáveis, catálogo de modalidades e um defeito no Excel
+
+Denner abriu o Excel do CPC 51 com o arquivo real e achou o defeito: na
+aba `DR_CPC_51_Detalhada`, o `+` de "Presencial" abria contas de EAD e
+vice-versa. Causa: a faixa carrega o id do GRUPO, e o código buscava as
+contas só por ele. O total da faixa sempre esteve certo — a composição é
+que estourava. Corrigido em commit próprio, com quatro testes que leem o
+workbook gerado e remontam a árvore do Excel. **Foi regressão introduzida
+por mim na sessão anterior: eu tinha consertado a tela e esquecido esta
+aba.**
+
+Na mesma conversa vieram três pedidos que viraram uma coisa só: poder
+editar o nome das contas, transformar "Comum / não segregado" em
+"Médio/Fundamental" e, principalmente, **não depender de mim para mudar
+nome nenhum**.
+
+**Decisão estrutural: nome é a quarta camada, e não é eixo.**
+`rotulos.js` guarda apelidos em quatro eixos (conta, grupo, linha
+estrutural, categoria do CPC 51) e a regra é uma frase: renomear é
+APARÊNCIA. A classificação continua lendo o nome original do plano —
+senão encurtar "GRADUACAO EAD INSTITUCIONAL" moveria a conta de faixa sem
+ninguém pedir. Valor segue sem campo editável em lugar nenhum.
+
+**E a lista de modalidades virou DADO.** Bastou o primeiro uso real para
+aparecer Médio/Fundamental; técnico, pós e extensão viriam depois, cada um
+exigindo commit e publicação. Agora o usuário cria, renomeia, reordena e
+remove faixas, e escreve os termos que identificam cada uma no plano. A
+faixa residual não se remove (é o destino de aluguel, PIS/COFINS/ISS,
+depreciação) e não se rateia nada.
+
+O que foi feito:
+
+- `modalidade.js` reescrito como catálogo (`CATALOGO_PADRAO` com
+  Presencial, EAD, Médio / Fundamental e a residual), casamento por
+  palavra inteira com desempate pelo termo mais longo, e normalização que
+  tira acento e pontuação dos dois lados.
+- `rotulos.js` novo + ids para as linhas estruturais das duas
+  demonstrações (`LINHAS_ESTRUTURAIS`, `LINHAS_ESTRUTURAIS_51`). A linha
+  de grupo passou a ser `prefixo + nomeDoGrupo(id)`: o `( + )` é
+  estrutura e não se edita.
+- `useRotulos.js` (hook dono dos nomes e do catálogo) e `EditorNomes.jsx`
+  (painel no topo do De-Para). O nome da conta se edita na própria linha,
+  com o nome do plano à vista quando os dois diferem.
+- Apelidos e catálogo atravessam DRE, CPC 51, Comparativa, De-Para e as
+  três exportações; perfil subiu para a versão 5 levando os dois.
+
+**Achado ao fechar:** "Salvar perfil" habilitava só com reclassificação
+manual (`manuais`). Quem tivesse apenas renomeado — o caso que esta
+sessão acabou de criar — não conseguia baixar o próprio trabalho. O botão
+passou a contar TUDO que o perfil leva (grupo, modalidade, categoria,
+apelidos e catálogo) e ganhou um irmão dentro do painel de nomes, que é
+onde a pessoa está quando acaba de renomear.
+
+**Medido nesta sessão:** Vitest 327/327 (25 testes novos em
+`rotulos.test.js`, 4 no `modalidade.test.js`); `npx oxlint src/ fixtures/`
+zero avisos; build ok (app 420 kB, +12 kB; CSS +1,1 kB); app rodado no
+navegador com balancete FICTÍCIO — renomeei grupo, conta e faixa residual
+e vi as três mudanças chegarem na DRE; 390px sem rolagem horizontal
+(medido em 0 px); Excel do CPC 51 gerado e relido conferindo a
+composição de cada faixa.
+
+**NÃO validado:** `node fixtures/validar.mjs` continua sem rodar (esta
+máquina não tem os arquivos reais). Nada nesta sessão muda número — há
+teste travando isso —, mas quem confirma que os termos do catálogo
+acertam o plano do IESB é o balancete de verdade, na coluna Modalidade
+do De-Para.
+
+**Ficou de fora, de propósito:** rateio das comuns (inventaria número que
+a contabilidade não lançou) e renomear as frases compostas da
+conciliação do CPC 51 ("Reclassificado para X") e os rótulos do LALUR e
+da nota de MPDA — são sentenças montadas, não nomes de linha; se
+aparecerem numa entrega, entram pelo mesmo registro de apelidos.
 
 ### 18/09/2026 — a DRE se abre em Presencial / EAD / Comum
 

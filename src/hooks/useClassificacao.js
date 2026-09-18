@@ -20,7 +20,7 @@ import { fazerModalidadeDe, sugerirModalidades } from "../lib/modalidade.js";
  * coluna comparativa do CPC 51 leem dessa lista. Ela usa `grupoDe`, ou
  * seja, reclassificar uma conta corrige todas as colunas de uma vez.
  */
-export function useClassificacao({ contas, nomesEfetivos, planos, balancetes }) {
+export function useClassificacao({ contas, nomesEfetivos, planos, balancetes, catalogoModalidades }) {
   const [classif, setClassif] = useState({});
   const [tocadas, setTocadas] = useState({});
   const [resultadoManual, setResultadoManual] = useState({});
@@ -48,14 +48,22 @@ export function useClassificacao({ contas, nomesEfetivos, planos, balancetes }) 
     [classif, sugestao]
   );
 
+  /* A sugestão relê o plano a cada mudança do catálogo — é o que faz
+     criar a modalidade "Técnico" com o termo certo reclassificar as
+     contas na hora, sem clicar em conta nenhuma. E lê o nome ORIGINAL do
+     plano, nunca o apelido: renomear é aparência (ver `rotulos.js`). */
   const sugestaoModalidade = useMemo(
-    () => (contasResultado.length ? sugerirModalidades(contasResultado, nomesEfetivos) : {}),
-    [contasResultado, nomesEfetivos]
+    () => (contasResultado.length ? sugerirModalidades(contasResultado, nomesEfetivos, catalogoModalidades) : {}),
+    [contasResultado, nomesEfetivos, catalogoModalidades]
   );
 
   const modalidadeDe = useMemo(
-    () => fazerModalidadeDe({ modalidadePorConta: modalidade, sugestao: sugestaoModalidade }),
-    [modalidade, sugestaoModalidade]
+    () => fazerModalidadeDe({
+      modalidadePorConta: modalidade,
+      sugestao: sugestaoModalidade,
+      catalogo: catalogoModalidades,
+    }),
+    [modalidade, sugestaoModalidade, catalogoModalidades]
   );
 
   const dre = useMemo(

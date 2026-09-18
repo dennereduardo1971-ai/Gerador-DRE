@@ -18,7 +18,8 @@
  */
 
 import { montarLinhas51 } from "./linhasCPC51.js";
-import { CATEGORIAS, NOME_CATEGORIA, gruposParaRevisar } from "./cpc51.js";
+import { CATEGORIAS, gruposParaRevisar } from "./cpc51.js";
+import { nomeDaCategoria51, nomeDoGrupo } from "./rotulos.js";
 import { descricaoDaConta } from "./depara.js";
 import { calcularMPDA, notaMPDA } from "./mpda.js";
 import { matrizDRE, matrizLinhas, cabecalho, baixar, dec, neutralizarFormula } from "./exportacao.js";
@@ -38,8 +39,8 @@ const FORMATO_VALOR = FORMATO_MOEDA;
  *  nome da categoria; os subtotais que atravessam categorias (resultado
  *  antes do financiamento, antes dos tributos, das operações
  *  continuadas) são "Subtotal", e o resultado do período é "Final". */
-function rotuloCategoria(l) {
-  if (l.cat) return NOME_CATEGORIA[l.cat] || l.cat;
+function rotuloCategoria(l, rotulos) {
+  if (l.cat) return nomeDaCategoria51(l.cat, rotulos);
   return l.t === "final" ? "Final" : "Subtotal";
 }
 
@@ -79,7 +80,10 @@ export function baixarCSVDePara(dePara, ctx = {}) {
  *  precisar de DOM. */
 export async function montarWorkbookCPC51(ctx) {
   const ExcelJS = (await import("exceljs")).default;
-  const { dre, dre51, conciliacao, dePara, medidas = [], politica, empresa, nomes = {}, comparativo = null } = ctx;
+  const {
+    dre, dre51, conciliacao, dePara, medidas = [], politica, empresa, nomes = {},
+    comparativo = null, rotulos = null,
+  } = ctx;
   const wb = new ExcelJS.Workbook();
   wb.creator = "Gerador de DRE";
   wb.created = new Date();
@@ -100,7 +104,7 @@ export async function montarWorkbookCPC51(ctx) {
      A coluna de notas sai VAZIA de propósito: a referência da nota
      explicativa é decisão de quem redige as demonstrações, e preencher
      por conta própria seria inventar uma referência que não existe. */
-  const itens51 = montarLinhas51(dre51).itens;
+  const itens51 = montarLinhas51(dre51, rotulos).itens;
   const linhas51 = matrizLinhas(itens51, base);
   const rotuloPeriodo = ctx.periodo || "Período";
   const COLS_DRE51 = [
@@ -121,7 +125,7 @@ export async function montarWorkbookCPC51(ctx) {
   const cab1 = escreverCabecalhoTabela(ws, COLS_DRE51);
   linhas51.forEach((l) => {
     const row = ws.addRow([
-      rotuloCategoria(l), l.cod ?? null, l.lbl, l.val ?? null,
+      rotuloCategoria(l, rotulos), l.cod ?? null, l.lbl, l.val ?? null,
       comparativo ? comparativo.valores[l.chave] ?? null : null, l.av ?? null, null,
     ]);
     row.getCell(4).numFmt = FORMATO_VALOR;
@@ -167,19 +171,33 @@ export async function montarWorkbookCPC51(ctx) {
   escreverCabecalhoTabela(wsDet, COLS_DET);
   itens51.forEach((l) => {
     const av = l.val == null ? null : l.val / base;
-    const row = wsDet.addRow([rotuloCategoria(l), l.cod ?? null, l.lbl, l.val ?? null, av]);
+    const row = wsDet.addRow([rotuloCategoria(l, rotulos), l.cod ?? null, l.lbl, l.val ?? null, av]);
     row.getCell(4).numFmt = FORMATO_VALOR;
     row.getCell(5).numFmt = FORMATO_PCT;
     if (l.t === "secao" || l.t === "sub" || l.t === "final") {
       marcarSubtotal(wsDet, row.number, COLS_DET.length);
       return;
     }
-    const contas = dre51.cat[l.cat]?.grupos.find((g) => g.id === l.id)?.contas || [];
+    /* A FAIXA DE MODALIDADE ABRE NAS CONTAS DELA, NÃO NAS DO GRUPO.
+       `l.id` é o id do GRUPO tanto na linha do tópico quanto na faixa
+       (Presencial / EAD / ...), então buscar só por ele fazia o `+` da
+       faixa abrir a lista inteira do grupo: dentro de "Presencial"
+       apareciam as contas de EAD, e vice-versa. O total da faixa sempre
+       esteve certo — era a composição que não fechava com ele, que é o
+       tipo de erro que faz um contador parar de confiar no arquivo.
+
+       Pelo mesmo motivo o tópico DIVIDIDO não abre mais em conta
+       nenhuma: quem lista as contas dele são as faixas logo abaixo, e
+       listar nos dois lugares mostraria o mesmo saldo duas vezes. */
+    const grupo = dre51.cat[l.cat]?.grupos.find((g) => g.id === l.id);
+    if (!grupo) return;
+    if (l.t === "l" && grupo.dividido) return;
+    const contas = (l.mod ? grupo.porModalidade[l.mod]?.contas : grupo.contas) || [];
     if (!contas.length) return;
     marcarSubtotal(wsDet, row.number, COLS_DET.length); // o tópico é o "cabeçalho" das contas abaixo
     const primeira = wsDet.rowCount + 1;
     contas.forEach((c) => {
-      const rowC = wsDet.addRow([null, c.conta, descricaoDaConta(c, nomes), c.saldo, c.saldo / base]);
+      const rowC = wsDet.addRow([null, c.conta, descricaoDaConta(c, nomes, rotulos), c.saldo, c.saldo / base]);
       rowC.getCell(4).numFmt = FORMATO_VALOR;
       rowC.getCell(5).numFmt = FORMATO_PCT;
       // Recuo visual: a conta é sub-área do tópico de cima, não uma linha
@@ -197,7 +215,7 @@ export async function montarWorkbookCPC51(ctx) {
   /* Não é uma tabela de-para linha a linha, e não deveria ser: as duas
      estruturas têm linhas diferentes de propósito. O que se compara é o
      conjunto, e o que precisa bater é o último número de cada coluna. */
-  const linhasAtual = matrizDRE(dre);
+  const linhasAtual = matrizDRE(dre, rotulos);
   const altura = Math.max(linhasAtual.length, linhas51.length);
   const wsPar = wb.addWorksheet("DFs paralelas");
   definirLarguras(wsPar, [52, 18, 3, 62, 18]);
@@ -308,11 +326,12 @@ export async function montarWorkbookCPC51(ctx) {
   aplicarZebra(wsPol, cabJ.number + 1, wsPol.rowCount, 2);
   linhaEmBranco(wsPol);
   const cabCat = escreverCabecalhoTabela(wsPol, ["Categoria", "Definição"], { congelar: false });
-  CATEGORIAS.forEach((c) => wsPol.addRow([c.nome, c.descricao]));
+  CATEGORIAS.forEach((c) => wsPol.addRow([nomeDaCategoria51(c.id, rotulos), c.descricao]));
   aplicarZebra(wsPol, cabCat.number + 1, wsPol.rowCount, 2);
   linhaEmBranco(wsPol);
   const cabRev = escreverCabecalhoTabela(wsPol, ["Grupo que exige julgamento", "Categoria adotada", "Motivo"], { congelar: false });
-  gruposParaRevisar(politica).forEach((g) => wsPol.addRow([g.nome, NOME_CATEGORIA[g.categoria] || "", g.motivo]));
+  gruposParaRevisar(politica).forEach((g) =>
+    wsPol.addRow([nomeDoGrupo(g.id, rotulos), nomeDaCategoria51(g.categoria, rotulos), g.motivo]));
   aplicarZebra(wsPol, cabRev.number + 1, wsPol.rowCount, 3);
 
   return wb;

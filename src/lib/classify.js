@@ -5,7 +5,7 @@
  * depreciação, provisões, financeiro e não operacional). */
 
 import { GRUPOS, SINAL_GRUPO, ehCredora } from "./grupos.js";
-import { blocosVazios, faixasDoGrupo } from "./modalidade.js";
+import { CATALOGO_PADRAO, blocosVazios, faixasDoGrupo } from "./modalidade.js";
 import { escolherPlano, grupoPorPlano } from "./planoPerfil.js";
 import { PLANOS_EMBUTIDOS } from "./planos/iesb.js";
 
@@ -224,7 +224,12 @@ export function agruparPorDigito(contas) {
  * linha por linha. */
 export function montarDRE(contasResultado, grupoDe, modalidadeDe = () => "COMUM") {
   const bal = {};
-  GRUPOS.forEach((g) => (bal[g.id] = { total: 0, contas: [], porModalidade: blocosVazios() }));
+  /* O CATÁLOGO VEM COM O RESOLVEDOR (`modalidadeDe.catalogo`), não por
+     fora: é ele que diz quais faixas existem e como se chamam. Montar os
+     blocos pelo catálogo padrão enquanto o resolvedor usa outro faria a
+     faixa renomeada aparecer com o nome antigo — ou sumir. */
+  const catalogo = modalidadeDe.catalogo || CATALOGO_PADRAO;
+  GRUPOS.forEach((g) => (bal[g.id] = { total: 0, contas: [], porModalidade: blocosVazios(catalogo) }));
   contasResultado.forEach((c) => {
     const g = grupoDe(c.conta);
     const val = Math.abs(c.saldo);

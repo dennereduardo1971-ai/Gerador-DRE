@@ -65,3 +65,23 @@ quem quiser varrer as comuns atrás de uma que deveria estar segregada.
 As colunas da exportação são derivadas de `COLUNAS` / `COLUNAS_RESUMO`,
 nunca de índice cravado: a coluna de Modalidade entrou no meio do
 resumo e um `6` fixo passaria a formatar a célula de texto ao lado.
+
+
+## A tela onde se renomeia
+
+O De-Para acumulou um quarto papel: é onde se muda o NOME de tudo.
+
+- **O nome da conta** é um campo na própria linha, com o nome do plano
+  como `placeholder` e, quando os dois diferem, à vista embaixo ("no
+  plano: ..."). Campo vazio volta ao nome do plano.
+- **O resto** (modalidades e seus termos, nomes de grupo, seções,
+  subtotais e categorias do CPC 51) fica no painel `EditorNomes`, no topo
+  da tela, em blocos recolhíveis.
+
+Por que aqui e não na DRE: a DRE é a tela que se imprime e se assina, e
+campo de texto no meio dela convida a editar enquanto se confere — um
+clique errado vira rótulo trocado num documento que saiu para fora. O
+De-Para já era a tela de cadastro.
+
+Regra que não se afrouxa: **nenhum campo desta tela muda valor.** Ver
+`.claude/docs/nomes.md`.

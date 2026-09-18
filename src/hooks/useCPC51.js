@@ -25,7 +25,7 @@ import { comparativo51 } from "../lib/linhasCPC51.js";
  */
 export function useCPC51({
   contasResultado, grupoDe, dre, nomesEfetivos, aba, dresPorBalancete, periodoAtivo, plano,
-  modalidadeDe = () => "COMUM",
+  modalidadeDe = () => "COMUM", rotulos = null,
 }) {
   const [politica, setPolitica] = useState(POLITICA_PADRAO);
   const [categoriaConta, setCategoriaConta] = useState({});
@@ -70,8 +70,8 @@ export function useCPC51({
   );
 
   const dePara = useMemo(
-    () => deParaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica, nomes: nomesEfetivos, plano }),
-    [contasResultado, grupoDe, categoriaConta, politica, nomesEfetivos, plano]
+    () => deParaCPC51(contasResultado, { grupoDe, categoriaPorConta: categoriaConta, politica, nomes: nomesEfetivos, plano, rotulos }),
+    [contasResultado, grupoDe, categoriaConta, politica, nomesEfetivos, plano, rotulos]
   );
 
   /* A demonstração do CPC 51 de cada balancete carregado, para a coluna
@@ -87,8 +87,8 @@ export function useCPC51({
   );
 
   const comparativo = useMemo(
-    () => comparativo51(dres51PorPeriodo, periodoAtivo),
-    [dres51PorPeriodo, periodoAtivo]
+    () => comparativo51(dres51PorPeriodo, periodoAtivo, rotulos),
+    [dres51PorPeriodo, periodoAtivo, rotulos]
   );
 
   function definirCategoria(conta, categoria) {

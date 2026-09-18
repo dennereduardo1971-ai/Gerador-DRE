@@ -354,11 +354,16 @@ describe("a coluna comparativa só traz período anterior de verdade", () => {
     expect(comparativo51(serie(), "20260301|março de 2026")).toBe(null);
   });
 
-  it("traz o período imediatamente anterior, casado por rótulo", () => {
+  it("traz o período imediatamente anterior, casado pela CHAVE da linha", () => {
+    /* Chave, não rótulo: com a quebra por modalidade "Presencial" se
+       repete embaixo de vários grupos, e com os rótulos editáveis dois
+       períodos podem ter sido renomeados de formas diferentes. A chave
+       (`FINAL51_LIQUIDO`, `<categoria>|<grupo>`) não muda com nenhum dos
+       dois. */
     const comp = comparativo51(serie(), "20260601|junho de 2026");
     expect(comp.rotulo).toBe("maio de 2026");
     const { dre51 } = montar();
-    expect(comp.valores["( = ) Resultado Líquido do Período"]).toBeCloseTo(dre51.liquido / 2, 2);
+    expect(comp.valores.FINAL51_LIQUIDO).toBeCloseTo(dre51.liquido / 2, 2);
   });
 });
 

@@ -50,3 +50,22 @@ passar despercebido se a mesma lib relê o que ela mesma gravou errado.
 Leia de volta com uma biblioteca INDEPENDENTE (`openpyxl` em Python
 serviu bem) antes de considerar validado.
 
+
+
+## Abrir um tópico em contas: filtre pela faixa
+
+A aba `DR_CPC_51_Detalhada` pendura as contas de cada tópico embaixo dele,
+recolhidas no `+` do Excel. Com a quebra por modalidade, duas regras:
+
+- **A faixa abre nas contas DELA** (`grupo.porModalidade[l.mod].contas`),
+  não nas do grupo. A faixa carrega o id do GRUPO, então buscar só por
+  `l.id` devolve a lista inteira — foi exatamente assim que o arquivo
+  entregue mostrou contas de EAD dentro de "Presencial", com o total da
+  faixa certo e a composição estourando o total. Erro de confiança: quem
+  confere somando a coluna para de acreditar no arquivo.
+- **O tópico dividido não abre em conta nenhuma.** Quem lista as contas
+  dele são as faixas logo abaixo; listar nos dois lugares mostra o mesmo
+  saldo duas vezes quando se expande tudo. Tópico sem divisão continua
+  abrindo normalmente.
+
+Há teste lendo o workbook gerado e remontando a árvore (`modalidade.test.js`).
