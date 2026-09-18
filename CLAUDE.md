@@ -14,6 +14,7 @@ daqui ou de `.claude/docs/`, corrija a frase no mesmo commit.
 | … isto | leia |
 |---|---|
 | para onde uma conta vai (padrões, mapa por código, perfis de plano) | `.claude/docs/classificacao.md` |
+| a modalidade de ensino (Presencial / EAD / Comum) | `.claude/docs/classificacao.md` + `.claude/docs/dre.md` |
 | a estrutura da DRE, subtotais, rótulos | `.claude/docs/dre.md` |
 | a leitura do balancete, a hierarquia, o período | `.claude/docs/balancete.md` |
 | a demonstração do CPC 51, MPDA, cronograma | `.claude/docs/cpc51.md` |
@@ -85,6 +86,8 @@ src/
     planoPerfil.js           # motor de perfis de plano de contas
     planos/iesb.js           # o plano do IESB, como DADO
     linhasDRE.js             # a DRE como dados (rótulos, sinais, cascata)
+    modalidade.js            # o 3º eixo: Presencial / EAD / Comum, e a
+                              # regra única de quando uma linha se divide
     cpc51.js                 # as cinco categorias, a política, a conciliação
     linhasCPC51.js           # a demonstração do CPC 51 como dados
     mpda.js                  # medidas de desempenho da administração
@@ -115,6 +118,7 @@ src/
     useSessao.js             # restaurar/gravar a sessão, a trava de carga
     useFontes.js             # os balancetes carregados, contas, nomes, plano
     useClassificacao.js      # classif/tocadas/sugestão/DRE/prova/perfis
+                              # + a modalidade (manual > nome do plano)
     useCPC51.js              # política, categorias, MPDA, conciliação
     useFiscal.js             # parâmetros, ajustes do LALUR, apuração
   App.jsx                    # o CASCO: navegação (SECOES), topo de contexto,
@@ -154,6 +158,12 @@ fica solto acima delas, porque não pertence a nenhuma:
 | Fiscal | o imposto lançado está certo? | Apuração |
 | Acompanhamento | como ela se moveu, e o que já foi fechado? | Comparativa, Histórico |
 | CPC 51 · 2027 | como isso fica em 2027? | Demonstração, Plano de ação |
+
+Os EIXOS são **três**, e a diferença entre eixo e aba é o que segurou a
+divisão por modalidade sem tela nova: grupo da DRE, categoria do CPC 51 e
+modalidade de ensino são propriedades da mesma conta, resolvidas cada uma
+por "manual > plano/nome > padrão", e todas as telas leem as três. Eixo
+novo não vira aba; vira coluna no De-Para.
 
 São **onze abas no total**, e esse número é para ser defendido. Já foram
 quatorze; o corte de 20/08/2026 tirou Painel, Balanço e Arquivos e fundiu
@@ -276,6 +286,24 @@ um caminho — a explicação completa está no `.claude/docs/` indicado.
   `sugerirClassificacao` decide por `contagem/n >= 0.5`; contas sem
   movimento aumentam `n` sem aumentar `contagem`, e a classificação de
   contas COM movimento muda sozinha. Só contas com movimento votam.
+- **A faixa de modalidade não soma — ela já foi somada.** As linhas do
+  tipo `mod` (Presencial / EAD / Comum) são detalhe da linha de cima:
+  ficam fora da cascata e fora do total do título de seção. Foi por isso
+  que `totalizarSecoes` deixou de parar na primeira linha que não fosse
+  `l` — com a quebra ligada, a primeira faixa cortava a seção ao meio e o
+  total do título passava a mostrar só a primeira linha, sem nenhum sinal
+  na tela. → `.claude/docs/dre.md`
+- **Linha de demonstração se casa por `chave`, nunca por rótulo.** A
+  Comparativa e a coluna comparativa do CPC 51 cruzam períodos por
+  `<grupo>` / `<grupo>|<modalidade>`. "Presencial" se repete embaixo de
+  cada tópico dividido: com casamento por RÓTULO, o valor do primeiro
+  tópico aparecia em todos os outros — número plausível, errado e sem
+  aviso. → `.claude/docs/dre.md`
+- **`\bPRESENCIAL` com fronteira de palavra, e EAD testado antes.** Sem
+  as duas coisas, "SEMIPRESENCIAL" bate com `/PRESENCIAL/` e a carga a
+  distância entra como presencial em silêncio. Pelo mesmo motivo,
+  "online", "digital" e "virtual" NÃO são padrões de EAD: casariam com
+  "MARKETING DIGITAL". → `.claude/docs/classificacao.md`
 - **O balancete das contas 1 e 2 NÃO fecha, e não deve fechar.** A
   diferença é o resultado do exercício, que vive nas contas 3 a 7. Nunca
   trate isso como erro de importação. → `.claude/docs/balancete.md`

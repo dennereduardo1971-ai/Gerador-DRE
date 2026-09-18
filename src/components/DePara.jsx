@@ -23,6 +23,7 @@ import { useMemo, useState } from "react";
 import { brl, pct } from "../lib/formato.js";
 import { GRUPOS } from "../lib/grupos.js";
 import { CATEGORIAS, NOME_CATEGORIA } from "../lib/cpc51.js";
+import { MODALIDADES, NOME_CURTO_MODALIDADE } from "../lib/modalidade.js";
 import { SITUACOES, filtrarDePara, porGrupo, resumoDePara } from "../lib/depara.js";
 import { situacaoDaLinha } from "../lib/exportacaoDePara.js";
 
@@ -40,29 +41,31 @@ const TOM_SITUACAO = { "A revisar": "edit" };
 
 export function DePara({
   linhas, empresa, cnpj,
-  onClassificar, onCategoriaConta, onLimparCategorias, onBaixarCSV, onBaixarExcel,
+  onClassificar, onCategoriaConta, onModalidade, onLimparCategorias, onBaixarCSV, onBaixarExcel,
 }) {
   const [busca, setBusca] = useState("");
   const [grupo, setGrupo] = useState("todos");
   const [categoria, setCategoria] = useState("todas");
   const [situacao, setSituacao] = useState("todas");
+  const [modalidade, setModalidade] = useState("todas");
 
   const resumo = useMemo(() => resumoDePara(linhas), [linhas]);
   const grupos = useMemo(() => porGrupo(linhas), [linhas]);
   const visiveis = useMemo(
-    () => filtrarDePara(linhas, { busca, grupo, categoria, situacao }),
-    [linhas, busca, grupo, categoria, situacao]
+    () => filtrarDePara(linhas, { busca, grupo, categoria, situacao, modalidade }),
+    [linhas, busca, grupo, categoria, situacao, modalidade]
   );
   const mostradas = visiveis.slice(0, TETO);
-  const filtrando = busca || grupo !== "todos" || categoria !== "todas" || situacao !== "todas";
+  const filtrando =
+    busca || grupo !== "todos" || categoria !== "todas" || situacao !== "todas" || modalidade !== "todas";
 
   return (
     <>
       <div className="card">
-        <h2>De-Para — plano de contas × DRE × CPC 51</h2>
+        <h2>De-Para — plano de contas × DRE × CPC 51 × modalidade</h2>
         <p className="hint">
-          Uma linha por conta: de onde vem e para onde vai nas duas estruturas.
-          Mudar aqui refaz a DRE na hora.
+          Uma linha por conta: de onde vem, para onde vai nas duas estruturas e de qual
+          modalidade ela nasce. Mudar aqui refaz a DRE na hora.
         </p>
         <div className="row">
           <button className="btn" onClick={onBaixarExcel}>Baixar Excel</button>
@@ -108,6 +111,16 @@ export function DePara({
           <div className="v">{resumo.aRevisar}</div>
           <div className="sub">{brl(resumo.valorARevisar)} em contas cujo grupo mistura naturezas
             que o CPC 51 separa.</div>
+        </div>
+        {/* A segregação não é placar de PENDÊNCIA: "comum" é resposta
+            legítima para a despesa da instituição inteira. O selo existe
+            para responder "quanto da DRE está separado por modalidade?",
+            que é a pergunta que a divisão da tela levanta. */}
+        <div className="check">
+          <div className="k">Segregadas por modalidade</div>
+          <div className="v">{resumo.presencial + resumo.ead}</div>
+          <div className="sub">{resumo.presencial} presencial, {resumo.ead} EAD,{" "}
+            {resumo.comum} comuns aos dois. {resumo.manuaisModalidade} decididas à mão.</div>
         </div>
         <div className="check" data-tone={resumo.semGrupo ? "bad" : "ok"}>
           <div className="k">Fora da DRE</div>
@@ -162,6 +175,13 @@ export function DePara({
             </select>
           </div>
           <div>
+            <label htmlFor="dp-modalidade">Modalidade</label>
+            <select id="dp-modalidade" value={modalidade} onChange={(e) => setModalidade(e.target.value)}>
+              <option value="todas">Todas as modalidades</option>
+              {MODALIDADES.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+            </select>
+          </div>
+          <div>
             <label htmlFor="dp-categoria">Categoria CPC 51</label>
             <select id="dp-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
               <option value="todas">Todas as categorias</option>
@@ -196,6 +216,7 @@ export function DePara({
                   <th className="num">Saldo</th>
                   <th>Grupo na DRE</th>
                   <th>Categoria CPC 51</th>
+                  <th>Modalidade</th>
                   <th>Situação</th>
                 </tr>
               </thead>
@@ -227,6 +248,20 @@ export function DePara({
                           Padrão: {NOME_CATEGORIA[l.categoria] || "fora da DRE"}
                         </option>
                         {CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                      </select>
+                    </td>
+                    {/* O valor vazio é "siga o nome do plano de contas" —
+                        e o texto da opção diz qual é esse padrão, para
+                        decidir sem abrir o plano noutra tela. Mesma
+                        mecânica do seletor de categoria ao lado. */}
+                    <td className="dp-modalidade" data-rotulo="Modalidade">
+                      <select value={l.modalidadeManual ? l.modalidade : ""}
+                        aria-label={`Modalidade de ensino da conta ${l.conta}`}
+                        onChange={(e) => onModalidade(l.conta, e.target.value)}>
+                        <option value="">
+                          Padrão: {NOME_CURTO_MODALIDADE[l.modalidade]}
+                        </option>
+                        {MODALIDADES.map((m) => <option key={m.id} value={m.id}>{m.curto}</option>)}
                       </select>
                     </td>
                     <td data-rotulo="Situação">

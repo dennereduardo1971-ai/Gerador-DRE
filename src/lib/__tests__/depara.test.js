@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { POLITICA_PADRAO, deParaCPC51 } from "../cpc51.js";
 import { filtrarDePara, montarDePara, porGrupo, resumoDePara } from "../depara.js";
-import { linhaCSV, montarWorkbookDePara, situacaoDaLinha } from "../exportacaoDePara.js";
+import { COLUNAS_RESUMO, linhaCSV, montarWorkbookDePara, situacaoDaLinha } from "../exportacaoDePara.js";
 
 const conta = (codigo, saldo, extra = {}) => ({
   conta: codigo,
@@ -223,18 +223,24 @@ describe("o resumo por grupo do Excel abre nas contas que o formam", () => {
   it("soma na mesma coluna: o total do grupo é o das contas debaixo dele", async () => {
     const { grupos, ws } = await contasDoResumo();
     const porNome = Object.fromEntries(grupos.map((g) => [g.nome, g]));
+    /* As colunas vêm do cabeçalho real, não de um índice cravado: a
+       coluna de Modalidade entrou no meio do resumo e um `6` fixo aqui
+       passaria a ler a célula de texto ao lado — o teste quebraria por
+       um motivo que não é o que ele mede. */
+    const COL_SALDO = COLUNAS_RESUMO.indexOf("Saldo") + 1;
+    const COL_CONTAS = COLUNAS_RESUMO.indexOf("Contas") + 1;
     let atual = null;
     let soma = 0;
     const fechar = () => { if (atual) expect(soma).toBeCloseTo(porNome[atual].total, 2); };
     ws.eachRow((row) => {
-      if (row.outlineLevel === 1) { soma += row.getCell(6).value; return; }
+      if (row.outlineLevel === 1) { soma += row.getCell(COL_SALDO).value; return; }
       const nome = row.getCell(1).value;
       if (!porNome[nome]) return;
       fechar();
       atual = nome;
       soma = 0;
-      expect(row.getCell(6).value).toBeCloseTo(porNome[nome].total, 2);
-      expect(row.getCell(7).value).toBe(porNome[nome].n);
+      expect(row.getCell(COL_SALDO).value).toBeCloseTo(porNome[nome].total, 2);
+      expect(row.getCell(COL_CONTAS).value).toBe(porNome[nome].n);
     });
     fechar();
   });

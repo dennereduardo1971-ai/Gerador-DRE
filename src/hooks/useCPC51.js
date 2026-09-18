@@ -23,7 +23,10 @@ import { comparativo51 } from "../lib/linhasCPC51.js";
  * resolver o GRUPO sem que o usuário precise classificar cada conta de
  * novo a cada balancete.
  */
-export function useCPC51({ contasResultado, grupoDe, dre, nomesEfetivos, aba, dresPorBalancete, periodoAtivo, plano }) {
+export function useCPC51({
+  contasResultado, grupoDe, dre, nomesEfetivos, aba, dresPorBalancete, periodoAtivo, plano,
+  modalidadeDe = () => "COMUM",
+}) {
   const [politica, setPolitica] = useState(POLITICA_PADRAO);
   const [categoriaConta, setCategoriaConta] = useState({});
   const [medidas, setMedidas] = useState([]);
@@ -33,9 +36,13 @@ export function useCPC51({ contasResultado, grupoDe, dre, nomesEfetivos, aba, dr
     [grupoDe, categoriaConta, politica, plano]
   );
 
+  /* A modalidade vem pronta de `useClassificacao`: é o MESMO eixo da DRE
+     atual, não uma segunda decisão. Se cada demonstração resolvesse a
+     modalidade por conta própria, uma correção manual na aba De-Para
+     valeria numa e não na outra. */
   const dre51 = useMemo(
-    () => montarDRE51(contasResultado, grupoDe, categoriaDe),
-    [contasResultado, grupoDe, categoriaDe]
+    () => montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe),
+    [contasResultado, grupoDe, categoriaDe, modalidadeDe]
   );
 
   const conciliacao = useMemo(
@@ -74,9 +81,9 @@ export function useCPC51({ contasResultado, grupoDe, dre, nomesEfetivos, aba, dr
   const dres51PorPeriodo = useMemo(
     () => (dresPorBalancete || []).map((d) => ({
       competencia: d.competencia, rotulo: d.rotulo,
-      dre51: montarDRE51(d.contas, grupoDe, categoriaDe),
+      dre51: montarDRE51(d.contas, grupoDe, categoriaDe, modalidadeDe),
     })),
-    [dresPorBalancete, grupoDe, categoriaDe]
+    [dresPorBalancete, grupoDe, categoriaDe, modalidadeDe]
   );
 
   const comparativo = useMemo(

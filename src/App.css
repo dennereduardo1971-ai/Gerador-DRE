@@ -1237,6 +1237,37 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
 .line[data-k="det"] .lbl { padding-left: 22px; font-size: 12.5px; color: var(--tinta-2); }
 .line[data-k="det"] .val { font-size: 12.5px; color: var(--tinta-2); }
 
+/* A FAIXA DE MODALIDADE (Presencial / EAD / Comum) — a quebra do tópico
+   logo acima dela.
+ *
+ * Ela fica ENTRE a linha da DRE e o detalhe de conta, e é isso que o
+ * recuo diz: 12px contra os 22px do detalhe. Sem a escada, faixa e conta
+ * parecem o mesmo nível e o leitor não sabe qual das duas soma na
+ * demonstração.
+ *
+ * Peso 500 e não 600: a faixa é leitura, não linha oficial da DRE —
+ * mesmo cuidado que o valor do título de seção logo abaixo neste
+ * arquivo. E nada de cor: verde e vermelho, neste projeto, pertencem ao
+ * dado. */
+.line[data-k="mod"] {
+  padding-top: 5px;
+  padding-bottom: 5px;
+  background: var(--papel);
+  border-bottom-color: transparent;
+}
+.line[data-k="mod"] .lbl {
+  padding-left: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tinta-2);
+}
+.line[data-k="mod"] .val { font-size: 13px; font-weight: 500; color: var(--tinta-2); }
+.line[data-k="mod"] .av { color: var(--tinta-2); }
+/* Conta pendurada numa faixa desce mais um degrau: tópico → modalidade →
+   conta. Um recuo só para os dois casos achataria de volta a hierarquia
+   que a faixa acabou de criar. */
+.line[data-k="det"][data-sob-mod] .lbl { padding-left: 34px; }
+
 /* Valor no título de seção. Fica entre o título comum e o subtotal em
    negrito de propósito: é a soma das linhas agrupadas ali, não uma linha
    oficial da demonstração ("Receita / Despesas Financeiras" é
@@ -1298,6 +1329,8 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
   background: var(--papel);
   border-top: 1px solid var(--regua-forte);
 }
+.dre-comparativa tr[data-k="mod"] td:first-child { padding-left: 24px; font-weight: 500; }
+.dre-comparativa tr[data-k="mod"] td { color: var(--tinta-2); font-size: 12.5px; }
 .dre-comparativa tr[data-k="sub"] td { font-weight: 600; }
 .dre-comparativa tr[data-k="final"] td {
   font-weight: 700;
@@ -1494,6 +1527,13 @@ tbody tr:nth-child(even) { background: var(--superficie-2); }
      o resultado que mais precisa aparecer numa demonstração impressa. */
   .line[data-k="final"] .val,
   .line[data-k="final"] .val.neg { color: #000; }
+
+  /* A quebra por modalidade é parte da demonstração, não enfeite de
+     tela: ela sai no papel e no PDF, onde a DRE é lida de verdade. Só
+     perde a cor de apoio, que no papel vira cinza ilegível. */
+  .line[data-k="mod"] .lbl,
+  .line[data-k="mod"] .val,
+  .line[data-k="mod"] .av { color: #000; }
 
   /* Papel impresso não é tela: sem sticky, sem sombra, com margem de
      verdade. O rodapé de página é o próximo bloco. */
@@ -1743,6 +1783,10 @@ tr[data-pendente="1"] td:first-child { box-shadow: inset 2px 0 0 var(--atencao);
    projeto inteiro tenta evitar. A tabela rola na horizontal quando não
    couber; o rótulo, não. */
 .dp-tabela select { width: 100%; min-width: 208px; }
+/* A modalidade cabe em menos: são três opções curtas, e a linha já
+   carrega dois seletores largos. Com os 208px dos outros, a tabela
+   passava a rolar na horizontal em tela de 1280px. */
+.dp-tabela .dp-modalidade select { min-width: 132px; }
 .dp-tabela .desc { min-width: 160px; }
 
 .dp-motivo {

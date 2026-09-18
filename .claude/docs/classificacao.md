@@ -174,3 +174,42 @@ cadastro adiantado, a segunda é valor fora da demonstração. Na DRE nada
 muda: elas ordenam por último e a prova de integridade conta
 `nComMovimento`, senão a frase "das 800 contas, R$ X entraram" fica
 errada de um jeito difícil de perceber.
+
+## O terceiro eixo: modalidade de ensino
+
+`modalidade.js` responde "de qual modalidade esta conta nasce?" —
+Presencial, EAD ou Comum. É eixo PARALELO ao grupo, pelo mesmo
+argumento que já valia para a categoria do CPC 51: criar
+`REC_MENSALIDADES_EAD` em `GRUPOS` quebraria a hierarquia de subtotais
+validada centavo a centavo, e uma conta caindo num grupo que ninguém
+soma faria dinheiro sumir da tela sem aviso.
+
+A resolução é a de sempre — **manual > nome no plano > padrão**:
+
+1. `modalidade` (decisão manual desta sessão ou do perfil);
+2. `modalidadePorNome`: o nome da própria conta e, se ele não disser
+   nada, o de cada ancestral, **da mais próxima à mais distante**;
+3. `COMUM`.
+
+Diferença deliberada em relação a `sugerirClassificacao`: aqui a conta
+mais próxima VENCE, em vez de todos os nomes virarem um texto só. Uma
+folha "TURMA PRESENCIAL" dentro de uma síntese "POS EAD" é a exceção
+que o plano quis declarar — concatenando, EAD ganharia sempre.
+
+Sobre os padrões (`PAT_EAD`, `PAT_PRESENCIAL`):
+
+- **EAD é testado antes**, e `PAT_PRESENCIAL` começa com `\b`. Sem as
+  duas coisas, "GRADUACAO SEMIPRESENCIAL" casaria com `/PRESENCIAL/` e
+  a carga a distância entraria como presencial em silêncio.
+- **Semipresencial cai em EAD** — julgamento contábil, não gramática.
+  Se a instituição tratar diferente, corrige-se a conta no De-Para, e a
+  origem passa a ser "manual".
+- **"online", "digital" e "virtual" ficam de fora**: casariam com
+  "MARKETING DIGITAL" e "COMPRAS ONLINE", que são despesa da
+  instituição inteira. Um padrão que aponta tudo não aponta nada, e o
+  erro apareceria como EAD inflado — difícil de perceber.
+
+`modalidadePorNome` devolve `null` quando o plano não declara nada.
+**`null` não é "COMUM"**: quem transforma ausência em faixa comum é
+`fazerModalidadeDe`, num lugar só — mesma doutrina do `null` de
+`ehCredora` e do `[______]` da nota de MPDA.

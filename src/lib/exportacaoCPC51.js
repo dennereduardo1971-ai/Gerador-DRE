@@ -122,7 +122,7 @@ export async function montarWorkbookCPC51(ctx) {
   linhas51.forEach((l) => {
     const row = ws.addRow([
       rotuloCategoria(l), l.cod ?? null, l.lbl, l.val ?? null,
-      comparativo ? comparativo.valores[l.lbl] ?? null : null, l.av ?? null, null,
+      comparativo ? comparativo.valores[l.chave] ?? null : null, l.av ?? null, null,
     ]);
     row.getCell(4).numFmt = FORMATO_VALOR;
     row.getCell(5).numFmt = FORMATO_VALOR;

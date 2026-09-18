@@ -39,10 +39,15 @@ const LINHAS_TOPO = [
   ["liquido", "Lucro Líquido do Exercício"],
 ];
 
-function valoresPorRotulo(dre) {
+/* O CASAMENTO ENTRE COLUNAS É PELA CHAVE DA LINHA, NÃO PELO RÓTULO.
+ * Com a quebra por modalidade, "Presencial" aparece embaixo de vários
+ * tópicos: um Map por rótulo guardaria só a última e repetiria o valor
+ * dela em todas as outras — erro silencioso, porque o número existe e
+ * parece plausível. `chave` é `<grupo>` ou `<grupo>|<modalidade>`. */
+function valoresPorLinha(dre) {
   const { itens } = montarLinhas(dre);
   const mapa = new Map();
-  itens.forEach((it) => mapa.set(it.lbl, it.val));
+  itens.forEach((it) => mapa.set(it.chave ?? it.lbl, it.val));
   return mapa;
 }
 
@@ -64,7 +69,7 @@ export function EtapaComparativo({ dresPorCompetencia }) {
 
   const colunas = dresPorCompetencia.map((d) => ({
     competencia: d.competencia,
-    valores: valoresPorRotulo(d.dre),
+    valores: valoresPorLinha(d.dre),
     base: d.dre.receitaLiq || 1,
   }));
 
@@ -117,7 +122,8 @@ export function EtapaComparativo({ dresPorCompetencia }) {
       <h2>DRE comparativa</h2>
       <p className="hint">
         Uma coluna por competência. O percentual é a análise vertical do próprio mês — dá para
-        comparar estrutura, não só tamanho.
+        comparar estrutura, não só tamanho. As linhas recuadas são a quebra do tópico acima
+        em Presencial, EAD e comum — elas somam o tópico, não se somam a ele.
       </p>
       <div className="scroll">
         <table className="tabela-larga dre-comparativa">
@@ -131,10 +137,10 @@ export function EtapaComparativo({ dresPorCompetencia }) {
           </thead>
           <tbody>
             {linhas.map((it, i) => (
-              <tr key={`${it.lbl}-${i}`} data-k={it.t}>
+              <tr key={`${it.chave ?? it.lbl}-${i}`} data-k={it.t}>
                 <td>{it.lbl}</td>
                 {colunas.map((c) => {
-                  const val = c.valores.get(it.lbl);
+                  const val = c.valores.get(it.chave ?? it.lbl);
                   if (val == null) return <td key={c.competencia} className="num">—</td>;
                   return (
                     <td key={c.competencia} className={"num " + (val < 0 ? "neg" : "")}>

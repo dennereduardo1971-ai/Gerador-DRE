@@ -14,8 +14,15 @@
 
 import { GRUPOS } from "./grupos.js";
 import { IDS_CATEGORIA, POLITICA_PADRAO } from "./cpc51.js";
+import { IDS_MODALIDADE } from "./modalidade.js";
 
-/* Versão 3: o perfil leva também os PARÂMETROS fiscais — regime,
+/* Versão 4: o perfil leva também a MODALIDADE decidida à mão (Presencial
+ * / EAD / Comum). Continua sendo decisão, não valor — a mesma razão de
+ * o arquivo poder ser versionado e mandado por e-mail. Só entram as
+ * contas corrigidas na mão: o que o nome do plano de contas já declara
+ * é redescoberto a cada balancete e não precisa viajar.
+ *
+ * Versão 3: o perfil leva também os PARÂMETROS fiscais — regime,
  * alíquotas, adesão ao PROUNI e o mapa de qual conta é PIS, qual é COFINS
  * e qual é ISS. Continuam sendo decisões: o prejuízo fiscal e a base
  * negativa de CSLL, que são VALORES de uma empresa identificada, ficam
@@ -31,14 +38,18 @@ import { IDS_CATEGORIA, POLITICA_PADRAO } from "./cpc51.js";
  * chegam vazios. Quem separou juros de mora de rendimento de aplicação
  * em janeiro não deve ter de refazer isso em fevereiro — e essa era a
  * razão de o perfil existir desde o início. */
-const VERSAO = 3;
+const VERSAO = 4;
 const IDS_VALIDOS = new Set(GRUPOS.map((g) => g.id));
 const CATEGORIAS_VALIDAS = new Set(IDS_CATEGORIA);
+const MODALIDADES_VALIDAS = new Set(IDS_MODALIDADE);
 
 /** Monta o objeto do perfil a partir do estado atual da classificação.
  *  `classif` são as escolhas manuais; `nomes`, o plano de contas
  *  importado. Só entram contas com grupo reconhecido. */
-export function montarPerfil({ nome, classif = {}, nomes = {}, categorias = {}, politica, medidas = [], fiscal = null }) {
+export function montarPerfil({
+  nome, classif = {}, nomes = {}, categorias = {}, politica, medidas = [], fiscal = null,
+  modalidades = {},
+}) {
   const contas = {};
   for (const [conta, grupo] of Object.entries(classif)) {
     if (IDS_VALIDOS.has(grupo)) contas[conta] = grupo;
@@ -46,6 +57,10 @@ export function montarPerfil({ nome, classif = {}, nomes = {}, categorias = {}, 
   const cats = {};
   for (const [conta, categoria] of Object.entries(categorias)) {
     if (CATEGORIAS_VALIDAS.has(categoria)) cats[conta] = categoria;
+  }
+  const mods = {};
+  for (const [conta, modalidade] of Object.entries(modalidades)) {
+    if (MODALIDADES_VALIDAS.has(modalidade)) mods[conta] = modalidade;
   }
   return {
     formato: "gerador-dre/perfil",
@@ -55,6 +70,7 @@ export function montarPerfil({ nome, classif = {}, nomes = {}, categorias = {}, 
     contas,
     nomes,
     categorias: cats,
+    modalidades: mods,
     politica: { ...POLITICA_PADRAO, ...politica },
     medidas,
     /* Só decisão, nunca valor. `fiscal.params` e `fiscal.mapaTributos`
@@ -94,6 +110,12 @@ export function lerPerfil(texto) {
     else ignoradas++;
   }
 
+  const modalidades = {};
+  for (const [conta, modalidade] of Object.entries(dados.modalidades || {})) {
+    if (MODALIDADES_VALIDAS.has(modalidade)) modalidades[conta] = modalidade;
+    else ignoradas++;
+  }
+
   /* Medida sem ajuste nenhum é igual ao próprio subtotal do CPC 51 — não
      é MPDA. Entra a validação estrutural mínima aqui, na leitura do
      arquivo, porque depois disso a medida vai direto para a nota
@@ -111,6 +133,7 @@ export function lerPerfil(texto) {
       contas,
       nomes: dados.nomes && typeof dados.nomes === "object" ? dados.nomes : {},
       categorias,
+      modalidades,
       politica: dados.politica && typeof dados.politica === "object" ? dados.politica : null,
       medidas,
     },

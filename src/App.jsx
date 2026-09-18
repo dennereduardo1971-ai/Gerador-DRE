@@ -132,7 +132,7 @@ export default function App() {
     contasResultado: cls.contasResultado, grupoDe: cls.grupoDe, dre: cls.dre,
     nomesEfetivos: fontes.nomesEfetivos, aba,
     dresPorBalancete: cls.dresPorBalancete, periodoAtivo: fontes.emFoco?.chave,
-    plano: fontes.planoAtivo,
+    plano: fontes.planoAtivo, modalidadeDe: cls.modalidadeDe,
   });
   /* A apuração lê a MESMA DRE que a aba Demonstração mostra. É por isso
      que reclassificar uma conta em Classificar refaz o imposto na hora —
@@ -198,6 +198,10 @@ export default function App() {
     baixarPerfil(montarPerfil({
       nome: empresa || fontes.periodo || "Perfil", classif: cls.classif, nomes: fontes.nomesEfetivos,
       categorias: cpc.categoriaConta, politica: cpc.politica, medidas: cpc.medidas,
+      // A modalidade corrigida à mão viaja junto: é decisão, como o
+      // grupo e a categoria. O que o nome do plano já declara não entra —
+      // é redescoberto a cada balancete.
+      modalidades: cls.modalidade,
       // Só os PARÂMETROS fiscais — regime, alíquotas, mapa de tributos.
       // Prejuízo fiscal é valor de cliente e fica fora, para o perfil
       // continuar podendo ser versionado e compartilhado.
@@ -214,17 +218,21 @@ export default function App() {
 
   /* ---------- De-Para ----------
      A mesma decisão das etapas Classificar e CPC 51, vista conta a conta e
-     nos dois eixos ao mesmo tempo. Não é um terceiro estado: lê `grupoDe`,
-     `tocadas` e `categoriaConta`, e escreve de volta nos mesmos setters —
-     por isso reclassificar aqui refaz a DRE na hora. */
+     nos TRÊS eixos ao mesmo tempo (grupo, categoria e modalidade). Não é
+     um quarto estado: lê `grupoDe`, `tocadas`, `categoriaConta` e
+     `modalidadeDe`, e escreve de volta nos mesmos setters — por isso
+     reclassificar aqui refaz a DRE na hora. */
   const deParaLinhas = useMemo(
     () => montarDePara(cls.contasResultado, {
       grupoDe: cls.grupoDe, tocadas: cls.tocadas, categoriaPorConta: cpc.categoriaConta,
       politica: cpc.politica, nomes: fontes.nomesEfetivos, plano: fontes.planoAtivo,
+      modalidadeDe: cls.modalidadeDe, modalidadePorConta: cls.modalidade,
+      sugestaoModalidade: cls.sugestaoModalidade,
     }),
     [
       cls.contasResultado, cls.grupoDe, cls.tocadas, cpc.categoriaConta, cpc.politica,
-      fontes.nomesEfetivos, fontes.planoAtivo,
+      fontes.nomesEfetivos, fontes.planoAtivo, cls.modalidadeDe, cls.modalidade,
+      cls.sugestaoModalidade,
     ]
   );
   const placarDePara = useMemo(() => resumoDePara(deParaLinhas), [deParaLinhas]);
@@ -478,6 +486,7 @@ export default function App() {
                 linhas={deParaLinhas} empresa={empresa} cnpj={cnpj}
                 onClassificar={cls.classificar}
                 onCategoriaConta={cpc.definirCategoria}
+                onModalidade={cls.definirModalidade}
                 onLimparCategorias={cpc.limparCategorias}
                 onBaixarCSV={() => baixarCSVDeParaCompleto(deParaLinhas, ctxArquivo)}
                 onBaixarExcel={() => baixarExcelDePara(deParaLinhas, placarDePara, porGrupo(deParaLinhas), ctxArquivo)}

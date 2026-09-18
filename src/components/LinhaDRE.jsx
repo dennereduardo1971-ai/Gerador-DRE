@@ -15,7 +15,12 @@ export function Linha({ lbl, val, tipo, base, escala, inicio, fim, nivel }) {
   return (
     <div className="line" data-k={tipo || ""}>
       <div className="lbl">{lbl}</div>
-      <Canal escala={escala} inicio={inicio} fim={fim} nivel={nivel} />
+      {/* A faixa de modalidade não desenha canal: o saldo corrente já
+          andou na linha de cima, e uma barra aqui somaria visualmente o
+          mesmo dinheiro duas vezes na cascata. */}
+      {tipo === "mod"
+        ? <div className="canal" />
+        : <Canal escala={escala} inicio={inicio} fim={fim} nivel={nivel} />}
       <div className={"val " + (val < 0 ? "neg" : "")}>
         {val < 0 ? "(" + brl(Math.abs(val)) + ")" : brl(val)}
       </div>
@@ -72,10 +77,13 @@ const LIMITE_DETALHE = 40;
  *  que somavam diferente do número da própria linha e, com razão, parava
  *  de confiar na tela. Aqui a conta que anda contra a natureza do grupo
  *  aparece com o sinal invertido, e a soma fecha. */
-export function Detalhe({ dre, id, nomes, base, mostrar }) {
+export function Detalhe({ dre, id, nomes, base, mostrar, mod = null }) {
   if (!mostrar) return null;
   const grupo = dre.bal[id];
-  const contas = grupo.contas;
+  /* Com `mod`, as contas são as daquela faixa — é o que faz o detalhe
+     ficar debaixo da modalidade certa quando a linha está dividida. Sem
+     `mod`, são todas as do grupo, como sempre foi. */
+  const contas = mod ? grupo.porModalidade[mod].contas : grupo.contas;
   const sinal = SINAL_GRUPO[id] ?? 1;
   const sobraram = contas.length - LIMITE_DETALHE;
 
@@ -84,7 +92,8 @@ export function Detalhe({ dre, id, nomes, base, mostrar }) {
       {contas.slice(0, LIMITE_DETALHE).map((c) => {
         const valor = c.saldo * sinal;
         return (
-          <div className="line" data-k="det" key={id + c.conta}>
+          <div className="line" data-k="det" data-sob-mod={mod ? "1" : undefined}
+            key={id + (mod || "") + c.conta}>
             <div className="lbl">
               <span className="code">{c.conta}</span>{" "}
               {nomes[c.conta] || (c.historico.trim().split(",")[0] || "").slice(0, 42)}
@@ -98,7 +107,7 @@ export function Detalhe({ dre, id, nomes, base, mostrar }) {
         );
       })}
       {sobraram > 0 && (
-        <div className="line" data-k="det" key={id + "-corte"}>
+        <div className="line" data-k="det" key={id + (mod || "") + "-corte"}>
           <div className="lbl">
             <i>+ {sobraram} {sobraram === 1 ? "conta não exibida" : "contas não exibidas"} — todas saem no CSV</i>
           </div>

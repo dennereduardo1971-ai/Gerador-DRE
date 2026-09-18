@@ -47,8 +47,24 @@ export function montarLinhas51(dre51) {
     const c = dre51.cat[catId];
     if (!c || !c.grupos.length) return;
     itens.push({ t: "secao", lbl: titulo, cat: catId });
-    c.grupos.forEach((g, i) =>
-      itens.push({ t: "l", lbl: g.nome, val: g.total, id: g.id, cat: catId, cod: codigo(catId, i) }));
+    c.grupos.forEach((g, i) => {
+      itens.push({
+        t: "l", lbl: g.nome, val: g.total, id: g.id, cat: catId,
+        cod: codigo(catId, i), chave: `${catId}|${g.id}`,
+      });
+      /* A quebra por modalidade (Presencial / EAD / Comum) é a mesma da
+         DRE atual — `faixasDoGrupo` decide quando ela aparece, para as
+         duas demonstrações nunca divergirem sobre qual linha se abre.
+         O CÓDIGO DA LINHA NÃO SE ESTENDE À FAIXA: `2.3` é posição de
+         LINHA na demonstração, e a faixa é detalhe dela, não uma linha
+         nova que a nota explicativa possa citar. */
+      (g.faixas || []).forEach((f) =>
+        itens.push({
+          t: "mod", lbl: f.nome, val: f.total, id: g.id, cat: catId,
+          mod: f.id, chave: `${catId}|${g.id}|${f.id}`,
+        })
+      );
+    });
   };
 
   bloco("OPERACIONAL", "Receitas e despesas operacionais");
@@ -94,7 +110,10 @@ export function montarLinhas51(dre51) {
  * Carregar mais de um balancete é o que dá material a esta coluna: cada
  * arquivo declara o próprio período, e a lista chega aqui já ordenada.
  *
- * O casamento é por RÓTULO, como em `EtapaComparativo`: um mês sem
+ * O casamento é pela CHAVE da linha (`categoria|grupo`, mais a
+ * modalidade quando é faixa), não pelo rótulo: com a quebra por
+ * modalidade, "Presencial" aparece em vários grupos, e casar por rótulo
+ * repetiria o valor de um grupo em todos os outros. Um mês sem
  * determinado grupo simplesmente não tem aquela linha, e a célula fica
  * vazia em vez de deslocar a coluna inteira. */
 export function comparativo51(dres51PorPeriodo = [], periodoAtivo) {
@@ -104,7 +123,7 @@ export function comparativo51(dres51PorPeriodo = [], periodoAtivo) {
   const anterior = dres51PorPeriodo[i - 1];
   const valores = {};
   montarLinhas51(anterior.dre51).itens.forEach((it) => {
-    if (it.val != null) valores[it.lbl] = it.val;
+    if (it.val != null) valores[it.chave ?? it.lbl] = it.val;
   });
   return { competencia: anterior.competencia, rotulo: anterior.rotulo, valores };
 }

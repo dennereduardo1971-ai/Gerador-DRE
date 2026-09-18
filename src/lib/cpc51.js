@@ -35,6 +35,7 @@
  */
 
 import { GRUPOS, NOME_GRUPO } from "./grupos.js";
+import { blocosVazios, faixasDoGrupo } from "./modalidade.js";
 
 export const CATEGORIAS = [
   {
@@ -224,7 +225,7 @@ const ordemGrupo = Object.fromEntries(GRUPOS.map((g, i) => [g.id, i]));
  *  propósito — no CPC 51 as linhas são somadas dentro da categoria, e é
  *  essa soma direta que garante que o lucro líquido seja idêntico ao da
  *  estrutura atual. */
-export function montarDRE51(contasResultado, grupoDe, categoriaDe) {
+export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe = () => "COMUM") {
   const cat = {};
   CATEGORIAS.forEach((c) => (cat[c.id] = { id: c.id, nome: c.nome, total: 0, grupos: [] }));
   const porGrupo = {}; // categoria|grupo -> bloco
@@ -239,17 +240,33 @@ export function montarDRE51(contasResultado, grupoDe, categoriaDe) {
     const grupo = grupoDe(c.conta);
     const chave = `${categoria}|${grupo}`;
     if (!porGrupo[chave]) {
-      porGrupo[chave] = { id: grupo, nome: NOME_GRUPO[grupo] || grupo, total: 0, contas: [] };
+      porGrupo[chave] = {
+        id: grupo, nome: NOME_GRUPO[grupo] || grupo, total: 0, contas: [],
+        porModalidade: blocosVazios(),
+      };
       cat[categoria].grupos.push(porGrupo[chave]);
     }
+    const item = { ...c, val: c.saldo };
     porGrupo[chave].total += c.saldo;
-    porGrupo[chave].contas.push({ ...c, val: c.saldo });
+    porGrupo[chave].contas.push(item);
+    /* A mesma quebra por modalidade da estrutura atual, com o mesmo
+       valor por conta (o saldo) que já soma aqui — as duas demonstrações
+       leem as mesmas contas, então Presencial no CPC 51 e Presencial na
+       DRE atual têm que ser a mesma quantia, só em linhas diferentes. */
+    const m = porGrupo[chave].porModalidade[modalidadeDe(c.conta)] || porGrupo[chave].porModalidade.COMUM;
+    m.total += c.saldo;
+    m.contas.push(item);
     cat[categoria].total += c.saldo;
   });
 
   Object.values(cat).forEach((c) => {
     c.grupos.sort((a, b) => (ordemGrupo[a.id] ?? 99) - (ordemGrupo[b.id] ?? 99));
-    c.grupos.forEach((g) => g.contas.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)));
+    c.grupos.forEach((g) => {
+      g.contas.sort((a, b) => Math.abs(b.val) - Math.abs(a.val));
+      Object.values(g.porModalidade).forEach((m) => m.contas.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)));
+      g.faixas = faixasDoGrupo(g.porModalidade);
+      g.dividido = g.faixas.length > 0;
+    });
   });
 
   const operacional = cat.OPERACIONAL.total;

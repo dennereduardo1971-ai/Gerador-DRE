@@ -27,10 +27,12 @@ import { MedidasMPDA } from "./MedidasMPDA.jsx";
  *  `Detalhe` da DRE tradicional porque lá o valor é multiplicado pelo
  *  sinal do grupo; aqui o valor JÁ é o saldo com sinal contábil, e
  *  multiplicar de novo inverteria despesa e receita. */
-function DetalheCategoria({ grupo, nomes, base, mostrar }) {
+function DetalheCategoria({ grupo, nomes, base, mostrar, mod = null }) {
   if (!mostrar) return null;
-  return grupo.contas.slice(0, 25).map((c) => (
-    <div className="line" data-k="det" key={grupo.id + c.conta}>
+  const contas = mod ? grupo.porModalidade[mod].contas : grupo.contas;
+  return contas.slice(0, 25).map((c) => (
+    <div className="line" data-k="det" data-sob-mod={mod ? "1" : undefined}
+      key={grupo.id + (mod || "") + c.conta}>
       <div className="lbl">
         <span className="code">{c.conta}</span>{" "}
         {nomes[c.conta] || (c.historico || "").trim().split(",")[0].slice(0, 42)}
@@ -129,11 +131,17 @@ export function EtapaCPC51({
         {itens.map((it, i) => {
           if (it.t === "secao") return <Secao key={`s${i}`} nome={it.lbl} val={it.val} base={base} />;
           const grupo = it.id ? gruposPorId[`${it.cat}|${it.id}`] : null;
+          // Igual à DRE atual: as contas penduram na faixa quando a linha
+          // está dividida, e na própria linha quando não está.
+          const detalharAqui = it.t === "mod" || (it.t === "l" && !grupo?.dividido);
           return (
-            <Fragment key={`${it.t}${i}`}>
+            <Fragment key={it.chave ? `${it.chave}${i}` : `${it.t}${i}`}>
               <Linha lbl={it.lbl} val={it.val} tipo={it.t === "l" ? "" : it.t} base={base}
                 escala={escala} inicio={it.inicio} fim={it.fim} nivel={it.nivel} />
-              {grupo && <DetalheCategoria grupo={grupo} nomes={nomes} base={base} mostrar={detalhado} />}
+              {grupo && detalharAqui && (
+                <DetalheCategoria grupo={grupo} mod={it.mod || null} nomes={nomes}
+                  base={base} mostrar={detalhado} />
+              )}
             </Fragment>
           );
         })}
