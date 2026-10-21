@@ -43,3 +43,6 @@ plano-dre_*.json
 # scratch/ guarda scripts de depuração de sessão, que apontam para
 # arquivos reais em /root/.claude/uploads. Nunca entram no Git.
 scratch/
+
+# histórico de DREs: tem valores reais, nunca no repositório público
+data/historico.json
