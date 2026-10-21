@@ -70,6 +70,7 @@ export async function buscarArquivo(cfg) {
  *  Precisa do `sha` atual quando o arquivo já existe (a API do GitHub usa
  *  isso para evitar sobrescrever uma versão mais nova sem querer). */
 export async function gravarArquivo(cfg, dados, sha, mensagem) {
+  await exigirRepositorioPrivado(cfg);
   const body = {
     message: mensagem || "Atualiza histórico de DREs",
     content: utf8ToBase64(JSON.stringify(dados, null, 2)),
@@ -84,6 +85,25 @@ export async function gravarArquivo(cfg, dados, sha, mensagem) {
   if (!r.ok) throw new Error(await mensagemDeErro(r));
   const json = await r.json();
   return { sha: json.content.sha };
+}
+
+/** O histórico leva totais REAIS da DRE (receita, resultado), então só
+ *  pode ser gravado em repositório PRIVADO. Isso já aconteceu: em
+ *  ago/2026, totais de dois meses de cliente foram parar no repositório
+ *  público do próprio app, porque o exemplo do formulário sugeria
+ *  justamente ele. A trava fica aqui, na gravação, para valer em toda
+ *  chamada (sincronizar e remover). Na dúvida, não grava: se não der
+ *  para confirmar que o repositório é privado, recusa. */
+export async function exigirRepositorioPrivado(cfg) {
+  const r = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}`, { headers: cabecalhos(cfg.token) });
+  if (!r.ok) throw new Error(await mensagemDeErro(r));
+  const repo = await r.json();
+  if (repo.private !== true) {
+    throw new Error(
+      `O repositório ${cfg.owner}/${cfg.repo} é PÚBLICO. O histórico tem valores reais da DRE e ` +
+      "não pode ir para lá. Crie um repositório privado só para os dados e aponte a sincronização para ele."
+    );
+  }
 }
 
 async function mensagemDeErro(r) {
