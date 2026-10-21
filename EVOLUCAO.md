@@ -98,6 +98,11 @@ Administrativas e vão para Insumos.
   Administrativas e o resultado líquido batem até o centavo com o ajuste
   feito à mão. **`validar.mjs` não rodou** (os fixtures não estão nesta
   máquina).
+- **Nome da linha por categoria no CPC 51** (`NOME_LINHA_51`): as 8
+  linhas que o IESB tinha renomeado à mão (marcadas em amarelo) e o 1.8
+  ("Custos dos Serviços Prestados") passaram a sair assim de fábrica.
+  Conferido: as 25 linhas com código do Excel real batem nome a nome com
+  o que o motor gera. Vitest 354.
 - Observado e não corrigido: em máquina fria, os testes que geram Excel
   passam do timeout de 5s do Vitest só para carregar o `exceljs`. Com
   `--testTimeout=60000`, tudo verde.

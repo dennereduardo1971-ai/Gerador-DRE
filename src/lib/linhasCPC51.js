@@ -64,6 +64,34 @@ const PADRAO_51 = Object.fromEntries(LINHAS_ESTRUTURAIS_51.map((l) => [l.id, l.p
  * que anda por código de conta). */
 const codigo = (catId, i) => `${IDS_CATEGORIA.indexOf(catId) + 1}.${i + 1}`;
 
+/* O NOME DA LINHA NO CPC 51 QUANDO A CATEGORIA MUDA O SENTIDO DELA.
+ *
+ * O financeiro e o "não operacional" se partem entre categorias, e o
+ * mesmo grupo aparece em duas delas. Com o nome único do grupo, a
+ * demonstração lia "Receitas Não Operacionais" DENTRO do operacional (o
+ * CPC 51 extingue o termo) e "Receitas Financeiras vinculadas às
+ * operações" DENTRO de investimento. Esses são os nomes que o IESB
+ * escreveu à mão no Excel do piloto (out/2026, marcados em amarelo), e
+ * eles servem para qualquer cliente porque só dizem o que a categoria já
+ * diz.
+ *
+ * O apelido do grupo (`rotulos.grupos`) continua vencendo: é decisão
+ * explícita de quem usa, e este mapa é só o nome de fábrica. */
+export const NOME_LINHA_51 = {
+  "OPERACIONAL|CUSTOS": "Custos dos Serviços Prestados", // o nome que o IESB usa no modelo
+  "OPERACIONAL|REC_FIN": "Receitas financeiras e monetárias vinculadas às operações",
+  "OPERACIONAL|DESP_FIN": "Despesas financeiras e bancárias vinculadas às operações",
+  "OPERACIONAL|OUTRAS_REC": "Outras Receitas Operacionais",
+  "OPERACIONAL|OUTRAS_DESP": "Outras Despesas Operacionais",
+  "INVESTIMENTO|REC_FIN": "Resultado de Aplicações Financeiras",
+  "INVESTIMENTO|OUTRAS_REC": "Outras Receitas de Investimento",
+  "INVESTIMENTO|OUTRAS_DESP": "Outras Despesas de Investimento",
+  "FINANCIAMENTO|DESP_FIN": "Despesas de financiamento",
+};
+
+export const nomeDaLinha51 = (catId, grupoId, rotulos) =>
+  rotulos?.grupos?.[grupoId] || NOME_LINHA_51[`${catId}|${grupoId}`] || nomeDoGrupo(grupoId, rotulos);
+
 export function montarLinhas51(dre51, rotulos = null) {
   const itens = [];
   const rot = (id) => rotuloDaLinha(id, PADRAO_51[id], rotulos);
@@ -74,11 +102,13 @@ export function montarLinhas51(dre51, rotulos = null) {
     itens.push({ t: "secao", lbl: rot(idTitulo), cat: catId, id: idTitulo, chave: idTitulo });
     c.grupos.forEach((g, i) => {
       itens.push({
-        /* O nome do grupo é o MESMO das duas demonstrações e do De-Para
-           (`nomeDoGrupo`): renomear "Bolsas / Resoluções" na DRE atual e
-           essa linha continuar com o nome antigo faria as duas
-           demonstrações parecerem falar de coisas diferentes. */
-        t: "l", lbl: nomeDoGrupo(g.id, rotulos), val: g.total, id: g.id, cat: catId,
+        /* O apelido do grupo vale nas duas demonstrações e no De-Para:
+           renomear "Bolsas / Resoluções" na DRE atual e esta linha
+           continuar com o nome antigo faria as duas parecerem falar de
+           coisas diferentes. Sem apelido, a linha usa o nome de fábrica
+           do CPC 51 (`NOME_LINHA_51`) quando a categoria muda o sentido
+           dela. */
+        t: "l", lbl: nomeDaLinha51(catId, g.id, rotulos), val: g.total, id: g.id, cat: catId,
         cod: codigo(catId, i), chave: `${catId}|${g.id}`,
       });
       /* O SUBGRUPO (`fazerLinha51De`) é detalhe da linha como a faixa —

@@ -13,7 +13,7 @@ import {
   gruposParaRevisar,
   montarDRE51,
 } from "../cpc51.js";
-import { comparativo51, montarLinhas51 } from "../linhasCPC51.js";
+import { comparativo51, montarLinhas51, nomeDaLinha51 } from "../linhasCPC51.js";
 import { montarWorkbookCPC51 } from "../exportacaoCPC51.js";
 
 /* Razão sintético com uma conta em cada grupo que importa para o CPC 51,
@@ -320,8 +320,8 @@ describe("o código da linha e a categoria de cada linha", () => {
 
     // operacional é a 1ª categoria da norma; investimento a 2ª, e assim por diante
     expect(cods["Receita Bruta com Mensalidades"]).toBe("1.1");
-    expect(cods["Receitas Financeiras vinculadas às operações"]).toBe("2.1");
-    expect(cods["Despesas Financeiras vinculadas às operações"]).toBe("3.1");
+    expect(cods["Resultado de Aplicações Financeiras"]).toBe("2.1");
+    expect(cods["Despesas de financiamento"]).toBe("3.1");
     expect(cods["IRPJ e CSLL"]).toBe("4.1");
     // dentro do bloco a numeração é contígua e na ordem da demonstração
     const operacionais = itens.filter((i) => i.cod && i.cat === "OPERACIONAL").map((i) => i.cod);
@@ -467,8 +467,9 @@ describe("a aba 'DR_CPC_51_Detalhada' abre as contas de cada tópico recolhidas"
     // mostrar composição diferente da que somou o valor de cima.
     Object.values(dre51.cat).forEach((c) =>
       c.grupos.forEach((g) => {
-        expect(vistas[g.nome].map((l) => l.conta)).toEqual(g.contas.map((l) => l.conta));
-        const soma = vistas[g.nome].reduce((s, l) => s + l.saldo, 0);
+        const nome = nomeDaLinha51(c.id, g.id);
+        expect(vistas[nome].map((l) => l.conta)).toEqual(g.contas.map((l) => l.conta));
+        const soma = vistas[nome].reduce((s, l) => s + l.saldo, 0);
         expect(soma).toBeCloseTo(g.total, 2);
       })
     );
@@ -565,7 +566,7 @@ describe("linha de apresentação do CPC 51 (subgrupos de Custos — piloto IESB
       atual = row.getCell(3).value;
       abertas[atual] = [];
     });
-    expect(abertas["Custos dos Serviços"]).toEqual([]); // quem lista são os subgrupos
+    expect(abertas["Custos dos Serviços Prestados"]).toEqual([]); // quem lista são os subgrupos
     expect(abertas["Custos dos Serviços - Apoio Acadêmico"]).toEqual(["4112000"]);
     expect(abertas["Custos dos Serviços - Insumos"]).toEqual(["4120614"]);
     expect(abertas["Despesas com Pessoal (Fopag)"]).toEqual(["4111101"]);
@@ -575,5 +576,26 @@ describe("linha de apresentação do CPC 51 (subgrupos de Custos — piloto IESB
     expect(fazerLinha51De({})).toBe(null);
     const sem = montarDRE51(contas, grupoDe2, categoriaDe);
     expect(sem.cat.OPERACIONAL.grupos.find((x) => x.id === "CUSTOS").subgrupos).toEqual([]);
+  });
+});
+
+describe("nome da linha no CPC 51 conforme a categoria", () => {
+  it("o mesmo grupo ganha o nome da categoria em que está", () => {
+    const nome = (dre51) => montarLinhas51(dre51).itens.find((i) => i.id === "REC_FIN" && i.t === "l");
+    const inv = nome(montar().dre51);
+    const oper = nome(montar({ categoriaPorConta: { "4210201": "OPERACIONAL" } }).dre51);
+    expect([inv.cat, inv.lbl]).toEqual(["INVESTIMENTO", "Resultado de Aplicações Financeiras"]);
+    expect([oper.cat, oper.lbl]).toEqual(["OPERACIONAL", "Receitas financeiras e monetárias vinculadas às operações"]);
+  });
+
+  it("não sobra 'Não Operacional' dentro do operacional", () => {
+    const { itens } = montarLinhas51(montar().dre51);
+    expect(itens.some((i) => /n[ãa]o operaciona/i.test(i.lbl))).toBe(false);
+  });
+
+  it("apelido do usuário continua vencendo", () => {
+    const rotulos = { grupos: { REC_FIN: "Financeiro" } };
+    expect(nomeDaLinha51("INVESTIMENTO", "REC_FIN", rotulos)).toBe("Financeiro");
+    expect(nomeDaLinha51("OPERACIONAL", "DESP_ADM")).toBe("Despesas Administrativas"); // sem nome próprio no CPC 51
   });
 });
