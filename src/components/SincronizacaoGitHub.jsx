@@ -51,7 +51,7 @@ export function SincronizacaoGitHub({ onSincronizado }) {
         <button className="btn ghost" onClick={() => setAberto(!aberto)}>{aberto ? "Ocultar" : "Configurar"}</button>
       </div>
       <p className="hint" style={{ marginTop: 8 }}>
-        Guarda o histórico num JSON dentro de um repositório seu. O token fica só neste navegador.
+        Guarda o histórico num JSON dentro de um repositório <b>privado</b> seu: ele tem valores reais da DRE, e o app recusa gravar em repositório público. O token fica só neste navegador.
       </p>
       <p className="hint" style={{ marginTop: -8 }}>
         Use um <b>fine-grained token</b> restrito a este repositório, com "Contents" em leitura e
@@ -67,7 +67,7 @@ export function SincronizacaoGitHub({ onSincronizado }) {
           </div>
           <div>
             <label>Repositório</label>
-            <input type="text" value={cfg.repo} placeholder="Gerador-DRE"
+            <input type="text" value={cfg.repo} placeholder="gerador-dre-dados (PRIVADO)"
               onChange={(e) => setCfg({ ...cfg, repo: e.target.value.trim() })} />
           </div>
           <div>
