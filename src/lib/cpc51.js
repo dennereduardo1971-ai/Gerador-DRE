@@ -217,6 +217,39 @@ export function fazerCategoriaDe({ grupoDe, categoriaPorConta = {}, politica = P
     resolverCategoria({ conta, grupo: grupoDe(conta), categoriaPorConta, politica, plano });
 }
 
+/** Em que LINHA do CPC 51 a conta aparece — e, se a linha se abre em
+ *  subgrupos, em qual deles.
+ *
+ *  É uma terceira decisão, ao lado do grupo e da categoria, e só vale
+ *  para a demonstração do CPC 51. Nasceu do piloto do IESB (reunião de
+ *  20/10/2026): a direção quer o custo dos serviços em três partes —
+ *  docentes, apoio acadêmico e insumos — com a folha do apoio acadêmico
+ *  (4112) e algumas despesas administrativas (4120) subindo para Custos.
+ *  A DRE ATUAL CONTINUA COMO ESTÁ: ela é a que bate com a DRE oficial
+ *  assinada, e mudar o GRUPO dessas contas quebraria essa validação. Aqui
+ *  muda só a linha em que a conta é apresentada no CPC 51; a categoria
+ *  (e, portanto, o lucro e a ponte) não muda.
+ *
+ *  Busca por PREFIXO, o mais longo vence — ao contrário de
+ *  `categoriaDoPlano`: o pedido foi "todo o grupo 4112", e conta nova
+ *  que nascer nele tem que cair junto sem ninguém lembrar. As contas da
+ *  4120 entram com o código inteiro, e o código inteiro é o prefixo mais
+ *  longo possível. */
+export function fazerLinha51De(plano) {
+  const def = plano?.linhas51;
+  if (!def) return null;
+  const subgrupos = def.subgrupos || {};
+  const prefixos = Object.keys(def.contas || {}).sort((a, b) => b.length - a.length);
+  return (conta, grupo) => {
+    const p = prefixos.find((x) => String(conta).startsWith(x));
+    let [g, sub] = p ? def.contas[p].split("|") : [grupo, null];
+    if (!GRUPOS.some((x) => x.id === g)) [g, sub] = [grupo, null];
+    const subs = subgrupos[g];
+    if (subs?.length && !subs.some((s) => s.id === sub)) sub = subs[0].id; // o 1º é o padrão do grupo
+    return { grupo: g, sub: subs?.length ? sub : null, subgrupos: subs || null };
+  };
+}
+
 const ordemGrupo = Object.fromEntries(GRUPOS.map((g, i) => [g.id, i]));
 
 /** A demonstração do resultado na estrutura do CPC 51.
@@ -226,7 +259,7 @@ const ordemGrupo = Object.fromEntries(GRUPOS.map((g, i) => [g.id, i]));
  *  propósito — no CPC 51 as linhas são somadas dentro da categoria, e é
  *  essa soma direta que garante que o lucro líquido seja idêntico ao da
  *  estrutura atual. */
-export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe = () => "COMUM") {
+export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe = () => "COMUM", linha51De = null) {
   // Mesmo catálogo da DRE atual, pela mesma razão — ver `montarDRE`.
   const catalogo = modalidadeDe.catalogo || CATALOGO_PADRAO;
   const cat = {};
@@ -240,18 +273,30 @@ export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe 
       foraDaDemonstracao += c.saldo;
       return;
     }
-    const grupo = grupoDe(c.conta);
+    /* A linha de apresentação (`fazerLinha51De`) pode diferir do grupo
+       da DRE atual. A CATEGORIA continua sendo a da conta — mudar de
+       linha nunca tira a conta do bloco em que ela soma. */
+    const linha = linha51De ? linha51De(c.conta, grupoDe(c.conta)) : null;
+    const grupo = linha ? linha.grupo : grupoDe(c.conta);
     const chave = `${categoria}|${grupo}`;
     if (!porGrupo[chave]) {
       porGrupo[chave] = {
         id: grupo, nome: NOME_GRUPO[grupo] || grupo, total: 0, contas: [],
         porModalidade: blocosVazios(catalogo),
+        porSubgrupo: linha?.subgrupos
+          ? Object.fromEntries(linha.subgrupos.map((s) => [s.id, { ...s, total: 0, contas: [] }]))
+          : null,
       };
       cat[categoria].grupos.push(porGrupo[chave]);
     }
     const item = { ...c, val: c.saldo };
     porGrupo[chave].total += c.saldo;
     porGrupo[chave].contas.push(item);
+    if (porGrupo[chave].porSubgrupo && linha?.sub) {
+      const s = porGrupo[chave].porSubgrupo[linha.sub];
+      s.total += c.saldo;
+      s.contas.push(item);
+    }
     /* A mesma quebra por modalidade da estrutura atual, com o mesmo
        valor por conta (o saldo) que já soma aqui — as duas demonstrações
        leem as mesmas contas, então Presencial no CPC 51 e Presencial na
@@ -267,8 +312,13 @@ export function montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe 
     c.grupos.forEach((g) => {
       g.contas.sort((a, b) => Math.abs(b.val) - Math.abs(a.val));
       Object.values(g.porModalidade).forEach((m) => m.contas.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)));
-      g.faixas = faixasDoGrupo(g.porModalidade);
-      g.dividido = g.faixas.length > 0;
+      /* Linha com subgrupos não se abre também em modalidade: seriam duas
+         quebras do mesmo saldo debaixo da mesma linha. Hoje só Custos tem
+         subgrupo, e Custos está fora do alcance da divisão (grupo 3). */
+      g.subgrupos = g.porSubgrupo ? Object.values(g.porSubgrupo).filter((s) => s.contas.length) : [];
+      g.subgrupos.forEach((s) => s.contas.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)));
+      g.faixas = g.subgrupos.length ? [] : faixasDoGrupo(g.porModalidade);
+      g.dividido = g.faixas.length > 0 || g.subgrupos.length > 0;
     });
   });
 

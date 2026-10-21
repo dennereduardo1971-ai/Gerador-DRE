@@ -81,6 +81,16 @@ export function montarLinhas51(dre51, rotulos = null) {
         t: "l", lbl: nomeDoGrupo(g.id, rotulos), val: g.total, id: g.id, cat: catId,
         cod: codigo(catId, i), chave: `${catId}|${g.id}`,
       });
+      /* O SUBGRUPO (`fazerLinha51De`) é detalhe da linha como a faixa —
+         mesmo tipo `mod`, fora da cascata, porque a linha de cima já o
+         somou —, mas, diferente da faixa, LEVA CÓDIGO (`1.8.1`): foi
+         pedido pelo cliente como subtotal citável, com nome próprio. */
+      (g.subgrupos || []).forEach((s, k) =>
+        itens.push({
+          t: "mod", lbl: s.nome, val: s.total, id: g.id, cat: catId,
+          sub: s.id, cod: `${codigo(catId, i)}.${k + 1}`, chave: `${catId}|${g.id}|sub:${s.id}`,
+        })
+      );
       /* A quebra por modalidade (Presencial / EAD / Comum) é a mesma da
          DRE atual — `faixasDoGrupo` decide quando ela aparece, para as
          duas demonstrações nunca divergirem sobre qual linha se abre.

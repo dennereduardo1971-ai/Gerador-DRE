@@ -192,7 +192,9 @@ export async function montarWorkbookCPC51(ctx) {
     const grupo = dre51.cat[l.cat]?.grupos.find((g) => g.id === l.id);
     if (!grupo) return;
     if (l.t === "l" && grupo.dividido) return;
-    const contas = (l.mod ? grupo.porModalidade[l.mod]?.contas : grupo.contas) || [];
+    // O subgrupo (1.8.1, 1.8.2...) abre nas contas DELE, pela mesma razão.
+    const contas = (l.sub ? grupo.porSubgrupo?.[l.sub]?.contas
+      : l.mod ? grupo.porModalidade[l.mod]?.contas : grupo.contas) || [];
     if (!contas.length) return;
     marcarSubtotal(wsDet, row.number, COLS_DET.length); // o tópico é o "cabeçalho" das contas abaixo
     const primeira = wsDet.rowCount + 1;

@@ -28,12 +28,12 @@ import { MedidasMPDA } from "./MedidasMPDA.jsx";
  *  `Detalhe` da DRE tradicional porque lá o valor é multiplicado pelo
  *  sinal do grupo; aqui o valor JÁ é o saldo com sinal contábil, e
  *  multiplicar de novo inverteria despesa e receita. */
-function DetalheCategoria({ grupo, nomes, base, mostrar, mod = null, rotulos = null }) {
+function DetalheCategoria({ grupo, nomes, base, mostrar, mod = null, sub = null, rotulos = null }) {
   if (!mostrar) return null;
-  const contas = mod ? grupo.porModalidade[mod].contas : grupo.contas;
+  const contas = sub ? grupo.porSubgrupo[sub].contas : mod ? grupo.porModalidade[mod].contas : grupo.contas;
   return contas.slice(0, 25).map((c) => (
-    <div className="line" data-k="det" data-sob-mod={mod ? "1" : undefined}
-      key={grupo.id + (mod || "") + c.conta}>
+    <div className="line" data-k="det" data-sob-mod={mod || sub ? "1" : undefined}
+      key={grupo.id + (mod || sub || "") + c.conta}>
       <div className="lbl">
         <span className="code">{c.conta}</span>{" "}
         {nomeDaConta(c.conta, nomes, rotulos, c.historico)}
@@ -140,7 +140,7 @@ export function EtapaCPC51({
               <Linha lbl={it.lbl} val={it.val} tipo={it.t === "l" ? "" : it.t} base={base}
                 escala={escala} inicio={it.inicio} fim={it.fim} nivel={it.nivel} />
               {grupo && detalharAqui && (
-                <DetalheCategoria grupo={grupo} mod={it.mod || null} nomes={nomes}
+                <DetalheCategoria grupo={grupo} mod={it.mod || null} sub={it.sub || null} nomes={nomes}
                   rotulos={rotulos} base={base} mostrar={detalhado} />
               )}
             </Fragment>

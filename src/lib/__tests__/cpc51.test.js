@@ -9,6 +9,7 @@ import {
   contasMistas,
   deParaCPC51,
   fazerCategoriaDe,
+  fazerLinha51De,
   gruposParaRevisar,
   montarDRE51,
 } from "../cpc51.js";
@@ -491,5 +492,88 @@ describe("a aba 'DR_CPC_51_Detalhada' abre as contas de cada tópico recolhidas"
       else if (dentro) dentro = false;
     });
     expect(mensalidades).toContain("3110101"); // a conta de mensalidades da fixture
+  });
+});
+
+describe("linha de apresentação do CPC 51 (subgrupos de Custos — piloto IESB)", () => {
+  /* Fictício: uma conta de docente, uma do apoio acadêmico (4112, que na
+     DRE atual é Fopag) e uma de insumo dentro de Administrativas. */
+  const PLANO = {
+    linhas51: {
+      subgrupos: {
+        CUSTOS: [
+          { id: "DOCENTES", nome: "Custos dos Serviços - Docentes" },
+          { id: "APOIO", nome: "Custos dos Serviços - Apoio Acadêmico" },
+          { id: "INSUMOS", nome: "Custos dos Serviços - Insumos" },
+        ],
+      },
+      contas: { "4112": "CUSTOS|APOIO", "4120614": "CUSTOS|INSUMOS" },
+    },
+  };
+  const contas = [
+    ...CONTAS,
+    conta("4112000", -7000), // apoio acadêmico
+    conta("4120614", -1200), // material de laboratório
+  ];
+  const grupoDe2 = (c) => ({ "4112000": "DESP_FOPAG", "4120614": "DESP_ADM" })[c] || grupoDe(c);
+  const categoriaDe = fazerCategoriaDe({ grupoDe: grupoDe2 });
+  const linha51De = fazerLinha51De(PLANO);
+  const dre = montarDRE(contas, grupoDe2);
+  const dre51 = montarDRE51(contas, grupoDe2, categoriaDe, undefined, linha51De);
+  const g = (id) => dre51.cat.OPERACIONAL.grupos.find((x) => x.id === id);
+
+  it("sobe a 4112 e o insumo para Custos só no CPC 51; a DRE atual não muda", () => {
+    expect(g("CUSTOS").total).toBeCloseTo(-40000 - 7000 - 1200, 2);
+    expect(g("DESP_FOPAG").total).toBeCloseTo(-20000, 2);
+    expect(g("DESP_ADM").total).toBeCloseTo(-9000, 2);
+    expect(dre.bal.CUSTOS.total).toBeCloseTo(40000, 2); // a estrutura atual segue o grupo
+  });
+
+  it("abre Custos em subgrupos com subtotal, e eles somam a linha", () => {
+    const subs = g("CUSTOS").subgrupos;
+    expect(subs.map((s) => [s.id, s.total])).toEqual([["DOCENTES", -40000], ["APOIO", -7000], ["INSUMOS", -1200]]);
+    expect(subs.reduce((s, x) => s + x.total, 0)).toBeCloseTo(g("CUSTOS").total, 2);
+  });
+
+  it("não mexe no lucro nem na ponte do operacional", () => {
+    const conc = conciliar(dre, dre51, contas, grupoDe2, categoriaDe);
+    expect(conc.fecha).toBe(true);
+    expect(conc.ponteFecha).toBe(true);
+  });
+
+  it("numera os subgrupos como 1.8.1, 1.8.2… debaixo da linha", () => {
+    const { itens } = montarLinhas51(dre51);
+    const i = itens.findIndex((x) => x.t === "l" && x.id === "CUSTOS");
+    const cod = itens[i].cod;
+    expect(itens.slice(i + 1, i + 4).map((x) => [x.cod, x.lbl])).toEqual([
+      [`${cod}.1`, "Custos dos Serviços - Docentes"],
+      [`${cod}.2`, "Custos dos Serviços - Apoio Acadêmico"],
+      [`${cod}.3`, "Custos dos Serviços - Insumos"],
+    ]);
+  });
+
+  it("no Excel detalhado, cada subgrupo abre só nas contas dele", async () => {
+    const wb = await montarWorkbookCPC51({
+      dre, dre51, conciliacao: conciliar(dre, dre51, contas, grupoDe2, categoriaDe),
+      dePara: [], politica: POLITICA_PADRAO, empresa: "Exemplo", periodo: "junho de 2026",
+    });
+    const ws = wb.getWorksheet("DR_CPC_51_Detalhada");
+    const abertas = {};
+    let atual = null;
+    ws.eachRow((row) => {
+      if (row.outlineLevel === 1) { if (atual) abertas[atual].push(row.getCell(2).value); return; }
+      atual = row.getCell(3).value;
+      abertas[atual] = [];
+    });
+    expect(abertas["Custos dos Serviços"]).toEqual([]); // quem lista são os subgrupos
+    expect(abertas["Custos dos Serviços - Apoio Acadêmico"]).toEqual(["4112000"]);
+    expect(abertas["Custos dos Serviços - Insumos"]).toEqual(["4120614"]);
+    expect(abertas["Despesas com Pessoal (Fopag)"]).toEqual(["4111101"]);
+  });
+
+  it("sem linhas51 no plano, nada muda", () => {
+    expect(fazerLinha51De({})).toBe(null);
+    const sem = montarDRE51(contas, grupoDe2, categoriaDe);
+    expect(sem.cat.OPERACIONAL.grupos.find((x) => x.id === "CUSTOS").subgrupos).toEqual([]);
   });
 });
