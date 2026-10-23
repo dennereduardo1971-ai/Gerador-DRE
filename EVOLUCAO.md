@@ -77,6 +77,36 @@ de cada assunto mora num arquivo lido sob demanda.
 
 ## Registro
 
+### 21/10/2026 — Custos dos Serviços em três subgrupos, só no CPC 51
+
+Pedido da direção do IESB (reunião de 20/10/2026, sobre o piloto): no
+CPC 51, Custos dos Serviços abre em **1.8.1 Docentes, 1.8.2 Apoio
+Acadêmico e 1.8.3 Insumos**, cada um com subtotal. O grupo 4112 inteiro
+sai de Fopag e vai para Apoio, e seis contas escolhidas da 4120 saem de
+Administrativas e vão para Insumos.
+
+- **Terceira decisão por conta, só de apresentação:** `linhas51` no plano
+  (`planos/iesb.js`) + `fazerLinha51De` (`cpc51.js`). A **DRE atual não
+  muda**. O Denner escolheu assim porque ela é a que bate com a DRE
+  oficial. A categoria não muda, então o lucro e a ponte também não.
+- Subgrupo é `t: "mod"` (fica fora da cascata, como a faixa), mas leva
+  código (`1.8.1`). Linha com subgrupo não se abre em modalidade.
+- `lerPlano` passou a aceitar `linhas51` em perfil de plano carregado.
+- Medido: Vitest 351 (6 novos), oxlint zero, build ok. Os totais do motor
+  foram conferidos contra as contas do Excel real que o cliente mandou
+  (DR_CPC_51_Detalhada de jan–jul/2026): os três subgrupos, Fopag,
+  Administrativas e o resultado líquido batem até o centavo com o ajuste
+  feito à mão. **`validar.mjs` não rodou** (os fixtures não estão nesta
+  máquina).
+- **Nome da linha por categoria no CPC 51** (`NOME_LINHA_51`): as 8
+  linhas que o IESB tinha renomeado à mão (marcadas em amarelo) e o 1.8
+  ("Custos dos Serviços Prestados") passaram a sair assim de fábrica.
+  Conferido: as 25 linhas com código do Excel real batem nome a nome com
+  o que o motor gera. Vitest 354.
+- Observado e não corrigido: em máquina fria, os testes que geram Excel
+  passam do timeout de 5s do Vitest só para carregar o `exceljs`. Com
+  `--testTimeout=60000`, tudo verde.
+
 ### 18/09/2026 (3ª) — a divisão ganhou alcance, a faixa "Comum" saiu, e digitar passou a funcionar
 
 Três pedidos do Denner, na ordem em que chegaram: dividir só o **grupo 3**

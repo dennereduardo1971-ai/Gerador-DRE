@@ -10,7 +10,7 @@ subtotais obrigatórios** (resultado operacional; resultado antes do
 financiamento e dos tributos sobre o lucro). Some o "não operacional": o
 operacional vira a categoria RESIDUAL.
 
-Oito coisas que não devem ser desfeitas por acidente:
+Dez coisas que não devem ser desfeitas por acidente:
 
 1. **A categoria é um eixo PARALELO ao grupo, não um grupo novo.** Cada
    conta tem um grupo (a linha da DRE atual) e uma categoria (o bloco do
@@ -79,10 +79,25 @@ Oito coisas que não devem ser desfeitas por acidente:
    houve uma versão com colunas separadas, e o valor da conta saía
    deslocado do valor do tópico que ele soma, obrigando a cruzar duas
    tabelas para conferir a composição.
+9. **A LINHA do CPC 51 pode diferir do grupo — só por `linhas51` do
+   plano.** `fazerLinha51De` move a conta de linha (e de subgrupo) apenas
+   na demonstração do CPC 51. A DRE atual segue o grupo, porque é ela que
+   bate com a DRE oficial. Nasceu do piloto do IESB: Custos em 1.8.1
+   Docentes / 1.8.2 Apoio Acadêmico (grupo 4112, que na DRE atual é
+   Fopag) / 1.8.3 Insumos (contas escolhidas da 4120). A busca é por
+   prefixo e o mais longo vence. O subgrupo é `t: "mod"` com código
+   próprio e abre só nas contas dele, na tela e no Excel. Não use isso
+   para mudar CATEGORIA: categoria é `categorias`, e a busca dela é exata.
+
+10. **O nome da linha no CPC 51 depende da categoria** (`NOME_LINHA_51`,
+    `linhasCPC51.js`). O mesmo grupo aparece em duas categorias e não pode
+    ler "Não Operacionais" dentro do operacional nem "vinculadas às
+    operações" dentro de investimento. Os nomes são os que o IESB
+    escreveu à mão no Excel do piloto. O apelido do grupo
+    (`rotulos.grupos`) continua vencendo; a DRE atual não muda.
 
 O cronograma de implementação (10 fases, 49 passos, go-live em
 jan-fev/2027) está em `cronograma51.js` e aparece na aba "Plano de ação",
 com o andamento em localStorage. Ele sobrevive a "Limpar tudo" de
 propósito: não guarda dado financeiro nenhum, e é do escritório, não do
 arquivo aberto.
-

@@ -89,6 +89,7 @@ export function matrizLinhas(itens, base) {
        RÓTULO punha o valor do primeiro tópico em todos os outros. */
     chave: it.chave ?? it.lbl,
     mod: it.mod ?? null,
+    sub: it.sub ?? null,
   }));
 }
 

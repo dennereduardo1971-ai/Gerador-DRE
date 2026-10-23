@@ -9,10 +9,11 @@ import {
   contasMistas,
   deParaCPC51,
   fazerCategoriaDe,
+  fazerLinha51De,
   gruposParaRevisar,
   montarDRE51,
 } from "../cpc51.js";
-import { comparativo51, montarLinhas51 } from "../linhasCPC51.js";
+import { comparativo51, montarLinhas51, nomeDaLinha51 } from "../linhasCPC51.js";
 import { montarWorkbookCPC51 } from "../exportacaoCPC51.js";
 
 /* Razão sintético com uma conta em cada grupo que importa para o CPC 51,
@@ -319,8 +320,8 @@ describe("o código da linha e a categoria de cada linha", () => {
 
     // operacional é a 1ª categoria da norma; investimento a 2ª, e assim por diante
     expect(cods["Receita Bruta com Mensalidades"]).toBe("1.1");
-    expect(cods["Receitas Financeiras vinculadas às operações"]).toBe("2.1");
-    expect(cods["Despesas Financeiras vinculadas às operações"]).toBe("3.1");
+    expect(cods["Resultado de Aplicações Financeiras"]).toBe("2.1");
+    expect(cods["Despesas de financiamento"]).toBe("3.1");
     expect(cods["IRPJ e CSLL"]).toBe("4.1");
     // dentro do bloco a numeração é contígua e na ordem da demonstração
     const operacionais = itens.filter((i) => i.cod && i.cat === "OPERACIONAL").map((i) => i.cod);
@@ -466,8 +467,9 @@ describe("a aba 'DR_CPC_51_Detalhada' abre as contas de cada tópico recolhidas"
     // mostrar composição diferente da que somou o valor de cima.
     Object.values(dre51.cat).forEach((c) =>
       c.grupos.forEach((g) => {
-        expect(vistas[g.nome].map((l) => l.conta)).toEqual(g.contas.map((l) => l.conta));
-        const soma = vistas[g.nome].reduce((s, l) => s + l.saldo, 0);
+        const nome = nomeDaLinha51(c.id, g.id);
+        expect(vistas[nome].map((l) => l.conta)).toEqual(g.contas.map((l) => l.conta));
+        const soma = vistas[nome].reduce((s, l) => s + l.saldo, 0);
         expect(soma).toBeCloseTo(g.total, 2);
       })
     );
@@ -491,5 +493,109 @@ describe("a aba 'DR_CPC_51_Detalhada' abre as contas de cada tópico recolhidas"
       else if (dentro) dentro = false;
     });
     expect(mensalidades).toContain("3110101"); // a conta de mensalidades da fixture
+  });
+});
+
+describe("linha de apresentação do CPC 51 (subgrupos de Custos — piloto IESB)", () => {
+  /* Fictício: uma conta de docente, uma do apoio acadêmico (4112, que na
+     DRE atual é Fopag) e uma de insumo dentro de Administrativas. */
+  const PLANO = {
+    linhas51: {
+      subgrupos: {
+        CUSTOS: [
+          { id: "DOCENTES", nome: "Custos dos Serviços - Docentes" },
+          { id: "APOIO", nome: "Custos dos Serviços - Apoio Acadêmico" },
+          { id: "INSUMOS", nome: "Custos dos Serviços - Insumos" },
+        ],
+      },
+      contas: { "4112": "CUSTOS|APOIO", "4120614": "CUSTOS|INSUMOS" },
+    },
+  };
+  const contas = [
+    ...CONTAS,
+    conta("4112000", -7000), // apoio acadêmico
+    conta("4120614", -1200), // material de laboratório
+  ];
+  const grupoDe2 = (c) => ({ "4112000": "DESP_FOPAG", "4120614": "DESP_ADM" })[c] || grupoDe(c);
+  const categoriaDe = fazerCategoriaDe({ grupoDe: grupoDe2 });
+  const linha51De = fazerLinha51De(PLANO);
+  const dre = montarDRE(contas, grupoDe2);
+  const dre51 = montarDRE51(contas, grupoDe2, categoriaDe, undefined, linha51De);
+  const g = (id) => dre51.cat.OPERACIONAL.grupos.find((x) => x.id === id);
+
+  it("sobe a 4112 e o insumo para Custos só no CPC 51; a DRE atual não muda", () => {
+    expect(g("CUSTOS").total).toBeCloseTo(-40000 - 7000 - 1200, 2);
+    expect(g("DESP_FOPAG").total).toBeCloseTo(-20000, 2);
+    expect(g("DESP_ADM").total).toBeCloseTo(-9000, 2);
+    expect(dre.bal.CUSTOS.total).toBeCloseTo(40000, 2); // a estrutura atual segue o grupo
+  });
+
+  it("abre Custos em subgrupos com subtotal, e eles somam a linha", () => {
+    const subs = g("CUSTOS").subgrupos;
+    expect(subs.map((s) => [s.id, s.total])).toEqual([["DOCENTES", -40000], ["APOIO", -7000], ["INSUMOS", -1200]]);
+    expect(subs.reduce((s, x) => s + x.total, 0)).toBeCloseTo(g("CUSTOS").total, 2);
+  });
+
+  it("não mexe no lucro nem na ponte do operacional", () => {
+    const conc = conciliar(dre, dre51, contas, grupoDe2, categoriaDe);
+    expect(conc.fecha).toBe(true);
+    expect(conc.ponteFecha).toBe(true);
+  });
+
+  it("numera os subgrupos como 1.8.1, 1.8.2… debaixo da linha", () => {
+    const { itens } = montarLinhas51(dre51);
+    const i = itens.findIndex((x) => x.t === "l" && x.id === "CUSTOS");
+    const cod = itens[i].cod;
+    expect(itens.slice(i + 1, i + 4).map((x) => [x.cod, x.lbl])).toEqual([
+      [`${cod}.1`, "Custos dos Serviços - Docentes"],
+      [`${cod}.2`, "Custos dos Serviços - Apoio Acadêmico"],
+      [`${cod}.3`, "Custos dos Serviços - Insumos"],
+    ]);
+  });
+
+  it("no Excel detalhado, cada subgrupo abre só nas contas dele", async () => {
+    const wb = await montarWorkbookCPC51({
+      dre, dre51, conciliacao: conciliar(dre, dre51, contas, grupoDe2, categoriaDe),
+      dePara: [], politica: POLITICA_PADRAO, empresa: "Exemplo", periodo: "junho de 2026",
+    });
+    const ws = wb.getWorksheet("DR_CPC_51_Detalhada");
+    const abertas = {};
+    let atual = null;
+    ws.eachRow((row) => {
+      if (row.outlineLevel === 1) { if (atual) abertas[atual].push(row.getCell(2).value); return; }
+      atual = row.getCell(3).value;
+      abertas[atual] = [];
+    });
+    expect(abertas["Custos dos Serviços Prestados"]).toEqual([]); // quem lista são os subgrupos
+    expect(abertas["Custos dos Serviços - Apoio Acadêmico"]).toEqual(["4112000"]);
+    expect(abertas["Custos dos Serviços - Insumos"]).toEqual(["4120614"]);
+    expect(abertas["Despesas com Pessoal (Fopag)"]).toEqual(["4111101"]);
+  });
+
+  it("sem linhas51 no plano, nada muda", () => {
+    expect(fazerLinha51De({})).toBe(null);
+    const sem = montarDRE51(contas, grupoDe2, categoriaDe);
+    expect(sem.cat.OPERACIONAL.grupos.find((x) => x.id === "CUSTOS").subgrupos).toEqual([]);
+  });
+});
+
+describe("nome da linha no CPC 51 conforme a categoria", () => {
+  it("o mesmo grupo ganha o nome da categoria em que está", () => {
+    const nome = (dre51) => montarLinhas51(dre51).itens.find((i) => i.id === "REC_FIN" && i.t === "l");
+    const inv = nome(montar().dre51);
+    const oper = nome(montar({ categoriaPorConta: { "4210201": "OPERACIONAL" } }).dre51);
+    expect([inv.cat, inv.lbl]).toEqual(["INVESTIMENTO", "Resultado de Aplicações Financeiras"]);
+    expect([oper.cat, oper.lbl]).toEqual(["OPERACIONAL", "Receitas financeiras e monetárias vinculadas às operações"]);
+  });
+
+  it("não sobra 'Não Operacional' dentro do operacional", () => {
+    const { itens } = montarLinhas51(montar().dre51);
+    expect(itens.some((i) => /n[ãa]o operaciona/i.test(i.lbl))).toBe(false);
+  });
+
+  it("apelido do usuário continua vencendo", () => {
+    const rotulos = { grupos: { REC_FIN: "Financeiro" } };
+    expect(nomeDaLinha51("INVESTIMENTO", "REC_FIN", rotulos)).toBe("Financeiro");
+    expect(nomeDaLinha51("OPERACIONAL", "DESP_ADM")).toBe("Despesas Administrativas"); // sem nome próprio no CPC 51
   });
 });

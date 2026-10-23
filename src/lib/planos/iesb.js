@@ -167,6 +167,35 @@ export const PLANO_IESB = {
     "6110113": "INVESTIMENTO", // IPTU IMOVEIS INVESTIMENTO
   },
 
+  /* A LINHA em que a conta aparece no CPC 51, quando ela não é a do
+   * grupo — só na demonstração do CPC 51; a DRE atual segue `codigos`
+   * acima, que é o que bate com a DRE oficial (ver `fazerLinha51De`).
+   *
+   * Pedido da direção do IESB na reunião de 20/10/2026, sobre o piloto:
+   * Custos dos Serviços em três subgrupos com subtotal. O 1º subgrupo é
+   * o padrão — conta de Custos que não esteja abaixo cai em Docentes.
+   * Busca por prefixo, o mais longo vence: "4112" leva o grupo inteiro
+   * do apoio acadêmico, inclusive conta nova. */
+  linhas51: {
+    subgrupos: {
+      CUSTOS: [
+        { id: "DOCENTES", nome: "Custos dos Serviços - Docentes" },
+        { id: "APOIO", nome: "Custos dos Serviços - Apoio Acadêmico" },
+        { id: "INSUMOS", nome: "Custos dos Serviços - Insumos" },
+      ],
+    },
+    contas: {
+      "4112": "CUSTOS|APOIO", // FOPAG - APOIO ACADEMICO, o grupo inteiro (sai de Despesas com Pessoal)
+      // ---- Insumos: contas escolhidas uma a uma dentro de Despesas Administrativas ----
+      "4120303": "CUSTOS|INSUMOS", // SERV. EDUC. POLOS PARCEIROS
+      "4120304": "CUSTOS|INSUMOS", // SERVICOS EDUCACIONAIS
+      "4120307": "CUSTOS|INSUMOS", // SERV. EDUC. CONTEUDISTAS
+      "4120614": "CUSTOS|INSUMOS", // MATERIAL P/LABORATORIO
+      "4120618": "CUSTOS|INSUMOS", // INSUMOS GENEROS ALIMENTICIOS DOS CURSOS
+      "4120619": "CUSTOS|INSUMOS", // CONTRAPARTIDA DE CONVENIO
+    },
+  },
+
   regras: [
     {
       /* "(-)PROUNI" mora dentro da conta-síntese "(-)BOLSAS ESTUDANTIS"

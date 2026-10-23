@@ -36,6 +36,10 @@
  *                contas do MESMO grupo têm natureza diferente. Campo
  *                opcional; um perfil sem ele funciona igual, só sem essa
  *                camada (a categoria cai no padrão do grupo).
+ *   linhas51   — só para a demonstração do CPC 51: em que linha (e
+ *                subgrupo) a conta aparece quando não é a do grupo.
+ *                Prefixo, o mais longo vence. Opcional. Ver
+ *                `fazerLinha51De` em cpc51.js.
  */
 
 import { CATEGORIAS } from "./cpc51.js";
@@ -176,6 +180,22 @@ export function lerPlano(texto) {
     else ignorados++;
   }
 
+  /* `linhas51` (ver `fazerLinha51De`): só o que aponta para grupo que
+     existe; subgrupo sem id ou sem nome não entra. */
+  const subgrupos = {};
+  for (const [grupo, lista] of Object.entries(d.linhas51?.subgrupos || {})) {
+    const ok = Array.isArray(lista) ? lista.filter((s) => s?.id && s?.nome).map((s) => ({ id: String(s.id), nome: String(s.nome) })) : [];
+    if (IDS_VALIDOS.has(grupo) && ok.length) subgrupos[grupo] = ok;
+  }
+  const contas51 = {};
+  for (const [cod, destino] of Object.entries(d.linhas51?.contas || {})) {
+    if (typeof destino === "string" && IDS_VALIDOS.has(destino.split("|")[0])) contas51[String(cod)] = destino;
+    else ignorados++;
+  }
+  const linhas51 = Object.keys(subgrupos).length || Object.keys(contas51).length
+    ? { subgrupos, contas: contas51 }
+    : undefined;
+
   return {
     ok: true,
     ignorados,
@@ -186,6 +206,7 @@ export function lerPlano(texto) {
       codigos,
       regras,
       categorias,
+      ...(linhas51 ? { linhas51 } : {}),
     },
   };
 }

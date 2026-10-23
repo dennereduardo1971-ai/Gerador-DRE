@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { sugerirClassificacao } from "../lib/classify.js";
 import {
   POLITICA_PADRAO, coberturaCPC51, conciliar, contasMistas, deParaCPC51,
-  fazerCategoriaDe, montarDRE51,
+  fazerCategoriaDe, fazerLinha51De, montarDRE51,
 } from "../lib/cpc51.js";
 import { comparativo51 } from "../lib/linhasCPC51.js";
 
@@ -40,9 +40,14 @@ export function useCPC51({
      atual, não uma segunda decisão. Se cada demonstração resolvesse a
      modalidade por conta própria, uma correção manual na aba De-Para
      valeria numa e não na outra. */
+  /* A linha de apresentação do CPC 51 vem do plano (`linhas51`), sem
+     decisão manual: é o desenho da demonstração pedido pelo cliente, não
+     julgamento conta a conta. A DRE atual não a lê. */
+  const linha51De = useMemo(() => fazerLinha51De(plano), [plano]);
+
   const dre51 = useMemo(
-    () => montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe),
-    [contasResultado, grupoDe, categoriaDe, modalidadeDe]
+    () => montarDRE51(contasResultado, grupoDe, categoriaDe, modalidadeDe, linha51De),
+    [contasResultado, grupoDe, categoriaDe, modalidadeDe, linha51De]
   );
 
   const conciliacao = useMemo(
@@ -81,9 +86,9 @@ export function useCPC51({
   const dres51PorPeriodo = useMemo(
     () => (dresPorBalancete || []).map((d) => ({
       competencia: d.competencia, rotulo: d.rotulo,
-      dre51: montarDRE51(d.contas, grupoDe, categoriaDe, modalidadeDe),
+      dre51: montarDRE51(d.contas, grupoDe, categoriaDe, modalidadeDe, linha51De),
     })),
-    [dresPorBalancete, grupoDe, categoriaDe, modalidadeDe]
+    [dresPorBalancete, grupoDe, categoriaDe, modalidadeDe, linha51De]
   );
 
   const comparativo = useMemo(
